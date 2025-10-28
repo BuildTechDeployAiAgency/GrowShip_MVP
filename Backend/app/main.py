@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 # from app.routes import excel_routes
-from app.routes import excel_routes
+from app.routes import excel_routes, order_routes
 # from app.routes import excel_routes, pdf_routes
 
 app = FastAPI(
@@ -41,6 +41,7 @@ app.add_middleware(
 
 # Include routes
 app.include_router(excel_routes.router, prefix="/api/v1/excel", tags=["excel"])
+app.include_router(order_routes.router, tags=["orders"])
 # app.include_router(pdf_routes.router, prefix="/api/v1/pdf", tags=["pdf"])
 
 @app.get("/")
