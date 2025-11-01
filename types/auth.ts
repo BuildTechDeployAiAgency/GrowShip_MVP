@@ -48,6 +48,15 @@ export interface Organization {
   organization_type: "super_admin" | "brand" | "distributor" | "manufacturer";
   parent_organization_id?: string;
   is_active: boolean;
+  contact_email?: string;
+  contact_phone?: string;
+  website?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  zip_code?: string;
+  description?: string;
   created_at: string;
   updated_at: string;
 }
