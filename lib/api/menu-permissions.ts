@@ -16,6 +16,9 @@ import {
   Calendar,
   Settings,
   Users2,
+  Building2,
+  Factory,
+  Package,
 } from "lucide-react";
 
 const iconMap: Record<string, any> = {
@@ -33,6 +36,9 @@ const iconMap: Record<string, any> = {
   Calendar: Calendar,
   Users2: Users2,
   Settings: Settings,
+  Building2: Building2,
+  Factory: Factory,
+  Package: Package,
 };
 
 // Query keys for TanStack Query
