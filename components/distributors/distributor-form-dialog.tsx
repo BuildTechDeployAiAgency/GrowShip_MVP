@@ -39,6 +39,7 @@ interface DistributorFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   distributor?: Distributor | null;
+  onSuccess?: (distributor: Distributor) => void;
 }
 
 interface DistributorFormData {
@@ -79,6 +80,7 @@ export function DistributorFormDialog({
   open,
   onOpenChange,
   distributor,
+  onSuccess,
 }: DistributorFormDialogProps) {
   const { profile, canPerformAction } = useEnhancedAuth();
   const isSuperAdmin = canPerformAction("view_all_users");
@@ -259,11 +261,14 @@ export function DistributorFormDialog({
 
       if (distributor) {
         await updateDistributor(distributor.id, distributorData);
+        onOpenChange(false);
       } else {
-        await createDistributor(distributorData);
+        const newDistributor = await createDistributor(distributorData);
+        onOpenChange(false);
+        if (onSuccess) {
+          onSuccess(newDistributor);
+        }
       }
-
-      onOpenChange(false);
     } catch (err: any) {
       console.error("Error saving distributor:", err);
       setError(err?.message || "Failed to save distributor. Please try again.");

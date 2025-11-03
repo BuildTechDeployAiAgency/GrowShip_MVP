@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search,
   MoreHorizontal,
@@ -33,6 +34,7 @@ import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { MainLayout } from "@/components/layout/main-layout";
 import { DistributorFormDialog } from "@/components/distributors/distributor-form-dialog";
 import { DistributorDetailsDialog } from "@/components/distributors/distributor-details-dialog";
+import Link from "next/link";
 
 const statusColors: Record<string, string> = {
   active: "bg-green-100 text-green-800",
@@ -42,6 +44,7 @@ const statusColors: Record<string, string> = {
 
 export function DistributorsList() {
   const { profile, canPerformAction } = useEnhancedAuth();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
     status: "all",
@@ -73,13 +76,17 @@ export function DistributorsList() {
   };
 
   const handleView = (distributor: Distributor) => {
-    setSelectedDistributor(distributor);
-    setShowDetailsDialog(true);
+    router.push(`/distributors/${distributor.id}`);
   };
 
   const handleEdit = (distributor: Distributor) => {
     setSelectedDistributor(distributor);
     setShowEditDialog(true);
+  };
+
+  const handleCreateSuccess = (newDistributor: Distributor) => {
+    setShowCreateDialog(false);
+    router.push(`/distributors/${newDistributor.id}`);
   };
 
   if (loading) {
@@ -178,9 +185,12 @@ export function DistributorsList() {
                   distributors.map((distributor) => (
                     <tr key={distributor.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <Link
+                          href={`/distributors/${distributor.id}`}
+                          className="text-sm font-medium text-teal-600 hover:text-teal-800 hover:underline cursor-pointer"
+                        >
                           {distributor.name}
-                        </div>
+                        </Link>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {distributor.code || "-"}
@@ -257,6 +267,7 @@ export function DistributorsList() {
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         distributor={null}
+        onSuccess={handleCreateSuccess}
       />
 
       {/* Edit Distributor Dialog */}
