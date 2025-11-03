@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import mammoth from "mammoth";
 import dynamic from "next/dynamic";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { Spreadsheet as SpreadsheetComponent } from "react-spreadsheet";
 
 // Dynamically import react-spreadsheet
@@ -67,7 +67,7 @@ export function FilePreviewDialog({
   const [data, setData] = useState<any[]>([]);
   const [sheets, setSheets] = useState<string[]>([]);
   const [currentSheet, setCurrentSheet] = useState<string>("");
-  const [workbook, setWorkbook] = useState<any>(null);
+  const [workbook, setWorkbook] = useState<ExcelJS.Workbook | null>(null);
   const [useFallbackViewer, setUseFallbackViewer] = useState(false);
   const [iframeError, setIframeError] = useState(false);
 
@@ -116,23 +116,37 @@ export function FilePreviewDialog({
     });
   };
 
-  const loadSheetData = (workbook: any, sheetName: string) => {
-    const worksheet = workbook.Sheets[sheetName];
+  const loadSheetData = async (workbook: ExcelJS.Workbook, sheetName: string) => {
+    const worksheet = workbook.getWorksheet(sheetName);
 
     if (worksheet) {
-      // Use sheet_to_json with header: 1 to get array of arrays
-      const rawData = XLSX.utils.sheet_to_json(worksheet, {
-        header: 1,
-        defval: "", // Default value for empty cells
-        raw: false, // Don't use raw values, format them
-        blankrows: false, // Skip completely blank rows
+      // Convert worksheet to array of arrays
+      const rawData: any[][] = [];
+      
+      worksheet.eachRow((row, rowNumber) => {
+        const rowData: any[] = [];
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          // Get cell value, handling different types
+          let value = "";
+          if (cell.value !== null && cell.value !== undefined) {
+            if (typeof cell.value === "object" && "text" in cell.value) {
+              value = cell.value.text;
+            } else if (cell.value instanceof Date) {
+              value = cell.value.toISOString();
+            } else {
+              value = String(cell.value);
+            }
+          }
+          rowData.push(value);
+        });
+        rawData.push(rowData);
       });
 
       console.log("Raw data from sheet:", rawData);
       console.log("Number of rows:", rawData.length);
       console.log(
         "Max columns:",
-        Math.max(...rawData.map((row: any) => (row ? row.length : 0)))
+        Math.max(...rawData.map((row: any) => (row ? row.length : 0)), 0)
       );
 
       // Filter out completely empty rows
@@ -144,7 +158,7 @@ export function FilePreviewDialog({
       console.log("Filtered data:", filteredData);
       console.log("Filtered rows:", filteredData.length);
 
-      const spreadsheetData = convertToSpreadsheetData(filteredData as any[][]);
+      const spreadsheetData = convertToSpreadsheetData(filteredData);
       setSpreadsheetData(spreadsheetData);
       setData(spreadsheetData);
       setLoading(false);
@@ -175,21 +189,28 @@ export function FilePreviewDialog({
           const response = await fetch(fileUrl);
           const arrayBuffer = await response.arrayBuffer();
 
-          // For CSV files, use different options
-          const options: XLSX.ParsingOptions =
-            fileType === "csv"
-              ? { type: "buffer", raw: false }
-              : { type: "buffer" };
+          // Create a new workbook instance
+          const parsedWorkbook = new ExcelJS.Workbook();
 
-          const parsedWorkbook = XLSX.read(arrayBuffer, options);
+          // Load the workbook from buffer
+          if (fileType === "csv") {
+            // For CSV, convert buffer to text and read as CSV
+            const text = new TextDecoder().decode(arrayBuffer);
+            await parsedWorkbook.csv.read(text);
+          } else {
+            await parsedWorkbook.xlsx.load(arrayBuffer);
+          }
 
           setWorkbook(parsedWorkbook);
-          setSheets(parsedWorkbook.SheetNames);
+          
+          // Get sheet names
+          const sheetNames = parsedWorkbook.worksheets.map((ws) => ws.name);
+          setSheets(sheetNames);
 
-          if (parsedWorkbook.SheetNames.length > 0) {
-            const firstSheet = parsedWorkbook.SheetNames[0];
+          if (sheetNames.length > 0) {
+            const firstSheet = sheetNames[0];
             setCurrentSheet(firstSheet);
-            loadSheetData(parsedWorkbook, firstSheet);
+            await loadSheetData(parsedWorkbook, firstSheet);
           } else {
             setError("No sheets found in the spreadsheet");
             setLoading(false);
@@ -556,7 +577,9 @@ export function FilePreviewDialog({
                 value={currentSheet}
                 onChange={(e) => {
                   setCurrentSheet(e.target.value);
-                  loadSheetData(workbook, e.target.value);
+                  if (workbook) {
+                    loadSheetData(workbook, e.target.value);
+                  }
                 }}
                 className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
               >

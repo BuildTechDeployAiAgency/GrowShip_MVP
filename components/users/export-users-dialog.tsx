@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { UserProfile } from "@/types/auth";
 
@@ -92,43 +92,52 @@ export function ExportUsersDialog({
     }
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     setIsExporting(true);
     try {
       const formattedData = users.map(formatUserData);
 
       // Create a new workbook
-      const workbook = XLSX.utils.book_new();
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Users");
 
-      // Create a worksheet from the data
-      const worksheet = XLSX.utils.json_to_sheet(formattedData);
+      // Add headers
+      const headers = Object.keys(formattedData[0] || {});
+      worksheet.addRow(headers);
+
+      // Style header row
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE0E0E0" },
+      };
+
+      // Add data rows
+      formattedData.forEach((row) => {
+        worksheet.addRow(headers.map((header) => row[header] ?? ""));
+      });
 
       // Set column widths
-      const columnWidths = [
-        { wch: 20 }, // Full Name
-        { wch: 30 }, // Email
-        { wch: 12 }, // Status
-        { wch: 15 }, // Role
-        { wch: 20 }, // Company
-        { wch: 15 }, // Phone
-        { wch: 25 }, // Address
-        { wch: 15 }, // City
-        { wch: 10 }, // State
-        { wch: 15 }, // Country
-        { wch: 15 }, // Created Date
-        { wch: 15 }, // Last Updated
+      worksheet.columns = [
+        { width: 20 }, // Full Name
+        { width: 30 }, // Email
+        { width: 12 }, // Status
+        { width: 15 }, // Role
+        { width: 20 }, // Company
+        { width: 15 }, // Phone
+        { width: 25 }, // Address
+        { width: 15 }, // City
+        { width: 10 }, // State
+        { width: 15 }, // Country
+        { width: 15 }, // Created Date
+        { width: 15 }, // Last Updated
       ];
-      worksheet["!cols"] = columnWidths;
-
-      // Add the worksheet to the workbook
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
 
       // Generate Excel file
-      const excelBuffer = XLSX.write(workbook, {
-        bookType: "xlsx",
-        type: "array",
-      });
-      const blob = new Blob([excelBuffer], {
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
       saveAs(

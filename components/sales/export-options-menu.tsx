@@ -28,17 +28,17 @@ export function ExportOptionsMenu({
   data,
   fileName = "sales_dashboard_data",
 }: ExportOptionsMenuProps) {
-  const handleExport = (format: "excel" | "csv" | "json") => {
+  const handleExport = async (format: "excel" | "csv" | "json") => {
     try {
       const exportData = data || generateSampleSalesData();
 
       switch (format) {
         case "excel":
-          exportToExcel(exportData, fileName);
+          await exportToExcel(exportData, fileName);
           toast.success("Data exported to Excel successfully!");
           break;
         case "csv":
-          exportToCSV(exportData, fileName);
+          await exportToCSV(exportData, fileName);
           toast.success("Data exported to CSV successfully!");
           break;
         case "json":

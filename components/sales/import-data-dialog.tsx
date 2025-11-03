@@ -40,22 +40,55 @@ export function ImportDataDialog({ trigger, authToken, userId, onUploadSuccess }
   const [currentStep, setCurrentStep] = React.useState<string>("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  // Security constants
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+  const ALLOWED_EXTENSIONS = /\.(xlsx|xls|csv)$/i;
+  const ALLOWED_MIME_TYPES = [
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/csv",
+  ];
+
+  const validateFile = (file: File): string | null => {
+    // Check file extension
+    if (!ALLOWED_EXTENSIONS.test(file.name)) {
+      return "Invalid file type. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.";
+    }
+
+    // Check MIME type
+    if (!ALLOWED_MIME_TYPES.includes(file.type) && file.type !== "") {
+      return "Invalid file MIME type. Please upload a valid Excel or CSV file.";
+    }
+
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      return `File size exceeds the maximum limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB. Please upload a smaller file.`;
+    }
+
+    // Check for empty files
+    if (file.size === 0) {
+      return "File is empty. Please upload a valid file.";
+    }
+
+    // Sanitize filename
+    const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9._-]/g, "");
+    if (sanitizedFilename !== file.name) {
+      console.warn("Filename contains potentially unsafe characters:", file.name);
+    }
+
+    return null;
+  };
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const validTypes = [
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "text/csv",
-      ];
-
-      if (
-        !validTypes.includes(file.type) &&
-        !file.name.match(/\.(xlsx|xls|csv)$/)
-      ) {
-        setError(
-          "Please select a valid Excel (.xlsx, .xls) or CSV (.csv) file"
-        );
+      const validationError = validateFile(file);
+      if (validationError) {
+        setError(validationError);
+        // Clear the file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
         return;
       }
 
@@ -80,19 +113,9 @@ export function ImportDataDialog({ trigger, authToken, userId, onUploadSuccess }
     event.preventDefault();
     const file = event.dataTransfer.files?.[0];
     if (file) {
-      const validTypes = [
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "text/csv",
-      ];
-
-      if (
-        !validTypes.includes(file.type) &&
-        !file.name.match(/\.(xlsx|xls|csv)$/)
-      ) {
-        setError(
-          "Please select a valid Excel (.xlsx, .xls) or CSV (.csv) file"
-        );
+      const validationError = validateFile(file);
+      if (validationError) {
+        setError(validationError);
         return;
       }
 

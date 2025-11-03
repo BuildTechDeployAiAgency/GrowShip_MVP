@@ -231,6 +231,9 @@ function SalesReportsComponent() {
   const handleUpload = async () => {
     if (!file || !user) return;
 
+    // Security constants
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    const ALLOWED_EXTENSIONS = /\.(xlsx|xls|csv|pdf)$/i;
     const allowedTypes = [
       "text/csv",
       "application/vnd.ms-excel",
@@ -238,8 +241,21 @@ function SalesReportsComponent() {
       "application/pdf",
     ];
 
-    if (!allowedTypes.includes(file.type)) {
+    // Validate file type
+    if (!allowedTypes.includes(file.type) && !ALLOWED_EXTENSIONS.test(file.name)) {
       toast.error("Please upload a CSV, Excel, or PDF file");
+      return;
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error(`File size exceeds the maximum limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB`);
+      return;
+    }
+
+    // Check for empty files
+    if (file.size === 0) {
+      toast.error("File is empty. Please upload a valid file.");
       return;
     }
 

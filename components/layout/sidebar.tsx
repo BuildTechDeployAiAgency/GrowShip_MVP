@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { useUserMenuPermissions } from "@/hooks/use-menu-permissions";
 import { getStoredUserData, getStoredProfile } from "@/lib/localStorage";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   X,
   User,
@@ -224,7 +224,6 @@ function MenuItemWithChildren({
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const [isMounted, setIsMounted] = useState(false);
 
   const { user: authUser, profile: authProfile, signOut } = useAuth();
 
@@ -242,11 +241,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const menuError = menuData?.error || error?.message;
 
   const isPendingUser = profile?.user_status === "pending";
-
-  // Ensure consistent rendering between server and client
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -298,14 +292,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
 
           <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-            {!isMounted ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-teal-500" />
-                <span className="ml-2 text-sm text-gray-500">
-                  Loading menu...
-                </span>
-              </div>
-            ) : menuItems && menuItems.length > 0 ? (
+            {menuItems && menuItems.length > 0 ? (
               <>
                 {menuItems.map((item) => (
                   <MenuItemWithChildren
@@ -346,7 +333,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </nav>
 
           <div className="border-t border-gray-200 p-4">
-            {!isMounted ? (
+            {loading ? (
               <div className="flex items-center p-3">
                 <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mr-3 animate-pulse">
                   <User className="h-4 w-4 text-gray-400" />

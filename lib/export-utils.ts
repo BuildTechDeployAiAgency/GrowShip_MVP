@@ -2,7 +2,8 @@
  * Utility functions for exporting data in various formats
  */
 
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 interface ExportData {
   [key: string]: any;
@@ -11,25 +12,47 @@ interface ExportData {
 /**
  * Export data to Excel format
  */
-export function exportToExcel(data: ExportData[], fileName: string = "export") {
+export async function exportToExcel(data: ExportData[], fileName: string = "export") {
   try {
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Data");
 
-    // Auto-size columns
-    const maxWidth = data.reduce(
-      (w, r) => Math.max(w, JSON.stringify(r).length),
-      10
-    );
-    worksheet["!cols"] = Object.keys(data[0] || {}).map(() => ({
-      wch: maxWidth,
-    }));
+    // Add headers
+    if (data.length > 0) {
+      const headers = Object.keys(data[0]);
+      worksheet.addRow(headers);
 
-    XLSX.writeFile(
-      workbook,
-      `${fileName}_${new Date().toISOString().split("T")[0]}.xlsx`
-    );
+      // Style header row
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE0E0E0" },
+      };
+
+      // Add data rows
+      data.forEach((row) => {
+        worksheet.addRow(headers.map((header) => row[header] ?? ""));
+      });
+
+      // Auto-size columns
+      worksheet.columns.forEach((column) => {
+        let maxLength = 10;
+        column.eachCell({ includeEmpty: false }, (cell) => {
+          const cellValue = cell.value?.toString() || "";
+          maxLength = Math.max(maxLength, cellValue.length);
+        });
+        column.width = Math.min(maxLength + 2, 50); // Cap at 50 characters
+      });
+    }
+
+    // Generate buffer and download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    saveAs(blob, `${fileName}_${new Date().toISOString().split("T")[0]}.xlsx`);
   } catch (error) {
     console.error("Error exporting to Excel:", error);
     throw new Error("Failed to export data to Excel");
@@ -39,25 +62,24 @@ export function exportToExcel(data: ExportData[], fileName: string = "export") {
 /**
  * Export data to CSV format
  */
-export function exportToCSV(data: ExportData[], fileName: string = "export") {
+export async function exportToCSV(data: ExportData[], fileName: string = "export") {
   try {
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const csv = XLSX.utils.sheet_to_csv(worksheet);
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Data");
 
+    // Add headers and data
+    if (data.length > 0) {
+      const headers = Object.keys(data[0]);
+      worksheet.addRow(headers);
+      data.forEach((row) => {
+        worksheet.addRow(headers.map((header) => row[header] ?? ""));
+      });
+    }
+
+    // Convert to CSV
+    const csv = await worksheet.csv.writeBuffer();
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `${fileName}_${new Date().toISOString().split("T")[0]}.csv`
-    );
-    link.style.visibility = "hidden";
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    saveAs(blob, `${fileName}_${new Date().toISOString().split("T")[0]}.csv`);
   } catch (error) {
     console.error("Error exporting to CSV:", error);
     throw new Error("Failed to export data to CSV");

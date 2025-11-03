@@ -307,7 +307,8 @@ export function AuthProvider({
         };
       }
 
-      if (expectedRole && profile.role_type !== expectedRole) {
+      // Allow super_admin to bypass portal restrictions and access any portal
+      if (expectedRole && profile.role_type !== expectedRole && profile.role_type !== "super_admin") {
         await supabase.auth.signOut();
         return {
           error: {
