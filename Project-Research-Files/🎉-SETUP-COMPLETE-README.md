@@ -12,7 +12,7 @@ Your GrowShip MVP is now **fully configured** and running successfully on **port
 |-----------|--------|---------|
 | **Server** | ✅ RUNNING | http://localhost:3000 |
 | **Port** | ✅ SINGLE PORT | Port 3000 (confirmed) |
-| **Supabase URL** | ✅ VERIFIED | runefgxmlbsegacjrvvu.supabase.co |
+| **Supabase URL** | ✅ VERIFIED | your-project-id.supabase.co |
 | **Anon Key** | ✅ CONFIGURED | Working |
 | **Service Role Key** | ✅ CONFIGURED | Working |
 | **Middleware** | ✅ FIXED | Next.js 15 compatible |
@@ -122,7 +122,7 @@ Your `.env.local` file is now complete with all required credentials:
 
 ```env
 # ✅ All credentials verified and working
-NEXT_PUBLIC_SUPABASE_URL=https://runefgxmlbsegacjrvvu.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -165,7 +165,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ## 📊 Database Information
 
 **Supabase Project:** GrowShip-MVP  
-**Project ID:** runefgxmlbsegacjrvvu  
+**Project ID:** your-project-id  
 **Region:** ap-southeast-2 (Sydney)  
 **Database:** PostgreSQL 17.6  
 **Status:** ACTIVE_HEALTHY
@@ -394,7 +394,7 @@ Your GrowShip MVP is **production-ready** and running perfectly on port 3000!
 **Setup Completed:** November 3, 2024  
 **Version:** 0.1.0  
 **Next.js:** 15.5.6  
-**Supabase Project:** runefgxmlbsegacjrvvu  
+**Supabase Project:** your-project-id  
 **Port:** 3000
 
 🚀 **Happy coding!**

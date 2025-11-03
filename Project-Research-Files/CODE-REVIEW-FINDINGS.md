@@ -678,7 +678,7 @@ HTTPS_PROXY=your-proxy (if needed)
 
 ```yaml
 Project Name: GrowShip-MVP
-Project ID: runefgxmlbsegacjrvvu
+Project ID: your-project-id
 Organization ID: kcwdrjjojhfydxioovkz
 Region: ap-southeast-2 (Australia)
 Status: ACTIVE_HEALTHY ✅
@@ -1301,9 +1301,9 @@ Reference: https://supabase.com/docs/guides/auth/auth-mfa
 ### 3.11 Supabase Project Settings
 
 ```yaml
-Project ID: runefgxmlbsegacjrvvu
-Database Host: db.runefgxmlbsegacjrvvu.supabase.co
-API URL: https://runefgxmlbsegacjrvvu.supabase.co
+Project ID: your-project-id
+Database Host: db.your-project-id.supabase.co
+API URL: https://your-project-id.supabase.co
 Region: ap-southeast-2 (Australia)
 Postgres Version: 17.6.1.029
 Status: ACTIVE_HEALTHY ✅
@@ -1311,7 +1311,7 @@ Status: ACTIVE_HEALTHY ✅
 
 **Configuration Files Needed**:
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://runefgxmlbsegacjrvvu.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=[from Supabase dashboard]
 SUPABASE_SERVICE_ROLE_KEY=[from Supabase dashboard]
 ```
@@ -1374,7 +1374,7 @@ POST /api/v1/excel/upload (from Frontend)
 **1. Configure Supabase Credentials**
 ```bash
 # Update .env.local with actual Supabase keys
-NEXT_PUBLIC_SUPABASE_URL=https://runefgxmlbsegacjrvvu.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=[GET FROM DASHBOARD]
 SUPABASE_SERVICE_ROLE_KEY=[GET FROM DASHBOARD]
 ```
@@ -1848,7 +1848,7 @@ git push
 Frontend (Local):     http://localhost:3000
 Backend (Local):      http://localhost:8000
 Backend API Docs:     http://localhost:8000/docs
-Supabase Dashboard:   https://supabase.com/dashboard/project/runefgxmlbsegacjrvvu
+Supabase Dashboard:   https://supabase.com/dashboard/project/your-project-id
 GitHub Repository:    https://github.com/BuildTechDeployAiAgency/GrowShip_MVP
 ```
 

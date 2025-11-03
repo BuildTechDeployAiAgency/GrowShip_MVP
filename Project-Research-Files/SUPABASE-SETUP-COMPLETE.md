@@ -10,13 +10,13 @@ Your Supabase project is **active and healthy** with all database tables properl
 
 ### 1. Project Status
 - **Project Name:** GrowShip-MVP
-- **Project ID:** runefgxmlbsegacjrvvu
+- **Project ID:** your-project-id
 - **Status:** ACTIVE_HEALTHY ✅
 - **Region:** ap-southeast-2 (Sydney, Australia)
 - **Database:** PostgreSQL 17.6
 
 ### 2. Credentials Verified
-- ✅ **Project URL:** `https://runefgxmlbsegacjrvvu.supabase.co`
+- ✅ **Project URL:** `https://your-project-id.supabase.co`
 - ✅ **Anon Key:** Verified and working
 - ⚠️ **Service Role Key:** Still needs to be added
 
@@ -52,7 +52,7 @@ The Service Role Key is the only missing piece. Here's how to get it:
 
 1. **Go to Supabase Dashboard:**
    ```
-   https://supabase.com/dashboard/project/runefgxmlbsegacjrvvu/settings/api
+   https://supabase.com/dashboard/project/your-project-id/settings/api
    ```
 
 2. **Find the "Service Role Key" section:**
@@ -127,7 +127,7 @@ Password: [Your password]
 ### Your Keys:
 ```env
 # ✅ Safe to expose (client-side)
-NEXT_PUBLIC_SUPABASE_URL=https://runefgxmlbsegacjrvvu.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci... (safe to use)
 
 # ⚠️ MUST KEEP SECRET (server-side only)

@@ -9,7 +9,7 @@ Your GrowShip MVP is now fully configured and ready to use!
 ## 📊 Setup Summary
 
 ### Supabase Configuration ✅
-- **Project:** GrowShip-MVP (runefgxmlbsegacjrvvu)
+- **Project:** GrowShip-MVP (your-project-id)
 - **Status:** ACTIVE_HEALTHY
 - **Region:** ap-southeast-2 (Sydney)
 - **Database:** PostgreSQL 17.6
@@ -252,7 +252,7 @@ Reference these files for help:
 ### URLs
 - **Frontend:** http://localhost:3000
 - **Backend:** http://localhost:8000 (optional)
-- **Supabase:** https://supabase.com/dashboard/project/runefgxmlbsegacjrvvu
+- **Supabase:** https://supabase.com/dashboard/project/your-project-id
 
 ### Key Commands
 ```bash
