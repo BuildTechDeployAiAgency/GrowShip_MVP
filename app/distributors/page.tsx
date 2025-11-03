@@ -5,8 +5,6 @@ import { useRequireProfile } from "@/hooks/use-auth";
 import { DistributorsList } from "@/components/distributors/distributors-list";
 import { ProtectedPage } from "@/components/common/protected-page";
 import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export default function DistributorsPage() {
   const { user, profile, loading } = useRequireProfile();
@@ -27,12 +25,6 @@ export default function DistributorsPage() {
         <MainLayout
           pageTitle="Distributors"
           pageSubtitle="Manage distributor relationships"
-          actions={
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Distributor
-            </Button>
-          }
         >
           <DistributorsList />
         </MainLayout>

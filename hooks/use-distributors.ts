@@ -50,6 +50,7 @@ interface UseDistributorsOptions {
   filters: DistributorFilters;
   organizationId?: string;
   debounceMs?: number;
+  isSuperAdmin?: boolean;
 }
 
 interface UseDistributorsReturn {
@@ -66,12 +67,14 @@ interface UseDistributorsReturn {
 async function fetchDistributors(
   debouncedSearchTerm: string,
   filters: DistributorFilters,
-  organizationId?: string
+  organizationId?: string,
+  isSuperAdmin: boolean = false
 ): Promise<{ distributors: Distributor[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("distributors").select("*", { count: "exact" });
 
-  if (organizationId) {
+  // Only apply org_id filter if not Super Admin
+  if (organizationId && !isSuperAdmin) {
     query = query.eq("org_id", organizationId);
   }
 
@@ -104,6 +107,7 @@ export function useDistributors({
   filters,
   organizationId,
   debounceMs = 300,
+  isSuperAdmin = false,
 }: UseDistributorsOptions): UseDistributorsReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
   const queryClient = useQueryClient();
@@ -117,8 +121,8 @@ export function useDistributors({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["distributors", debouncedSearchTerm, filters, organizationId],
-    queryFn: () => fetchDistributors(debouncedSearchTerm, filters, organizationId),
+    queryKey: ["distributors", debouncedSearchTerm, filters, organizationId, isSuperAdmin],
+    queryFn: () => fetchDistributors(debouncedSearchTerm, filters, organizationId, isSuperAdmin),
     staleTime: 0,
   });
 
@@ -126,6 +130,11 @@ export function useDistributors({
     mutationFn: async (distributor: Partial<Distributor>): Promise<Distributor> => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
+
+      // Ensure org_id is set if not provided (for non-super-admin users)
+      if (!distributor.org_id && organizationId && !isSuperAdmin) {
+        distributor.org_id = organizationId;
+      }
 
       const distributorData = {
         ...distributor,

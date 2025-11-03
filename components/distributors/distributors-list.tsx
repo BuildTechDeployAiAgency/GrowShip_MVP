@@ -31,6 +31,8 @@ import {
 import { useDistributors, Distributor } from "@/hooks/use-distributors";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { MainLayout } from "@/components/layout/main-layout";
+import { DistributorFormDialog } from "@/components/distributors/distributor-form-dialog";
+import { DistributorDetailsDialog } from "@/components/distributors/distributor-details-dialog";
 
 const statusColors: Record<string, string> = {
   active: "bg-green-100 text-green-800",
@@ -39,11 +41,17 @@ const statusColors: Record<string, string> = {
 };
 
 export function DistributorsList() {
-  const { profile } = useEnhancedAuth();
+  const { profile, canPerformAction } = useEnhancedAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
     status: "all",
   });
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [selectedDistributor, setSelectedDistributor] = useState<Distributor | null>(null);
+
+  const isSuperAdmin = canPerformAction("view_all_users");
 
   const {
     distributors,
@@ -55,12 +63,23 @@ export function DistributorsList() {
     searchTerm,
     filters,
     organizationId: profile?.organization_id,
+    isSuperAdmin,
   });
 
   const handleDelete = async (distributorId: string) => {
     if (confirm("Are you sure you want to delete this distributor?")) {
       await deleteDistributor(distributorId);
     }
+  };
+
+  const handleView = (distributor: Distributor) => {
+    setSelectedDistributor(distributor);
+    setShowDetailsDialog(true);
+  };
+
+  const handleEdit = (distributor: Distributor) => {
+    setSelectedDistributor(distributor);
+    setShowEditDialog(true);
   };
 
   if (loading) {
@@ -112,6 +131,10 @@ export function DistributorsList() {
               <SelectItem value="archived">Archived</SelectItem>
             </SelectContent>
           </Select>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Building2 className="mr-2 h-4 w-4" />
+            Add Distributor
+          </Button>
         </div>
       </div>
 
@@ -195,11 +218,11 @@ export function DistributorsList() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleView(distributor)}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEdit(distributor)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
@@ -228,6 +251,33 @@ export function DistributorsList() {
           Showing {distributors.length} of {totalCount} distributors
         </div>
       )}
+
+      {/* Create Distributor Dialog */}
+      <DistributorFormDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        distributor={null}
+      />
+
+      {/* Edit Distributor Dialog */}
+      <DistributorFormDialog
+        open={showEditDialog}
+        onOpenChange={(open) => {
+          setShowEditDialog(open);
+          if (!open) setSelectedDistributor(null);
+        }}
+        distributor={selectedDistributor}
+      />
+
+      {/* View Details Dialog */}
+      <DistributorDetailsDialog
+        open={showDetailsDialog}
+        onOpenChange={(open) => {
+          setShowDetailsDialog(open);
+          if (!open) setSelectedDistributor(null);
+        }}
+        distributor={selectedDistributor}
+      />
     </div>
   );
 }
