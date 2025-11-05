@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-toastify";
 
-export type OrderStatus = "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
+export type OrderStatus = "pending" | "processing" | "shipped" | "delivered";
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "partially_paid";
 
 export interface Order {
@@ -175,14 +175,33 @@ export function useOrders({
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
-      const orderData = {
+      // Validate required fields
+      if (!order.brand_id) {
+        throw new Error("Brand ID is required to create an order");
+      }
+
+      if (!order.distributor_id) {
+        throw new Error("Distributor ID is required to create an order");
+      }
+
+      // Convert empty strings to null for optional UUID fields only
+      const cleanOrderData = {
         ...order,
+        customer_id: order.customer_id || null,
+        // Keep brand_id and distributor_id as-is since they're required
+      };
+
+      const orderData = {
+        ...cleanOrderData,
         user_id: user?.id,
         order_number: `ORD-${Date.now()}`,
-        order_date: new Date().toISOString(),
+        // Keep the order_date from the form if provided, otherwise use current date
+        order_date: order.order_date || new Date().toISOString(),
         created_by: user?.id,
         updated_by: user?.id,
       };
+
+      console.log("Creating order with data:", orderData);
 
       const { data: newOrder, error: createError } = await supabase
         .from("orders")
@@ -191,7 +210,8 @@ export function useOrders({
         .single();
 
       if (createError) {
-        throw createError;
+        console.error("Supabase error creating order:", createError);
+        throw new Error(createError.message || "Failed to create order");
       }
 
       return newOrder;

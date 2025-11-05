@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { useUserMenuPermissions } from "@/hooks/use-menu-permissions";
 import { getStoredUserData, getStoredProfile } from "@/lib/localStorage";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   User,
@@ -224,6 +224,7 @@ function MenuItemWithChildren({
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
 
   const { user: authUser, profile: authProfile, signOut } = useAuth();
 
@@ -242,9 +243,77 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const isPendingUser = profile?.user_status === "pending";
 
+  // Prevent hydration mismatch by only rendering client-specific content after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const handleSignOut = async () => {
     await signOut();
   };
+
+  // Show loading skeleton during SSR and initial mount
+  if (!mounted) {
+    return (
+      <>
+        {isOpen && (
+          <div className="fixed inset-0 z-40 lg:hidden">
+            <div
+              className="fixed inset-0 bg-gray-600 bg-opacity-75"
+              onClick={onClose}
+            />
+          </div>
+        )}
+        <div
+          className={`
+          fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 lg:h-full border-r border-gray-200
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
+        >
+          <div className="flex h-full flex-col">
+            <div className="flex h-16 items-center justify-between px-6 border-b border-gray-200">
+              <div className="flex items-center">
+                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center mr-3">
+                  <span className="text-white font-bold text-sm bg-teal-500 rounded-sm px-3 py-2">
+                    G
+                  </span>
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold text-black">GrowShip</h1>
+                  <p className="text-xs text-black/80">Business Portal</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="lg:hidden h-8 w-8 text-black hover:bg-white/20"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-teal-500" />
+                <span className="ml-2 text-sm text-gray-500">Loading...</span>
+              </div>
+            </nav>
+            <div className="border-t border-gray-200 p-4">
+              <div className="flex items-center p-3">
+                <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mr-3 animate-pulse">
+                  <User className="h-4 w-4 text-gray-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="h-4 bg-gray-200 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded animate-pulse w-2/3"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

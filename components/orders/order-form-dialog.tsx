@@ -93,7 +93,7 @@ export function OrderFormDialog({
   order,
   onSuccess,
 }: OrderFormDialogProps) {
-  const { profile, canPerformAction } = useEnhancedAuth();
+  const { profile, canPerformAction, profileLoading } = useEnhancedAuth();
   const isSuperAdmin = canPerformAction("view_all_users");
   const { createOrder, updateOrder } = useOrders({
     searchTerm: "",
@@ -115,7 +115,7 @@ export function OrderFormDialog({
 
   const [formData, setFormData] = useState<OrderFormData>({
     distributor_id: "",
-    brand_id: profile?.brand_id || "",
+    brand_id: "", // Will be auto-populated from selected distributor
     order_date: new Date().toISOString().split("T")[0],
     order_status: "pending", // Default to pending
     customer_name: "",
@@ -142,6 +142,18 @@ export function OrderFormDialog({
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Debug profile and brand_id
+  useEffect(() => {
+    if (open) {
+      console.log("OrderFormDialog Debug:", {
+        profileLoading,
+        profile,
+        brand_id: profile?.brand_id,
+        isSuperAdmin,
+      });
+    }
+  }, [open, profile, profileLoading, isSuperAdmin]);
 
   // Reset form when dialog opens/closes
   useEffect(() => {
@@ -173,11 +185,11 @@ export function OrderFormDialog({
         currency: order.currency || "USD",
         payment_status: order.payment_status,
       });
-    } else if (open) {
-      // Creating new order
+    } else if (open && !profileLoading) {
+      // Creating new order - brand will be auto-populated from distributor
       setFormData({
         distributor_id: "",
-        brand_id: profile?.brand_id || "",
+        brand_id: "", // Will be auto-populated from selected distributor
         order_date: new Date().toISOString().split("T")[0],
         order_status: "pending",
         customer_name: "",
@@ -188,11 +200,11 @@ export function OrderFormDialog({
         tax_total: 0,
         shipping_cost: 0,
         total_amount: 0,
-        currency: "USD",
+        currency: "AED",
         payment_status: "pending",
       });
     }
-  }, [open, order, profile?.brand_id]);
+  }, [open, order, profileLoading]);
 
   // Auto-populate fields when distributor is selected
   useEffect(() => {
@@ -204,6 +216,9 @@ export function OrderFormDialog({
       if (selectedDistributor) {
         setFormData((prev) => ({
           ...prev,
+          // Auto-populate brand_id from distributor (this is the fix!)
+          brand_id: selectedDistributor.brand_id,
+          
           // Auto-populate customer info
           customer_name: selectedDistributor.name,
           customer_email: selectedDistributor.contact_email,
@@ -326,6 +341,11 @@ export function OrderFormDialog({
       return;
     }
 
+    if (!formData.brand_id) {
+      toast.error("Brand information is missing. Please select a distributor first.");
+      return;
+    }
+
     if (!formData.order_date) {
       toast.error("Please select an order date");
       return;
@@ -339,6 +359,13 @@ export function OrderFormDialog({
     setIsSubmitting(true);
 
     try {
+      console.log("Form data before submission:", {
+        distributor_id: formData.distributor_id,
+        brand_id: formData.brand_id,
+        customer_name: formData.customer_name,
+        items: formData.items,
+      });
+
       const orderData: Partial<Order> = {
         distributor_id: formData.distributor_id,
         brand_id: formData.brand_id,
@@ -376,12 +403,16 @@ export function OrderFormDialog({
         payment_status: formData.payment_status,
       };
 
+      console.log("Submitting order data:", orderData);
+
       if (order) {
         // Update existing order
         await updateOrder(order.id, orderData);
       } else {
         // Create new order
-        await createOrder(orderData);
+        console.log("Calling createOrder...");
+        const result = await createOrder(orderData);
+        console.log("Order created successfully:", result);
       }
 
       onClose();
@@ -390,6 +421,11 @@ export function OrderFormDialog({
       }
     } catch (error: any) {
       console.error("Error submitting order:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        stack: error?.stack,
+        fullError: error,
+      });
       toast.error(error?.message || "Failed to save order");
     } finally {
       setIsSubmitting(false);
@@ -409,6 +445,15 @@ export function OrderFormDialog({
               : "Fill in the information to create a new order"}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Show info message about brand being auto-populated */}
+        {!order && !formData.brand_id && formData.distributor_id && (
+          <div className="mx-6 mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              Brand will be automatically linked from the selected distributor.
+            </p>
+          </div>
+        )}
 
         <ScrollArea className="flex-1 px-1 overflow-y-auto">
           <form onSubmit={handleSubmit} className="space-y-4 pr-4 pb-8">
@@ -483,11 +528,9 @@ export function OrderFormDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="confirmed">Confirmed</SelectItem>
                     <SelectItem value="processing">Processing</SelectItem>
                     <SelectItem value="shipped">Shipped</SelectItem>
                     <SelectItem value="delivered">Delivered</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -564,15 +607,29 @@ export function OrderFormDialog({
                     <Label htmlFor="quantity" className="text-sm">Quantity</Label>
                     <Input
                       id="quantity"
-                      type="number"
-                      min="1"
-                      value={currentItem.quantity}
-                      onChange={(e) =>
-                        setCurrentItem({
-                          ...currentItem,
-                          quantity: parseFloat(e.target.value) || 0,
-                        })
-                      }
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g., 10"
+                      value={currentItem.quantity === 0 ? "" : currentItem.quantity}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Allow empty, numbers, and decimals
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          const numValue = value === "" ? 0 : parseFloat(value);
+                          if (!isNaN(numValue) && numValue >= 0) {
+                            setCurrentItem({
+                              ...currentItem,
+                              quantity: numValue,
+                            });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Ensure at least 1 on blur if field is empty or 0
+                        if (e.target.value === "" || parseFloat(e.target.value) === 0) {
+                          setCurrentItem({ ...currentItem, quantity: 1 });
+                        }
+                      }}
                     />
                   </div>
 
@@ -580,16 +637,23 @@ export function OrderFormDialog({
                     <Label htmlFor="unit_price" className="text-sm">Unit Price ($)</Label>
                     <Input
                       id="unit_price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={currentItem.unit_price}
-                      onChange={(e) =>
-                        setCurrentItem({
-                          ...currentItem,
-                          unit_price: parseFloat(e.target.value) || 0,
-                        })
-                      }
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g., 99.99"
+                      value={currentItem.unit_price === 0 ? "" : currentItem.unit_price}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Allow empty, numbers, and decimals
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          const numValue = value === "" ? 0 : parseFloat(value);
+                          if (!isNaN(numValue) && numValue >= 0) {
+                            setCurrentItem({
+                              ...currentItem,
+                              unit_price: numValue,
+                            });
+                          }
+                        }
+                      }}
                     />
                   </div>
 
@@ -597,17 +661,23 @@ export function OrderFormDialog({
                     <Label htmlFor="discount" className="text-sm">Discount (%)</Label>
                     <Input
                       id="discount"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={currentItem.discount}
-                      onChange={(e) =>
-                        setCurrentItem({
-                          ...currentItem,
-                          discount: parseFloat(e.target.value) || 0,
-                        })
-                      }
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g., 10"
+                      value={currentItem.discount === 0 ? "" : currentItem.discount}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Allow empty, numbers, and decimals
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          const numValue = value === "" ? 0 : parseFloat(value);
+                          if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+                            setCurrentItem({
+                              ...currentItem,
+                              discount: numValue,
+                            });
+                          }
+                        }
+                      }}
                     />
                   </div>
 
@@ -615,17 +685,23 @@ export function OrderFormDialog({
                     <Label htmlFor="tax_rate" className="text-sm">Tax Rate (%)</Label>
                     <Input
                       id="tax_rate"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={currentItem.tax_rate}
-                      onChange={(e) =>
-                        setCurrentItem({
-                          ...currentItem,
-                          tax_rate: parseFloat(e.target.value) || 0,
-                        })
-                      }
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g., 5"
+                      value={currentItem.tax_rate === 0 ? "" : currentItem.tax_rate}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Allow empty, numbers, and decimals
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          const numValue = value === "" ? 0 : parseFloat(value);
+                          if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+                            setCurrentItem({
+                              ...currentItem,
+                              tax_rate: numValue,
+                            });
+                          }
+                        }
+                      }}
                     />
                   </div>
                 </div>
@@ -741,7 +817,12 @@ export function OrderFormDialog({
           <Button
             type="submit"
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={
+              isSubmitting || 
+              !formData.distributor_id || 
+              !formData.order_date ||
+              formData.items.length === 0
+            }
           >
             {isSubmitting
               ? "Saving..."

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   Search,
@@ -42,11 +43,9 @@ import { format } from "date-fns";
 
 const statusColors: Record<OrderStatus, string> = {
   pending: "bg-yellow-100 text-yellow-800",
-  confirmed: "bg-blue-100 text-blue-800",
   processing: "bg-purple-100 text-purple-800",
   shipped: "bg-indigo-100 text-indigo-800",
   delivered: "bg-green-100 text-green-800",
-  cancelled: "bg-red-100 text-red-800",
 };
 
 const paymentColors: Record<PaymentStatus, string> = {
@@ -62,6 +61,7 @@ interface OrdersListProps {
 }
 
 export function OrdersList({ onCreateOrder }: OrdersListProps) {
+  const router = useRouter();
   const { profile } = useEnhancedAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
@@ -106,6 +106,10 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
     setShowEditDialog(false);
     setSelectedOrder(null);
     refetch();
+  };
+
+  const handleViewDetails = (orderId: string) => {
+    router.push(`/orders/${orderId}`);
   };
 
   if (loading) {
@@ -153,11 +157,9 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="confirmed">Confirmed</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
           <Select
@@ -238,9 +240,12 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
                   orders.map((order) => (
                     <tr key={order.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <button
+                          onClick={() => handleViewDetails(order.id)}
+                          className="text-sm font-medium text-teal-600 hover:text-teal-800 hover:underline cursor-pointer"
+                        >
                           {order.order_number}
-                        </div>
+                        </button>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
@@ -282,7 +287,7 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setSelectedOrder(order)}>
+                            <DropdownMenuItem onClick={() => handleViewDetails(order.id)}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>

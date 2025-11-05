@@ -14,6 +14,9 @@ export default function OrdersPage() {
   const { user, profile, loading } = useRequireProfile();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
+  // Debug profile data
+  console.log("OrdersPage Profile:", { user, profile, brand_id: profile?.brand_id });
+
   if (loading) {
     return (
       <MainLayout pageTitle="Orders" pageSubtitle="Loading...">
