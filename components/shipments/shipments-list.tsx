@@ -60,7 +60,7 @@ export function ShipmentsList() {
   } = useShipments({
     searchTerm,
     filters,
-    organizationId: profile?.organization_id,
+    brandId: profile?.brand_id,
   });
 
   const handleStatusChange = async (shipmentId: string, status: ShipmentStatus) => {

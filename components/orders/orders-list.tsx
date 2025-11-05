@@ -37,6 +37,7 @@ import {
 import { useOrders, Order, OrderStatus, PaymentStatus } from "@/hooks/use-orders";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { MainLayout } from "@/components/layout/main-layout";
+import { OrderFormDialog } from "./order-form-dialog";
 import { format } from "date-fns";
 
 const statusColors: Record<OrderStatus, string> = {
@@ -56,7 +57,11 @@ const paymentColors: Record<PaymentStatus, string> = {
   partially_paid: "bg-yellow-100 text-yellow-800",
 };
 
-export function OrdersList() {
+interface OrdersListProps {
+  onCreateOrder?: () => void;
+}
+
+export function OrdersList({ onCreateOrder }: OrdersListProps) {
   const { profile } = useEnhancedAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
@@ -66,6 +71,7 @@ export function OrdersList() {
     dateRange: "all",
   });
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   const {
     orders,
@@ -74,20 +80,32 @@ export function OrdersList() {
     totalCount,
     deleteOrder,
     updateOrder,
+    refetch,
   } = useOrders({
     searchTerm,
     filters,
-    organizationId: profile?.organization_id,
+    brandId: profile?.brand_id,
   });
 
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
     await updateOrder(orderId, { order_status: status });
   };
 
+  const handleEdit = (order: Order) => {
+    setSelectedOrder(order);
+    setShowEditDialog(true);
+  };
+
   const handleDelete = async (orderId: string) => {
     if (confirm("Are you sure you want to delete this order?")) {
       await deleteOrder(orderId);
     }
+  };
+
+  const handleEditSuccess = () => {
+    setShowEditDialog(false);
+    setSelectedOrder(null);
+    refetch();
   };
 
   if (loading) {
@@ -268,7 +286,7 @@ export function OrdersList() {
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEdit(order)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
@@ -305,6 +323,17 @@ export function OrdersList() {
           Showing {orders.length} of {totalCount} orders
         </div>
       )}
+
+      {/* Edit Order Dialog */}
+      <OrderFormDialog
+        open={showEditDialog}
+        onClose={() => {
+          setShowEditDialog(false);
+          setSelectedOrder(null);
+        }}
+        order={selectedOrder}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   );
 }

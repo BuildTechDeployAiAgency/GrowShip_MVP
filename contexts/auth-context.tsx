@@ -37,7 +37,7 @@ interface AuthContextType {
     email: string,
     password: string,
     role: string,
-    organizationId?: string
+    brandId?: string
   ) => Promise<{ error: any }>;
   signIn: (
     email: string,
@@ -156,7 +156,7 @@ export function AuthProvider({
     email: string,
     password: string,
     role: string,
-    organizationId?: string
+    brandId?: string
   ) => {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -202,13 +202,13 @@ export function AuthProvider({
             };
           }
 
-          // Create user membership if organizationId is provided
-          if (organizationId) {
+          // Create user membership if brandId is provided
+          if (brandId) {
             const { error: membershipError } = await supabase
               .from("user_memberships")
               .insert({
                 user_id: data.user.id,
-                organization_id: organizationId,
+                brand_id: brandId,
                 role_name: (role + "_admin") as UserProfile["role_name"],
                 is_active: true,
               });

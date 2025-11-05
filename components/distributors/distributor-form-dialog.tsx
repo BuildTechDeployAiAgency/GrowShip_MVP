@@ -46,7 +46,7 @@ interface DistributorFormData {
   // Basic info
   name: string;
   code: string;
-  org_id: string;
+  brand_id: string;
 
   // Contact info
   contact_name: string;
@@ -88,14 +88,14 @@ export function DistributorFormDialog({
   const { createDistributor, updateDistributor } = useDistributors({
     searchTerm: "",
     filters: { status: "all" },
-    organizationId: isSuperAdmin ? undefined : profile?.organization_id,
+    brandId: isSuperAdmin ? undefined : profile?.brand_id,
     isSuperAdmin,
   });
 
   const [formData, setFormData] = useState<DistributorFormData>({
     name: "",
     code: "",
-    org_id: profile?.organization_id || "",
+    brand_id: profile?.brand_id || "",
     contact_name: "",
     contact_email: "",
     contact_phone: "",
@@ -127,7 +127,7 @@ export function DistributorFormDialog({
         setFormData({
           name: distributor.name || "",
           code: distributor.code || "",
-          org_id: distributor.org_id || "",
+          brand_id: distributor.brand_id || "",
           contact_name: distributor.contact_name || "",
           contact_email: distributor.contact_email || "",
           contact_phone: distributor.contact_phone || "",
@@ -157,7 +157,7 @@ export function DistributorFormDialog({
         setFormData({
           name: "",
           code: "",
-          org_id: profile?.organization_id || "",
+          brand_id: profile?.brand_id || "",
           contact_name: "",
           contact_email: "",
           contact_phone: "",
@@ -213,7 +213,7 @@ export function DistributorFormDialog({
       return false;
     }
 
-    if (!formData.org_id) {
+    if (!formData.brand_id) {
       setError("Organization is required");
       return false;
     }
@@ -235,7 +235,7 @@ export function DistributorFormDialog({
       const distributorData: Partial<Distributor> = {
         name: formData.name.trim(),
         code: formData.code.trim() || undefined,
-        org_id: formData.org_id,
+        brand_id: formData.brand_id,
         contact_name: formData.contact_name.trim() || undefined,
         contact_email: formData.contact_email.trim() || undefined,
         contact_phone: formData.contact_phone.trim() || undefined,
@@ -361,13 +361,13 @@ export function DistributorFormDialog({
 
                 {isSuperAdmin && (
                   <div>
-                    <Label htmlFor="org_id">
+                    <Label htmlFor="brand_id">
                       Organization <span className="text-red-500">*</span>
                     </Label>
                     <Select
-                      value={formData.org_id}
+                      value={formData.brand_id}
                       onValueChange={(value) =>
-                        setFormData({ ...formData, org_id: value })
+                        setFormData({ ...formData, brand_id: value })
                       }
                     >
                       <SelectTrigger>

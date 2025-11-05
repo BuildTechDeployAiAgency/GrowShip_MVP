@@ -52,7 +52,7 @@ interface DistributorFormData {
 
   // Additional
   message: string;
-  organization_id: string;
+  brand_id: string;
 }
 
 export function InviteDistributorDialog({
@@ -76,7 +76,7 @@ export function InviteDistributorDialog({
     country: "",
     zipCode: "",
     message: "",
-    organization_id: profile?.organization_id || "",
+    brand_id: profile?.brand_id || "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -150,7 +150,7 @@ export function InviteDistributorDialog({
         body: JSON.stringify({
           email: formData.contactEmail,
           role: formData.contactRole,
-          organization_id: formData.organization_id,
+          brand_id: formData.brand_id,
           companyInfo: {
             name: formData.companyName,
             email: formData.companyEmail,
@@ -209,7 +209,7 @@ export function InviteDistributorDialog({
         country: "",
         zipCode: "",
         message: "",
-        organization_id: "",
+        brand_id: "",
       });
       setCurrentStep(1);
       setError(null);
@@ -251,7 +251,7 @@ export function InviteDistributorDialog({
         country: "",
         zipCode: "",
         message: "",
-        organization_id: "",
+        brand_id: "",
       });
       setCurrentStep(1);
       setError(null);

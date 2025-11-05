@@ -146,7 +146,7 @@ export function EnhancedUsersManagement() {
           *,
           user_memberships!inner(
             id,
-            organization_id,
+            brand_id,
             role_name,
             is_active,
             organizations!inner(
@@ -160,7 +160,7 @@ export function EnhancedUsersManagement() {
       // Apply organization filter based on user's access level
       if (currentOrganization && !canPerformAction("view_all_users")) {
         query = query.eq(
-          "user_memberships.organization_id",
+          "user_memberships.brand_id",
           currentOrganization.id
         );
       }
@@ -190,7 +190,7 @@ export function EnhancedUsersManagement() {
       // Apply organization filter
       if (filters.organization !== "all") {
         query = query.eq(
-          "user_memberships.organization_id",
+          "user_memberships.brand_id",
           filters.organization
         );
       }
@@ -612,7 +612,7 @@ export function EnhancedUsersManagement() {
                             </DropdownMenuItem>
                             {canManageUser(
                               user.role_name,
-                              user.organization_id
+                              user.brand_id
                             ) && (
                               <>
                                 <DropdownMenuItem>
@@ -704,7 +704,7 @@ export function EnhancedUsersManagement() {
                             </DropdownMenuItem>
                             {canManageUser(
                               user.role_name,
-                              user.organization_id
+                              user.brand_id
                             ) && (
                               <>
                                 <DropdownMenuItem>

@@ -116,7 +116,7 @@ export function ExportUsersDialog({
 
       // Add data rows
       formattedData.forEach((row) => {
-        worksheet.addRow(headers.map((header) => row[header] ?? ""));
+        worksheet.addRow(headers.map((header) => (row as any)[header] ?? ""));
       });
 
       // Set column widths

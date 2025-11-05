@@ -37,13 +37,13 @@ export function DistributorDetailsDialog({
   const [orgName, setOrgName] = useState<string>("");
 
   useEffect(() => {
-    if (distributor?.org_id && open) {
+    if (distributor?.brand_id && open) {
       const loadOrgName = async () => {
         const supabase = createClient();
         const { data } = await supabase
           .from("organizations")
           .select("name")
-          .eq("id", distributor.org_id)
+          .eq("id", distributor.brand_id)
           .single();
         if (data) {
           setOrgName(data.name);
@@ -51,7 +51,7 @@ export function DistributorDetailsDialog({
       };
       loadOrgName();
     }
-  }, [distributor?.org_id, open]);
+  }, [distributor?.brand_id, open]);
 
   if (!distributor) return null;
 

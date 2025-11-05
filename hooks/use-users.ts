@@ -15,7 +15,7 @@ interface UserFilters {
 interface UseUsersOptions {
   searchTerm: string;
   filters: UserFilters;
-  organizationId?: string;
+  brandId?: string;
   debounceMs?: number;
 }
 
@@ -34,14 +34,14 @@ interface UseUsersReturn {
 async function fetchUsers(
   debouncedSearchTerm: string,
   filters: UserFilters,
-  organizationId?: string
+  brandId?: string
 ): Promise<{ users: UserProfile[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("user_profiles").select("*", { count: "exact" });
 
-  // Apply organization filter - only show users from the same organization
-  if (organizationId) {
-    query = query.eq("organization_id", organizationId);
+  // Apply brand filter - only show users from the same brand
+  if (brandId) {
+    query = query.eq("brand_id", brandId);
   }
 
   // Apply search filter
@@ -84,7 +84,7 @@ async function fetchUsers(
 export function useUsers({
   searchTerm,
   filters,
-  organizationId,
+  brandId,
   debounceMs = 300,
 }: UseUsersOptions): UseUsersReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -99,8 +99,8 @@ export function useUsers({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ["users", debouncedSearchTerm, filters, organizationId],
-    queryFn: () => fetchUsers(debouncedSearchTerm, filters, organizationId),
+    queryKey: ["users", debouncedSearchTerm, filters, brandId],
+    queryFn: () => fetchUsers(debouncedSearchTerm, filters, brandId),
     staleTime: 0,
   });
 

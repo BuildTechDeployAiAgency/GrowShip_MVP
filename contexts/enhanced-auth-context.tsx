@@ -50,7 +50,7 @@ interface EnhancedAuthContextType {
     email: string,
     password: string,
     role: string,
-    organizationId?: string
+    brandId?: string
   ) => Promise<{ error: any }>;
   signIn: (
     email: string,
@@ -62,8 +62,8 @@ interface EnhancedAuthContextType {
   resetPassword: (email: string) => Promise<{ error: any }>;
   updatePassword: (password: string) => Promise<{ error: any }>;
   uploadAvatar: (file: File) => Promise<{ error: any; url?: string }>;
-  switchOrganization: (organizationId: string) => Promise<void>;
-  canAccessOrganization: (organizationId: string) => boolean;
+  switchOrganization: (brandId: string) => Promise<void>;
+  canAccessOrganization: (brandId: string) => boolean;
   canManageUser: (
     targetUserRole: string,
     targetUserOrganizationId?: string
@@ -114,13 +114,13 @@ export function EnhancedAuthProvider({
   // Load user organizations and memberships
   const loadUserOrganizations = async (userId: string) => {
     try {
-      // Load user memberships with organization data
+      // Load user memberships with brand data
       const { data: membershipData, error: membershipError } = await supabase
         .from("user_memberships")
         .select(
           `
           *,
-          organizations!inner(
+          brands!inner(
             id,
             name,
             organization_type,
@@ -137,17 +137,17 @@ export function EnhancedAuthProvider({
         return;
       }
 
-      // Convert to Organization objects
+      // Convert to Organization objects (Brand objects)
       const orgs: Organization[] = (membershipData || []).map(
         (membership: any) => ({
-          id: membership.organizations.id,
-          name: membership.organizations.name,
-          slug: membership.organizations.name
+          id: membership.brands.id,
+          name: membership.brands.name,
+          slug: membership.brands.name
             .toLowerCase()
             .replace(/\s+/g, "-"),
-          organization_type: membership.organizations.organization_type,
-          is_active: membership.organizations.is_active,
-          created_at: membership.organizations.created_at,
+          organization_type: membership.brands.organization_type,
+          is_active: membership.brands.is_active,
+          created_at: membership.brands.created_at,
           updated_at: new Date().toISOString(),
         })
       );
@@ -254,7 +254,7 @@ export function EnhancedAuthProvider({
     email: string,
     password: string,
     role: string,
-    organizationId?: string
+    brandId?: string
   ) => {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -288,7 +288,7 @@ export function EnhancedAuthProvider({
               email: email,
               is_profile_complete: false,
               user_status: "approved" as UserProfile["user_status"],
-              organization_id: organizationId,
+              brand_id: brandId,
             });
 
           if (profileError) {
@@ -301,13 +301,13 @@ export function EnhancedAuthProvider({
             };
           }
 
-          // Create user membership if organizationId is provided
-          if (organizationId) {
+          // Create user membership if brandId is provided
+          if (brandId) {
             const { error: membershipError } = await supabase
               .from("user_memberships")
               .insert({
                 user_id: data.user.id,
-                organization_id: organizationId,
+                brand_id: brandId,
                 role_name: (role + "_admin") as UserProfile["role_name"],
                 is_active: true,
               });
@@ -466,7 +466,7 @@ export function EnhancedAuthProvider({
       });
 
       // Refresh organizations if organization-related data changed
-      if (profileData.organization_id || profileData.parent_organization_id) {
+      if (profileData.brand_id || profileData.parent_brand_id) {
         await loadUserOrganizations(user.id);
       }
 
@@ -539,22 +539,22 @@ export function EnhancedAuthProvider({
     }
   };
 
-  const switchOrganization = async (organizationId: string) => {
-    const org = organizations.find((o) => o.id === organizationId);
+  const switchOrganization = async (brandId: string) => {
+    const org = organizations.find((o) => o.id === brandId);
     if (org) {
       setCurrentOrganization(org);
-      localStorage.setItem("currentOrganizationId", organizationId);
+      localStorage.setItem("currentOrganizationId", brandId);
     }
   };
 
   // Permission checking methods
-  const canAccessOrganization = (organizationId: string): boolean => {
+  const canAccessOrganization = (brandId: string): boolean => {
     if (!profile) return false;
     const permissionChecker = createPermissionChecker(
       profile.role_name,
-      profile.organization_id
+      profile.brand_id
     );
-    return permissionChecker.canAccessOrganization(organizationId, "");
+    return permissionChecker.canAccessOrganization(brandId, "");
   };
 
   const canManageUser = (
@@ -564,7 +564,7 @@ export function EnhancedAuthProvider({
     if (!profile) return false;
     const permissionChecker = createPermissionChecker(
       profile.role_name,
-      profile.organization_id
+      profile.brand_id
     );
     return permissionChecker.canManageUser(
       targetUserRole as any,
@@ -579,7 +579,7 @@ export function EnhancedAuthProvider({
     if (!profile) return false;
     const permissionChecker = createPermissionChecker(
       profile.role_name,
-      profile.organization_id
+      profile.brand_id
     );
     return permissionChecker.canPerformAction(action, targetOrganizationId);
   };

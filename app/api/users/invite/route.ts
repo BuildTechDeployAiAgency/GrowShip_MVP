@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, role, message, organization_id } = body;
+    const { email, role, message, brand_id } = body;
 
     if (!email || !role) {
       return NextResponse.json(
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     console.log("Attempting to invite user:", {
       email,
       role,
-      organization_id,
+      brand_id,
       redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/invite`,
     });
 
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
         data: {
           role: role,
           invited_by: user.id,
-          organization_id: organization_id,
+          brand_id: brand_id,
         },
         redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/invite`,
       });
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
           email: email,
           is_profile_complete: false,
           user_status: "pending",
-          organization_id: organization_id,
+          brand_id: brand_id,
         });
 
       if (profileError) {
@@ -105,13 +105,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Create user membership if organization_id is provided
-      if (organization_id) {
+      // Create user membership if brand_id is provided
+      if (brand_id) {
         const { error: membershipError } = await adminSupabase
           .from("user_memberships")
           .insert({
             user_id: inviteData.user.id,
-            organization_id: organization_id,
+            brand_id: brand_id,
             role_name: role,
             is_active: true,
           });

@@ -14,7 +14,7 @@ interface CustomerFilters {
 interface UseCustomersOptions {
   searchTerm: string;
   filters: CustomerFilters;
-  organizationId?: string;
+  brandId?: string;
   debounceMs?: number;
 }
 
@@ -36,7 +36,7 @@ interface UseCustomersReturn {
 async function fetchCustomers(
   debouncedSearchTerm: string,
   filters: CustomerFilters,
-  organizationId?: string
+  brandId?: string
 ): Promise<{ customers: UserProfile[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("user_profiles").select("*", { count: "exact" });
@@ -45,8 +45,8 @@ async function fetchCustomers(
   query = query.ilike("role_name", "%customer%");
 
   // Apply organization filter - only show customers from the same organization
-  if (organizationId) {
-    query = query.eq("organization_id", organizationId);
+  if (brandId) {
+    query = query.eq("brand_id", brandId);
   }
 
   // Apply search filter
@@ -84,7 +84,7 @@ async function fetchCustomers(
 export function useCustomers({
   searchTerm,
   filters,
-  organizationId,
+  brandId,
   debounceMs = 300,
 }: UseCustomersOptions): UseCustomersReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -101,8 +101,8 @@ export function useCustomers({
 
   // Use React Query for fetching customers
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ["customers", debouncedSearchTerm, filters, organizationId],
-    queryFn: () => fetchCustomers(debouncedSearchTerm, filters, organizationId),
+    queryKey: ["customers", debouncedSearchTerm, filters, brandId],
+    queryFn: () => fetchCustomers(debouncedSearchTerm, filters, brandId),
     staleTime: 0, // Always refetch to ensure fresh data
   });
 

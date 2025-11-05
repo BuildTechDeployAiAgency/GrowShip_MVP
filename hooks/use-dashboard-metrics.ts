@@ -26,7 +26,7 @@ export interface DashboardMetrics {
 export interface DashboardMetricsFilters {
   tableSuffix?: string;
   userId?: string;
-  organizationId?: string;
+  brandId?: string;
   userRole?: string;
   year?: number;
   month?: number;
@@ -53,7 +53,7 @@ function toNumber(value: unknown, fallback: number = 0): number {
 async function fetchDashboardMetrics(
   filters: DashboardMetricsFilters = {},
   userRole?: string,
-  organizationId?: string
+  brandId?: string
 ): Promise<DashboardMetrics | null> {
   const supabase = createClient();
 
@@ -63,7 +63,7 @@ async function fetchDashboardMetrics(
     p_year: filters.year || new Date().getFullYear(),
     p_month: filters.month || new Date().getMonth() + 1,
     p_user_role: userRole || "",
-    p_organization_id: organizationId || null,
+    p_brand_id: brandId || null,
   };
 
   const { data, error } = await supabase.rpc(
@@ -120,13 +120,13 @@ export function useDashboardMetrics({
       "dashboard-metrics",
       filters,
       profile?.role_name,
-      profile?.organization_id,
+      profile?.brand_id,
     ],
     queryFn: () =>
       fetchDashboardMetrics(
         filters,
         profile?.role_name,
-        profile?.organization_id
+        profile?.brand_id
       ),
     enabled: enabled && !!user && !!profile,
     staleTime: 5 * 60 * 1000,

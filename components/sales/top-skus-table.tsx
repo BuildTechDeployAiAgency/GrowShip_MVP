@@ -20,7 +20,7 @@ export function TopSkusTable({ filters }: TopSkusTableProps = {}) {
 
   // Brand admins use organization-based table, others use personal table
   const tableSuffix = profile?.role_name?.startsWith("brand_admin")
-    ? `sales_documents_view_${profile.organization_id?.replace(/-/g, "_")}`
+    ? `sales_documents_view_${profile.brand_id?.replace(/-/g, "_")}`
     : `sales_documents_${user?.id?.replace(/-/g, "_")}`;
 
   // Merge component filters with auth-based filters and global date filters
@@ -29,7 +29,7 @@ export function TopSkusTable({ filters }: TopSkusTableProps = {}) {
       ...filters,
       tableSuffix: filters?.tableSuffix || tableSuffix,
       userId: filters?.userId || user?.id,
-      organizationId: profile?.organization_id,
+      brandId: profile?.brand_id,
       userRole: profile?.role_name,
       year: filters?.year || dateFilters.year,
       month: filters?.month || dateFilters.month,
@@ -38,7 +38,7 @@ export function TopSkusTable({ filters }: TopSkusTableProps = {}) {
       filters,
       tableSuffix,
       user?.id,
-      profile?.organization_id,
+      profile?.brand_id,
       profile?.role_name,
       dateFilters.year,
       dateFilters.month,

@@ -13,7 +13,8 @@ export interface Order {
   order_number: string;
   order_date: string;
   user_id: string;
-  organization_id: string;
+  brand_id: string;
+  distributor_id?: string;
   customer_id?: string;
   customer_name: string;
   customer_email?: string;
@@ -52,12 +53,13 @@ interface OrderFilters {
   paymentStatus: string;
   customerType: string;
   dateRange: string;
+  distributorId?: string;
 }
 
 interface UseOrdersOptions {
   searchTerm: string;
   filters: OrderFilters;
-  organizationId?: string;
+  brandId?: string;
   debounceMs?: number;
 }
 
@@ -76,13 +78,17 @@ interface UseOrdersReturn {
 async function fetchOrders(
   debouncedSearchTerm: string,
   filters: OrderFilters,
-  organizationId?: string
+  brandId?: string
 ): Promise<{ orders: Order[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("orders").select("*", { count: "exact" });
 
-  if (organizationId) {
-    query = query.eq("organization_id", organizationId);
+  if (brandId) {
+    query = query.eq("brand_id", brandId);
+  }
+
+  if (filters.distributorId && filters.distributorId !== "all") {
+    query = query.eq("distributor_id", filters.distributorId);
   }
 
   if (debouncedSearchTerm.trim()) {
@@ -144,7 +150,7 @@ async function fetchOrders(
 export function useOrders({
   searchTerm,
   filters,
-  organizationId,
+  brandId,
   debounceMs = 300,
 }: UseOrdersOptions): UseOrdersReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -159,8 +165,8 @@ export function useOrders({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ["orders", debouncedSearchTerm, filters, organizationId],
-    queryFn: () => fetchOrders(debouncedSearchTerm, filters, organizationId),
+    queryKey: ["orders", debouncedSearchTerm, filters, brandId],
+    queryFn: () => fetchOrders(debouncedSearchTerm, filters, brandId),
     staleTime: 0,
   });
 

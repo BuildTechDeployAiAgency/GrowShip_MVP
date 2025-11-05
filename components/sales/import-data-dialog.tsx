@@ -142,7 +142,7 @@ export function ImportDataDialog({ trigger, authToken, userId, onUploadSuccess }
     formData.append('file', selectedFile);
     if (user?.id) {
       formData.append('user_id', user.id);
-      formData.append('organization_id', user.id);
+      formData.append('brand_id', user.id);
     }
 
     try {

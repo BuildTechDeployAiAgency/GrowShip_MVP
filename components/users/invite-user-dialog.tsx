@@ -104,7 +104,7 @@ export function InviteUserDialog({
           email: formData.email,
           role: formData.role,
           message: formData.message,
-          organization_id: currentOrganization?.id || profile?.organization_id,
+          brand_id: currentOrganization?.id || profile?.brand_id,
         }),
       });
 

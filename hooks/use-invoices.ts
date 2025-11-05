@@ -12,7 +12,8 @@ export interface Invoice {
   invoice_number: string;
   order_id?: string;
   user_id?: string;
-  organization_id: string;
+  brand_id: string;
+  distributor_id?: string;
   customer_id?: string;
   customer_name: string;
   customer_email?: string;
@@ -38,12 +39,13 @@ export interface Invoice {
 interface InvoiceFilters {
   paymentStatus: string;
   dateRange: string;
+  distributorId?: string;
 }
 
 interface UseInvoicesOptions {
   searchTerm: string;
   filters: InvoiceFilters;
-  organizationId?: string;
+  brandId?: string;
   debounceMs?: number;
 }
 
@@ -61,13 +63,17 @@ interface UseInvoicesReturn {
 async function fetchInvoices(
   debouncedSearchTerm: string,
   filters: InvoiceFilters,
-  organizationId?: string
+  brandId?: string
 ): Promise<{ invoices: Invoice[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("invoices").select("*", { count: "exact" });
 
-  if (organizationId) {
-    query = query.eq("organization_id", organizationId);
+  if (brandId) {
+    query = query.eq("brand_id", brandId);
+  }
+
+  if (filters.distributorId && filters.distributorId !== "all") {
+    query = query.eq("distributor_id", filters.distributorId);
   }
 
   if (debouncedSearchTerm.trim()) {
@@ -121,7 +127,7 @@ async function fetchInvoices(
 export function useInvoices({
   searchTerm,
   filters,
-  organizationId,
+  brandId,
   debounceMs = 300,
 }: UseInvoicesOptions): UseInvoicesReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -136,8 +142,8 @@ export function useInvoices({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["invoices", debouncedSearchTerm, filters, organizationId],
-    queryFn: () => fetchInvoices(debouncedSearchTerm, filters, organizationId),
+    queryKey: ["invoices", debouncedSearchTerm, filters, brandId],
+    queryFn: () => fetchInvoices(debouncedSearchTerm, filters, brandId),
     staleTime: 0,
   });
 

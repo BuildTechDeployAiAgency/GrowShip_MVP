@@ -39,7 +39,7 @@ export async function exportToExcel(data: ExportData[], fileName: string = "expo
       // Auto-size columns
       worksheet.columns.forEach((column) => {
         let maxLength = 10;
-        column.eachCell({ includeEmpty: false }, (cell) => {
+        column?.eachCell?.({ includeEmpty: false }, (cell) => {
           const cellValue = cell.value?.toString() || "";
           maxLength = Math.max(maxLength, cellValue.length);
         });
@@ -64,21 +64,27 @@ export async function exportToExcel(data: ExportData[], fileName: string = "expo
  */
 export async function exportToCSV(data: ExportData[], fileName: string = "export") {
   try {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Data");
-
-    // Add headers and data
-    if (data.length > 0) {
-      const headers = Object.keys(data[0]);
-      worksheet.addRow(headers);
-      data.forEach((row) => {
-        worksheet.addRow(headers.map((header) => row[header] ?? ""));
-      });
+    if (data.length === 0) {
+      throw new Error("No data to export");
     }
 
-    // Convert to CSV
-    const csv = await worksheet.csv.writeBuffer();
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const headers = Object.keys(data[0]);
+    
+    // Convert to CSV manually
+    const csvContent = data.map((row) =>
+      headers.map((header) => {
+        const value = row[header] ?? "";
+        // Escape quotes and wrap in quotes if contains comma, quote, or newline
+        const stringValue = String(value);
+        if (stringValue.includes(",") || stringValue.includes('"') || stringValue.includes("\n")) {
+          return `"${stringValue.replace(/"/g, '""')}"`;
+        }
+        return stringValue;
+      }).join(",")
+    ).join("\n");
+    
+    const csvWithHeaders = [headers.join(","), csvContent].join("\n");
+    const blob = new Blob([csvWithHeaders], { type: "text/csv;charset=utf-8;" });
     saveAs(blob, `${fileName}_${new Date().toISOString().split("T")[0]}.csv`);
   } catch (error) {
     console.error("Error exporting to CSV:", error);

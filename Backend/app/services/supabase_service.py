@@ -28,20 +28,20 @@ class SupabaseService:
         
         self.storage_bucket = "sales-reports"
     
-    async def upload_file_to_storage(self, file_content: bytes, filename: str, user_id: str, organization_id: str, document_id: str = None) -> str:
+    async def upload_file_to_storage(self, file_content: bytes, filename: str, user_id: str, brand_id: str, document_id: str = None) -> str:
         """Upload file to Supabase storage with user_id/document_id folder structure"""
         try:
             # Create file path with organization/user/document structure
             if document_id:
-                file_path = f"{organization_id}/{user_id}/{document_id}/{filename}"
+                file_path = f"{brand_id}/{user_id}/{document_id}/{filename}"
             else:
-                file_path = f"{organization_id}/{user_id}/{filename}"
+                file_path = f"{brand_id}/{user_id}/{filename}"
             
             print(f"[INFO] Attempting to upload file to storage: {file_path}")
             
             # Check if file already exists
             try:
-                existing_files = self.client.storage.from_(self.storage_bucket).list(path=f"{organization_id}/{user_id}/{document_id}" if document_id else f"{organization_id}/{user_id}")
+                existing_files = self.client.storage.from_(self.storage_bucket).list(path=f"{brand_id}/{user_id}/{document_id}" if document_id else f"{brand_id}/{user_id}")
                 if any(file['name'] == filename for file in existing_files):
                     print(f"[WARNING] File already exists, skipping upload: {filename}")
                     return file_path
@@ -66,8 +66,8 @@ class SupabaseService:
             print(f"[ERROR] Error uploading file to storage: {str(e)}")
             raise Exception(f"Error uploading file to storage: {str(e)}")
     
-    async def check_duplicate_document(self, document_name: str, user_id: str, organization_id: str) -> Optional[Dict[str, Any]]:
-        """Check if document already exists based on document_name, user_id, and organization_id with status"""
+    async def check_duplicate_document(self, document_name: str, user_id: str, brand_id: str) -> Optional[Dict[str, Any]]:
+        """Check if document already exists based on document_name, user_id, and brand_id with status"""
         try:
             print(f"[INFO] Checking for duplicate document: {document_name}")
             
@@ -75,7 +75,7 @@ class SupabaseService:
             result = self.client.table("sales_documents_storage")\
                 .select("document_id, document_name, status, created_at")\
                 .eq('user_id', user_id)\
-                .eq('organization_id', organization_id)\
+                .eq('brand_id', brand_id)\
                 .eq('document_name', document_name)\
                 .order('created_at', desc=True)\
                 .limit(1)\
@@ -100,7 +100,7 @@ class SupabaseService:
             print(f"[ERROR] Error checking for duplicate document: {str(e)}")
             return None
     
-    async def insert_document_storage_metadata(self, document_name: str, user_id: str, organization_id: str, 
+    async def insert_document_storage_metadata(self, document_name: str, user_id: str, brand_id: str, 
                                              document_id: str, status: str = "processing", document_path: str = None) -> bool:
         """Insert document metadata into sales_documents_storage table with status"""
         try:
@@ -110,7 +110,7 @@ class SupabaseService:
             document_data = {
                 "document_name": document_name,
                 "user_id": user_id,
-                "organization_id": organization_id,
+                "brand_id": brand_id,
                 "document_id": document_id,
                 "status": status
             }
@@ -159,7 +159,7 @@ class SupabaseService:
     
     
     async def insert_document_metadata(self, filename: str, file_path: str, file_size: int, 
-                                     content_type: str, user_id: str, organization_id: str, 
+                                     content_type: str, user_id: str, brand_id: str, 
                                      upload_status: str = "uploaded", processing_status: str = "pending",
                                      total_records: int = 0, processed_records: int = 0, 
                                      error_message: str = None) -> str:
@@ -174,7 +174,7 @@ class SupabaseService:
                 "file_size": file_size,
                 "content_type": content_type,
                 "user_id": user_id,
-                "organization_id": organization_id,
+                "brand_id": brand_id,
                 "upload_status": upload_status,
                 "processing_status": processing_status,
                 "total_records": total_records,
@@ -185,7 +185,7 @@ class SupabaseService:
             # Insert or update document metadata
             result = self.client.table("sales_documents").upsert(
                 document_data,
-                on_conflict="filename,user_id,organization_id"
+                on_conflict="filename,user_id,brand_id"
             ).execute()
             
             # Check if insertion was successful
@@ -232,7 +232,7 @@ class SupabaseService:
             print(f"[ERROR] Error updating document processing status: {str(e)}")
             return False
     
-    async def get_user_documents(self, user_id: str, organization_id: str, limit: int = 50, offset: int = 0) -> Dict[str, Any]:
+    async def get_user_documents(self, user_id: str, brand_id: str, limit: int = 50, offset: int = 0) -> Dict[str, Any]:
         """Get user's uploaded documents with pagination"""
         try:
             print(f"[INFO] Retrieving documents for user: {user_id}")
@@ -240,7 +240,7 @@ class SupabaseService:
             result = self.client.table("sales_documents")\
                 .select("*")\
                 .eq('user_id', user_id)\
-                .eq('organization_id', organization_id)\
+                .eq('brand_id', brand_id)\
                 .order('created_at', desc=True)\
                 .range(offset, offset + limit - 1)\
                 .execute()
@@ -287,10 +287,10 @@ class SupabaseService:
             print(f"[ERROR] Error creating user table: {str(e)}")
             return False
 
-    async def create_organization_view(self, organization_id: str, user_id: str) -> bool:
+    async def create_brand_view(self, brand_id: str, user_id: str) -> bool:
         """Create organization-specific view for admin to see all users' data"""
         try:
-            view_name = f"sales_documents_view_{organization_id.replace('-', '_')}"
+            view_name = f"sales_documents_view_{brand_id.replace('-', '_')}"
             user_table = f"sales_documents_{user_id.replace('-', '_')}"
             
             print(f"[INFO] Creating organization view: {view_name} from user table: {user_table}")
@@ -304,7 +304,7 @@ class SupabaseService:
                 print(f"[INFO] View {view_name} doesn't exist, creating it...")
                         
             # Execute view creation using raw SQL
-            data, error = self.client.rpc('create_organization_view', {'organization_id': organization_id, 'view_name': view_name, 'user_table': user_table}).execute()
+            data, error = self.client.rpc('create_brand_view', {'brand_id': brand_id, 'view_name': view_name, 'user_table': user_table}).execute()
             if error:
                 print(f"[ERROR] Error creating view: {error}")
                 return False
@@ -316,32 +316,32 @@ class SupabaseService:
             print(f"[ERROR] Error creating organization view: {str(e)}")
             return False
 
-    async def check_organization_view_exists(self, organization_id: str) -> bool:
+    async def check_organization_view_exists(self, brand_id: str) -> bool:
         """Check if organization view exists"""
         try:
-            view_name = f"sales_documents_view_{organization_id.replace('-', '_')}"
+            view_name = f"sales_documents_view_{brand_id.replace('-', '_')}"
             result = self.client.table(view_name).select("id").limit(1).execute()
             return True
         except Exception as e:
             print(f"[INFO] View {view_name} doesn't exist: {e}")
             return False
 
-    async def get_all_user_tables_for_organization(self, organization_id: str) -> List[str]:
+    async def get_all_user_tables_for_organization(self, brand_id: str) -> List[str]:
         """Get all user tables that exist for an organization"""
         try:
             # Get all users in the organization from sales_documents table
             result = self.client.table("user_memberships")\
                 .select("user_id")\
-                .eq('organization_id', organization_id)\
+                .eq('brand_id', brand_id)\
                 .execute()
             
             if not hasattr(result, 'data') or not result.data:
-                print(f"[INFO] No users found for organization {organization_id}")
+                print(f"[INFO] No users found for organization {brand_id}")
                 return []
             
             # Get unique user IDs
             user_ids = list(set([row['user_id'] for row in result.data]))
-            print(f"[INFO] Found {len(user_ids)} unique users for organization {organization_id}")
+            print(f"[INFO] Found {len(user_ids)} unique users for organization {brand_id}")
             
             # Check which user tables actually exist
             existing_tables = []
@@ -362,18 +362,18 @@ class SupabaseService:
             print(f"[ERROR] Error getting user tables for organization: {str(e)}")
             return []
 
-    async def create_or_replace_materialized_view(self, organization_id: str) -> bool:
+    async def create_or_replace_materialized_view(self, brand_id: str) -> bool:
         """Create or replace materialized view for organization with all user tables"""
         try:
-            view_name = f"sales_documents_view_{organization_id.replace('-', '_')}"
+            view_name = f"sales_documents_view_{brand_id.replace('-', '_')}"
             
             print(f"[INFO] Creating/updating materialized view: {view_name}")
             
             # Get all user tables for this organization
-            user_tables = await self.get_all_user_tables_for_organization(organization_id)
+            user_tables = await self.get_all_user_tables_for_organization(brand_id)
             
             if not user_tables:
-                print(f"[WARNING] No user tables found for organization {organization_id}")
+                print(f"[WARNING] No user tables found for organization {brand_id}")
                 return False
             
             print(f"[INFO] Found {len(user_tables)} user tables: {user_tables}")
@@ -385,7 +385,7 @@ class SupabaseService:
                 SELECT 
                     id,
                     user_id,
-                    organization_id,
+                    brand_id,
                     product_name,
                     year,
                     month,
@@ -481,23 +481,23 @@ class SupabaseService:
             print(f"[ERROR] Error creating materialized view: {str(e)}")
             return False
 
-    async def check_materialized_view_exists(self, organization_id: str) -> bool:
+    async def check_materialized_view_exists(self, brand_id: str) -> bool:
         """Check if materialized view exists"""
         try:
-            view_name = f"sales_documents_view_{organization_id.replace('-', '_')}"
+            view_name = f"sales_documents_view_{brand_id.replace('-', '_')}"
             result = self.client.table(view_name).select("id").limit(1).execute()
             return True
         except Exception as e:
             print(f"[INFO] Materialized view {view_name} doesn't exist: {e}")
             return False
 
-    async def get_materialized_view_info(self, organization_id: str) -> Dict[str, Any]:
+    async def get_materialized_view_info(self, brand_id: str) -> Dict[str, Any]:
         """Get information about the materialized view"""
         try:
-            view_name = f"sales_documents_view_{organization_id.replace('-', '_')}"
+            view_name = f"sales_documents_view_{brand_id.replace('-', '_')}"
             
             # Check if view exists
-            exists = await self.check_materialized_view_exists(organization_id)
+            exists = await self.check_materialized_view_exists(brand_id)
             
             if not exists:
                 return {
@@ -511,7 +511,7 @@ class SupabaseService:
             record_count = result.count if hasattr(result, 'count') else 0
             
             # Get user tables that should be included
-            user_tables = await self.get_all_user_tables_for_organization(organization_id)
+            user_tables = await self.get_all_user_tables_for_organization(brand_id)
             
             return {
                 "exists": True,
@@ -525,14 +525,14 @@ class SupabaseService:
             print(f"[ERROR] Error getting materialized view info: {str(e)}")
             return {
                 "exists": False,
-                "view_name": f"sales_documents_view_{organization_id.replace('-', '_')}",
+                "view_name": f"sales_documents_view_{brand_id.replace('-', '_')}",
                 "error": str(e)
             }
 
-    async def is_user_table_in_view(self, organization_id: str, user_id: str) -> bool:
+    async def is_user_table_in_view(self, brand_id: str, user_id: str) -> bool:
         """Check if user table is already included in the organization view"""
         try:
-            view_name = f"sales_documents_view_{organization_id.replace('-', '_')}"
+            view_name = f"sales_documents_view_{brand_id.replace('-', '_')}"
             user_table = f"sales_documents_{user_id.replace('-', '_')}"
             
             # First check if the user table exists
@@ -567,14 +567,14 @@ class SupabaseService:
             return False
 
     
-    async def store_mapped_data(self, organization_id: str, user_id: str, mapped_data: pd.DataFrame, document_id: str = None) -> bool:
+    async def store_mapped_data(self, brand_id: str, user_id: str, mapped_data: pd.DataFrame, document_id: str = None) -> bool:
         """Store mapped data to user table and update materialized view"""
         try:
             # Create user table if it doesn't exist
             await self.create_user_table(user_id)
             
             table_name = f"sales_documents_{user_id.replace('-', '_')}"
-            materialized_view_name = f"sales_documents_view_{organization_id.replace('-', '_')}"
+            materialized_view_name = f"sales_documents_view_{brand_id.replace('-', '_')}"
             
             print(f"[INFO] Storing mapped data to user table: {table_name}")
             print(f"[INFO] Materialized view: {materialized_view_name}")
@@ -586,7 +586,7 @@ class SupabaseService:
             for _, row in mapped_data.iterrows():
                 record = {
                     'user_id': user_id,
-                    'organization_id': organization_id,
+                    'brand_id': brand_id,
                     'document_id': document_id,  # Add document_id to each record
                     'product_name': row.get('Category or product name') or row.get('Product Name'),
                     'country': row.get('Country'),
@@ -623,7 +623,7 @@ class SupabaseService:
             
             # Create or update materialized view after data insertion
             print(f"[INFO] Creating/updating materialized view with all user tables")
-            materialized_view_success = await self.create_or_replace_materialized_view(organization_id)
+            materialized_view_success = await self.create_or_replace_materialized_view(brand_id)
             
             if materialized_view_success:
                 print(f"[SUCCESS] Data stored in user table {table_name} and materialized view {materialized_view_name} updated")
@@ -654,10 +654,10 @@ class SupabaseService:
             
             return False
     
-    async def create_business_functions(self, organization_id: str) -> bool:
+    async def create_business_functions(self, brand_id: str) -> bool:
         """Create Supabase functions for business questions (materialized view)"""
         try:
-            view_name = f"sales_documents_view_{organization_id.replace('-', '_')}"
+            view_name = f"sales_documents_view_{brand_id.replace('-', '_')}"
             print(f"[INFO] Creating business functions for materialized view: {view_name}")
             
             # Create functions using raw SQL
@@ -683,7 +683,7 @@ class SupabaseService:
                         SUM(sd.sales_value_usd) as total_sales,
                         SUM(sd.sales_count) as total_count
                     FROM {view_name} sd
-                    WHERE sd.organization_id = org_id 
+                    WHERE sd.brand_id = org_id 
                         AND sd.user_id = user_uuid
                         AND sd.sales_value_usd IS NOT NULL
                     GROUP BY sd.product_name
@@ -712,7 +712,7 @@ class SupabaseService:
                         SUM(sd.sales_value_usd) as total_sales,
                         SUM(sd.sales_count) as total_count
                     FROM {view_name} sd
-                    WHERE sd.organization_id = org_id 
+                    WHERE sd.brand_id = org_id 
                         AND sd.user_id = user_uuid
                         AND sd.sales_value_usd IS NOT NULL
                     GROUP BY sd.country
@@ -743,7 +743,7 @@ class SupabaseService:
                         SUM(sd.sales_value_usd) as total_sales,
                         SUM(sd.sales_count) as total_count
                     FROM {view_name} sd
-                    WHERE sd.organization_id = org_id 
+                    WHERE sd.brand_id = org_id 
                         AND sd.user_id = user_uuid
                         AND sd.sales_value_usd IS NOT NULL
                         AND (year_filter IS NULL OR sd.year = year_filter)
@@ -778,7 +778,7 @@ class SupabaseService:
                             ELSE 0
                         END as avg_sales_per_item
                     FROM {view_name} sd
-                    WHERE sd.organization_id = org_id 
+                    WHERE sd.brand_id = org_id 
                         AND sd.user_id = user_uuid
                         AND sd.sales_value_usd IS NOT NULL
                     GROUP BY sd.type
@@ -804,7 +804,7 @@ class SupabaseService:
             print(f"[ERROR] Error creating business functions: {str(e)}")
             return False
     
-    async def get_user_data(self, organization_id: str, user_id: str, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+    async def get_user_data(self, brand_id: str, user_id: str, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
         """Get user's sales data with pagination"""
         try:
             table_name = f"sales_documents_{user_id.replace('-', '_')}"
@@ -813,7 +813,7 @@ class SupabaseService:
             
             result = self.client.table(table_name)\
                 .select("*")\
-                .eq('organization_id', organization_id)\
+                .eq('brand_id', brand_id)\
                 .eq('user_id', user_id)\
                 .order('created_at', desc=True)\
                 .range(offset, offset + limit - 1)\
@@ -834,16 +834,16 @@ class SupabaseService:
             print(f"[ERROR] Error getting user data: {str(e)}")
             return {"data": [], "total": 0, "offset": offset, "limit": limit}
 
-    async def get_admin_data(self, organization_id: str, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+    async def get_admin_data(self, brand_id: str, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
         """Get all organization data for admin (from materialized view)"""
         try:
-            view_name = f"sales_documents_view_{organization_id.replace('-', '_')}"
+            view_name = f"sales_documents_view_{brand_id.replace('-', '_')}"
             print(f"[INFO] Retrieving admin data from materialized view: {view_name}")
-            print(f"[INFO] Organization ID: {organization_id}, Limit: {limit}, Offset: {offset}")
+            print(f"[INFO] Organization ID: {brand_id}, Limit: {limit}, Offset: {offset}")
             
             result = self.client.table(view_name)\
                 .select("*")\
-                .eq('organization_id', organization_id)\
+                .eq('brand_id', brand_id)\
                 .order('created_at', desc=True)\
                 .range(offset, offset + limit - 1)\
                 .execute()
@@ -863,17 +863,17 @@ class SupabaseService:
             print(f"[ERROR] Error getting admin data: {str(e)}")
             return {"data": [], "total": 0, "offset": offset, "limit": limit}
     
-    async def call_business_function(self, function_name: str, organization_id: str, user_id: str, **kwargs) -> List[Dict]:
+    async def call_business_function(self, function_name: str, brand_id: str, user_id: str, **kwargs) -> List[Dict]:
         """Call a business function"""
         try:
             print(f"[INFO] Calling business function: {function_name}")
-            print(f"[INFO] Organization ID: {organization_id}, User ID: {user_id}")
+            print(f"[INFO] Organization ID: {brand_id}, User ID: {user_id}")
             print(f"[INFO] Parameters: {kwargs}")
             
             result = self.client.rpc(
                 function_name,
                 {
-                    'org_id': organization_id,
+                    'org_id': brand_id,
                     'user_uuid': user_id,
                     **kwargs
                 }
@@ -889,7 +889,7 @@ class SupabaseService:
             print(f"[ERROR] Error calling business function {function_name}: {str(e)}")
             return []
     
-    async def delete_document_and_data(self, document_id: str, user_id: str, organization_id: str) -> bool:
+    async def delete_document_and_data(self, document_id: str, user_id: str, brand_id: str) -> bool:
         """Delete document and all associated data using document_id"""
         try:
             print(f"[INFO] Starting deletion process for document: {document_id}")
@@ -897,7 +897,7 @@ class SupabaseService:
             # Delete from storage using the folder structure
             try:
                 # List files in the document folder
-                file_path = f"{organization_id}/{user_id}/{document_id}"
+                file_path = f"{brand_id}/{user_id}/{document_id}"
                 files = self.client.storage.from_(self.storage_bucket).list(path=file_path)
                 
                 if files:
@@ -912,7 +912,7 @@ class SupabaseService:
                 print(f"[WARNING] Could not delete files from storage: {e}")
             
             # Delete sales data
-            table_name = f"sales_data_{organization_id.replace('-', '_')}"
+            table_name = f"sales_data_{brand_id.replace('-', '_')}"
             try:
                 delete_result = self.client.table(table_name).delete().eq("document_id", document_id).execute()
                 print(f"[SUCCESS] Deleted sales data for document: {document_id}")

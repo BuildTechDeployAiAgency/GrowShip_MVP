@@ -61,7 +61,7 @@ interface UploadedReport {
   user_name?: string;
   user_email?: string;
   company_name?: string;
-  organization_id?: string;
+  brand_id?: string;
   storage_path: string;
   created_at: string;
   updated_at?: string;
@@ -159,9 +159,9 @@ function SalesReportsComponent() {
       if (profile.role_name?.startsWith("brand_admin")) {
         console.log(
           "Brand admin - filtering by organization:",
-          profile.organization_id
+          profile.brand_id
         );
-        query = query.eq("organization_id", profile.organization_id);
+        query = query.eq("brand_id", profile.brand_id);
       } else {
         console.log("Other user - filtering by user_id:", user.id);
         query = query.eq("user_id", user.id);
@@ -193,7 +193,7 @@ function SalesReportsComponent() {
           id: doc.id,
           name: doc.document_name || "Unknown",
           documentId: doc.document_id || doc.id,
-          organizationId: doc.organization_id || "Unknown",
+          organizationId: doc.brand_id || "Unknown",
           url: supabase.storage.from(bucket).getPublicUrl(doc.document_path)
             .data.publicUrl,
           uploadedAt: doc.created_at || new Date().toISOString(),
@@ -203,7 +203,7 @@ function SalesReportsComponent() {
           user_name: userInfo.contact_name || "Unknown User",
           user_email: userInfo.email || "",
           company_name: userInfo.company_name || "Unknown Company",
-          organization_id: doc.organization_id,
+          brand_id: doc.brand_id,
           storage_path: doc.document_path,
           created_at: doc.created_at,
           updated_at: doc.updated_at,
@@ -264,7 +264,7 @@ function SalesReportsComponent() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("user_id", user.id);
-      formData.append("organization_id", profile?.organization_id || "");
+      formData.append("brand_id", profile?.brand_id || "");
 
       // Determine API endpoint based on file type
       const isPdf = file.type === "application/pdf";
@@ -328,7 +328,7 @@ function SalesReportsComponent() {
       // Get document info from sales_documents_storage with proper filtering
       let query = supabase
         .from("sales_documents_storage")
-        .select("document_id, document_path, user_id, organization_id")
+        .select("document_id, document_path, user_id, brand_id")
         .eq("id", fileToDelete);
 
       // Brand admins can delete any report from their organization
@@ -336,7 +336,7 @@ function SalesReportsComponent() {
       if (!profile.role_name?.startsWith("brand_admin")) {
         query = query.eq("user_id", user.id);
       } else {
-        query = query.eq("organization_id", profile.organization_id);
+        query = query.eq("brand_id", profile.brand_id);
       }
 
       const { data: docData, error: docError } = await query.single();
@@ -524,13 +524,13 @@ function SalesReportsComponent() {
       user: !!user,
       profile: !!profile,
       userId: user?.id,
-      orgId: profile?.organization_id,
+      orgId: profile?.brand_id,
       role: profile?.role_name,
     });
     if (user && profile) {
       listReports();
     }
-  }, [user?.id, profile?.organization_id, profile?.role_name]);
+  }, [user?.id, profile?.brand_id, profile?.role_name]);
 
   const handleTemplateUpload = async (file: File) => {
     // Handle template upload logic here

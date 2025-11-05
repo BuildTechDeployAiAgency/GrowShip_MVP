@@ -82,7 +82,7 @@ export function UsersManagement() {
   } = useUsers({
     searchTerm,
     filters: usersFilters,
-    organizationId: profile?.organization_id,
+    brandId: profile?.brand_id,
   });
 
   // Fetch customers data
@@ -97,7 +97,7 @@ export function UsersManagement() {
   } = useCustomers({
     searchTerm,
     filters: customersFilters,
-    organizationId: profile?.organization_id,
+    brandId: profile?.brand_id,
   });
 
   const usersStatusCounts = users.reduce((acc, user) => {

@@ -13,7 +13,8 @@ export interface PurchaseOrder {
   po_number: string;
   po_date: string;
   user_id?: string;
-  organization_id: string;
+  brand_id: string;
+  distributor_id?: string;
   supplier_id?: string;
   supplier_name: string;
   supplier_email?: string;
@@ -40,12 +41,13 @@ interface POFilters {
   status: string;
   paymentStatus: string;
   dateRange: string;
+  distributorId?: string;
 }
 
 interface UsePurchaseOrdersOptions {
   searchTerm: string;
   filters: POFilters;
-  organizationId?: string;
+  brandId?: string;
   debounceMs?: number;
 }
 
@@ -63,13 +65,17 @@ interface UsePurchaseOrdersReturn {
 async function fetchPurchaseOrders(
   debouncedSearchTerm: string,
   filters: POFilters,
-  organizationId?: string
+  brandId?: string
 ): Promise<{ purchaseOrders: PurchaseOrder[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("purchase_orders").select("*", { count: "exact" });
 
-  if (organizationId) {
-    query = query.eq("organization_id", organizationId);
+  if (brandId) {
+    query = query.eq("brand_id", brandId);
+  }
+
+  if (filters.distributorId && filters.distributorId !== "all") {
+    query = query.eq("distributor_id", filters.distributorId);
   }
 
   if (debouncedSearchTerm.trim()) {
@@ -127,7 +133,7 @@ async function fetchPurchaseOrders(
 export function usePurchaseOrders({
   searchTerm,
   filters,
-  organizationId,
+  brandId,
   debounceMs = 300,
 }: UsePurchaseOrdersOptions): UsePurchaseOrdersReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -142,8 +148,8 @@ export function usePurchaseOrders({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["purchaseOrders", debouncedSearchTerm, filters, organizationId],
-    queryFn: () => fetchPurchaseOrders(debouncedSearchTerm, filters, organizationId),
+    queryKey: ["purchaseOrders", debouncedSearchTerm, filters, brandId],
+    queryFn: () => fetchPurchaseOrders(debouncedSearchTerm, filters, brandId),
     staleTime: 0,
   });
 

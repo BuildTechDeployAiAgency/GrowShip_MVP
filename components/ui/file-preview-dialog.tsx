@@ -194,9 +194,11 @@ export function FilePreviewDialog({
 
           // Load the workbook from buffer
           if (fileType === "csv") {
-            // For CSV, convert buffer to text and read as CSV
+            // For CSV, convert buffer to text and parse manually
             const text = new TextDecoder().decode(arrayBuffer);
-            await parsedWorkbook.csv.read(text);
+            // Create a simple stream from the text
+            const stream = new Blob([text]).stream();
+            await parsedWorkbook.csv.read(stream as any);
           } else {
             await parsedWorkbook.xlsx.load(arrayBuffer);
           }

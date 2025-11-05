@@ -56,7 +56,7 @@ function monthNumberToShortLabel(monthNumber: number): string {
 async function fetchRevenueComparison(
   filters: RevenueComparisonFilters = {},
   userRole?: string,
-  organizationId?: string
+  brandId?: string
 ): Promise<RevenueMonthPoint[]> {
   const supabase = createClient();
 
@@ -65,7 +65,7 @@ async function fetchRevenueComparison(
     p_user_id: filters.userId || "",
     p_year: filters.year || new Date().getFullYear(),
     p_user_role: userRole || "",
-    p_organization_id: organizationId || null,
+    p_brand_id: brandId || null,
   };
 
   // Expecting an RPC that returns monthly rows with month_number/current/previous totals
@@ -120,13 +120,13 @@ export function useRevenueComparison({
       "revenue-comparison",
       filters,
       profile?.role_name,
-      profile?.organization_id,
+      profile?.brand_id,
     ],
     queryFn: () =>
       fetchRevenueComparison(
         filters,
         profile?.role_name,
-        profile?.organization_id
+        profile?.brand_id
       ),
     enabled: enabled && !!user && !!profile,
     staleTime: 5 * 60 * 1000,

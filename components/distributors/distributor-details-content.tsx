@@ -26,13 +26,13 @@ export function DistributorDetailsContent({
   const [orgName, setOrgName] = useState<string>("");
 
   useEffect(() => {
-    if (distributor?.org_id) {
+    if (distributor?.brand_id) {
       const loadOrgName = async () => {
         const supabase = createClient();
         const { data } = await supabase
           .from("organizations")
           .select("name")
-          .eq("id", distributor.org_id)
+          .eq("id", distributor.brand_id)
           .single();
         if (data) {
           setOrgName(data.name);
@@ -40,7 +40,7 @@ export function DistributorDetailsContent({
       };
       loadOrgName();
     }
-  }, [distributor?.org_id]);
+  }, [distributor?.brand_id]);
 
   const formatCurrency = (amount?: number, currency?: string) => {
     if (amount === undefined || amount === null) return "N/A";

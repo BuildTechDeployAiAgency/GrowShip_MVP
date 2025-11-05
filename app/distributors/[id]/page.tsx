@@ -41,7 +41,7 @@ export default function DistributorDetailPage() {
   const { deleteDistributor } = useDistributors({
     searchTerm: "",
     filters: { status: "all" },
-    organizationId: profile?.organization_id,
+    brandId: profile?.brand_id,
   });
 
   useEffect(() => {

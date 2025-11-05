@@ -13,7 +13,8 @@ export interface Shipment {
   order_id?: string;
   po_id?: string;
   user_id?: string;
-  organization_id: string;
+  brand_id: string;
+  distributor_id?: string;
   carrier?: string;
   tracking_number?: string;
   shipping_method?: string;
@@ -38,12 +39,13 @@ export interface Shipment {
 interface ShipmentFilters {
   status: string;
   dateRange: string;
+  distributorId?: string;
 }
 
 interface UseShipmentsOptions {
   searchTerm: string;
   filters: ShipmentFilters;
-  organizationId?: string;
+  brandId?: string;
   debounceMs?: number;
 }
 
@@ -61,13 +63,17 @@ interface UseShipmentsReturn {
 async function fetchShipments(
   debouncedSearchTerm: string,
   filters: ShipmentFilters,
-  organizationId?: string
+  brandId?: string
 ): Promise<{ shipments: Shipment[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("shipments").select("*", { count: "exact" });
 
-  if (organizationId) {
-    query = query.eq("organization_id", organizationId);
+  if (brandId) {
+    query = query.eq("brand_id", brandId);
+  }
+
+  if (filters.distributorId && filters.distributorId !== "all") {
+    query = query.eq("distributor_id", filters.distributorId);
   }
 
   if (debouncedSearchTerm.trim()) {
@@ -121,7 +127,7 @@ async function fetchShipments(
 export function useShipments({
   searchTerm,
   filters,
-  organizationId,
+  brandId,
   debounceMs = 300,
 }: UseShipmentsOptions): UseShipmentsReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -136,8 +142,8 @@ export function useShipments({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["shipments", debouncedSearchTerm, filters, organizationId],
-    queryFn: () => fetchShipments(debouncedSearchTerm, filters, organizationId),
+    queryKey: ["shipments", debouncedSearchTerm, filters, brandId],
+    queryFn: () => fetchShipments(debouncedSearchTerm, filters, brandId),
     staleTime: 0,
   });
 

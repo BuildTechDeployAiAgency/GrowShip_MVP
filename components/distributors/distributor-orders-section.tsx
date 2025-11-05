@@ -67,7 +67,7 @@ export function DistributorOrdersSection({
       paymentStatus: "all",
       customerType: "distributor",
     },
-    organizationId: isSuperAdmin ? undefined : profile?.organization_id,
+    brandId: isSuperAdmin ? undefined : profile?.brand_id,
   });
 
   // Filter orders by distributor name (since we don't have distributor_id in orders table)

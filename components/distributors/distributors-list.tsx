@@ -65,7 +65,7 @@ export function DistributorsList() {
   } = useDistributors({
     searchTerm,
     filters,
-    organizationId: profile?.organization_id,
+    brandId: profile?.brand_id,
     isSuperAdmin,
   });
 

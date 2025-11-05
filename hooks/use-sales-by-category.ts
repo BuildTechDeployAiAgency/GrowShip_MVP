@@ -39,7 +39,7 @@ function toNumber(value: unknown, fallback: number = 0): number {
 async function fetchSalesByCategory(
   filters: SalesByCategoryFilters = {},
   userRole?: string,
-  organizationId?: string
+  brandId?: string
 ): Promise<CategoryPoint[]> {
   const supabase = createClient();
 
@@ -49,7 +49,7 @@ async function fetchSalesByCategory(
     p_year: filters.year || new Date().getFullYear(),
     p_month: filters.month ?? null,
     p_user_role: userRole || "",
-    p_organization_id: organizationId || null,
+    p_brand_id: brandId || null,
   };
 
   // RPC must accept (p_table_suffix text, p_user_id uuid, p_year int, p_month int|null)
@@ -94,13 +94,13 @@ export function useSalesByCategory({
       "sales-by-category",
       filters,
       profile?.role_name,
-      profile?.organization_id,
+      profile?.brand_id,
     ],
     queryFn: () =>
       fetchSalesByCategory(
         filters,
         profile?.role_name,
-        profile?.organization_id
+        profile?.brand_id
       ),
     enabled: enabled && !!user && !!profile,
     staleTime: 5 * 60 * 1000,

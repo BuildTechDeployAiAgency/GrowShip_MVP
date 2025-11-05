@@ -72,7 +72,7 @@ export function PurchaseOrdersList() {
   } = usePurchaseOrders({
     searchTerm,
     filters,
-    organizationId: profile?.organization_id,
+    brandId: profile?.brand_id,
   });
 
   const handleStatusChange = async (poId: string, status: POStatus) => {

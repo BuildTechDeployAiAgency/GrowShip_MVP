@@ -59,7 +59,7 @@ export function InvoicesList() {
   } = useInvoices({
     searchTerm,
     filters,
-    organizationId: profile?.organization_id,
+    brandId: profile?.brand_id,
   });
 
   const handlePaymentStatusChange = async (invoiceId: string, status: PaymentStatus) => {

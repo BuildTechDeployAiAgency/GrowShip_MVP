@@ -6,9 +6,9 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     level: 1,
     name: "Super Administrator",
     description: "Global access to all organizations and features",
-    can_access_all_organizations: true,
+    can_access_all_brands: true,
     can_manage_users: true,
-    can_manage_organizations: true,
+    can_manage_brands: true,
     can_view_financials: true,
     can_manage_products: true,
     can_manage_orders: true,
@@ -17,9 +17,9 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     level: 2,
     name: "Brand Administrator",
     description: "Manage brand organization and associated distributors",
-    can_access_all_organizations: false,
+    can_access_all_brands: false,
     can_manage_users: true,
-    can_manage_organizations: false,
+    can_manage_brands: false,
     can_view_financials: true,
     can_manage_products: true,
     can_manage_orders: true,
@@ -28,9 +28,9 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     level: 3,
     name: "Brand Finance",
     description: "Financial management for brand organization",
-    can_access_all_organizations: false,
+    can_access_all_brands: false,
     can_manage_users: false,
-    can_manage_organizations: false,
+    can_manage_brands: false,
     can_view_financials: true,
     can_manage_products: false,
     can_manage_orders: true,
@@ -39,9 +39,9 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     level: 3,
     name: "Brand Manager",
     description: "Operational management for brand organization",
-    can_access_all_organizations: false,
+    can_access_all_brands: false,
     can_manage_users: false,
-    can_manage_organizations: false,
+    can_manage_brands: false,
     can_view_financials: false,
     can_manage_products: true,
     can_manage_orders: true,
@@ -50,9 +50,9 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     level: 4,
     name: "Brand User",
     description: "Standard brand user with limited access",
-    can_access_all_organizations: false,
+    can_access_all_brands: false,
     can_manage_users: false,
-    can_manage_organizations: false,
+    can_manage_brands: false,
     can_view_financials: false,
     can_manage_products: false,
     can_manage_orders: false,
@@ -61,9 +61,9 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     level: 2,
     name: "Distributor Administrator",
     description: "Manage distributor organization and users",
-    can_access_all_organizations: false,
+    can_access_all_brands: false,
     can_manage_users: true,
-    can_manage_organizations: false,
+    can_manage_brands: false,
     can_view_financials: true,
     can_manage_products: false,
     can_manage_orders: true,
@@ -72,9 +72,9 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     level: 3,
     name: "Distributor Finance",
     description: "Financial management for distributor organization",
-    can_access_all_organizations: false,
+    can_access_all_brands: false,
     can_manage_users: false,
-    can_manage_organizations: false,
+    can_manage_brands: false,
     can_view_financials: true,
     can_manage_products: false,
     can_manage_orders: true,
@@ -83,9 +83,9 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     level: 3,
     name: "Distributor Manager",
     description: "Operational management for distributor organization",
-    can_access_all_organizations: false,
+    can_access_all_brands: false,
     can_manage_users: false,
-    can_manage_organizations: false,
+    can_manage_brands: false,
     can_view_financials: false,
     can_manage_products: false,
     can_manage_orders: true,
@@ -94,9 +94,9 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     level: 4,
     name: "Distributor User",
     description: "Standard distributor user with limited access",
-    can_access_all_organizations: false,
+    can_access_all_brands: false,
     can_manage_users: false,
-    can_manage_organizations: false,
+    can_manage_brands: false,
     can_view_financials: false,
     can_manage_products: false,
     can_manage_orders: false,
@@ -105,9 +105,9 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     level: 2,
     name: "Manufacturer Administrator",
     description: "Manage manufacturer organization and users",
-    can_access_all_organizations: false,
+    can_access_all_brands: false,
     can_manage_users: true,
-    can_manage_organizations: false,
+    can_manage_brands: false,
     can_view_financials: true,
     can_manage_products: true,
     can_manage_orders: true,
@@ -116,9 +116,9 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     level: 3,
     name: "Manufacturer Finance",
     description: "Financial management for manufacturer organization",
-    can_access_all_organizations: false,
+    can_access_all_brands: false,
     can_manage_users: false,
-    can_manage_organizations: false,
+    can_manage_brands: false,
     can_view_financials: true,
     can_manage_products: false,
     can_manage_orders: true,
@@ -127,9 +127,9 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     level: 3,
     name: "Manufacturer Manager",
     description: "Operational management for manufacturer organization",
-    can_access_all_organizations: false,
+    can_access_all_brands: false,
     can_manage_users: false,
-    can_manage_organizations: false,
+    can_manage_brands: false,
     can_view_financials: false,
     can_manage_products: true,
     can_manage_orders: true,
@@ -149,8 +149,8 @@ export class PermissionChecker {
   }
 
   // Check if user can access all organizations (Super Admin only)
-  canAccessAllOrganizations(): boolean {
-    return this.userPermissions.can_access_all_organizations;
+  canAccessAllBrands(): boolean {
+    return this.userPermissions.can_access_all_brands;
   }
 
   // Check if user can manage users in their organization
@@ -160,7 +160,7 @@ export class PermissionChecker {
 
   // Check if user can manage organizations
   canManageOrganizations(): boolean {
-    return this.userPermissions.can_manage_organizations;
+    return this.userPermissions.can_manage_brands;
   }
 
   // Check if user can view financial data
@@ -181,7 +181,7 @@ export class PermissionChecker {
   // Check if user can access a specific organization
   canAccessOrganization(organizationId: string, organizationType: string): boolean {
     // Super admin can access all organizations
-    if (this.canAccessAllOrganizations()) {
+    if (this.canAccessAllBrands()) {
       return true;
     }
 
@@ -209,7 +209,7 @@ export class PermissionChecker {
   // Check if user can manage another user
   canManageUser(targetUserRole: UserRoleName, targetUserOrganizationId?: string): boolean {
     // Super admin can manage all users
-    if (this.canAccessAllOrganizations()) {
+    if (this.canAccessAllBrands()) {
       return true;
     }
 
@@ -224,7 +224,7 @@ export class PermissionChecker {
 
   // Get accessible organization types for this user
   getAccessibleOrganizationTypes(): string[] {
-    if (this.canAccessAllOrganizations()) {
+    if (this.canAccessAllBrands()) {
       return ["super_admin", "brand", "distributor", "manufacturer"];
     }
 
@@ -244,7 +244,7 @@ export class PermissionChecker {
   canPerformAction(action: string, targetOrganizationId?: string): boolean {
     switch (action) {
       case "view_all_users":
-        return this.canAccessAllOrganizations();
+        return this.canAccessAllBrands();
       case "manage_users":
         return this.canManageUsers();
       case "view_financials":

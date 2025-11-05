@@ -34,14 +34,14 @@ export interface UserProfile {
   avatar?: string;
   is_profile_complete: boolean;
   user_status: UserStatus;
-  organization_id?: string;
-  parent_organization_id?: string;
+  brand_id?: string;
+  parent_brand_id?: string;
   created_at: string;
   updated_at: string;
 }
 
-// New interfaces for hierarchical access control
-export interface Organization {
+// Brand interface (formerly Organization)
+export interface Brand {
   id: string;
   name: string;
   slug: string;
@@ -52,10 +52,13 @@ export interface Organization {
   updated_at: string;
 }
 
+// Keep Organization as alias for backward compatibility during transition
+export type Organization = Brand;
+
 export interface UserMembership {
   id: string;
   user_id: string;
-  organization_id: string;
+  brand_id: string;
   role_name: UserRoleName;
   is_active: boolean;
   created_at: string;
@@ -66,9 +69,9 @@ export interface PermissionLevel {
   level: number;
   name: string;
   description: string;
-  can_access_all_organizations: boolean;
+  can_access_all_brands: boolean;
   can_manage_users: boolean;
-  can_manage_organizations: boolean;
+  can_manage_brands: boolean;
   can_view_financials: boolean;
   can_manage_products: boolean;
   can_manage_orders: boolean;

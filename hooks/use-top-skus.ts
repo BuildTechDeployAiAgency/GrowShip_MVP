@@ -46,7 +46,7 @@ export interface UseTopSkusReturn {
 async function fetchTopSkus(
   filters: TopSkusFilters = {},
   userRole?: string,
-  organizationId?: string
+  brandId?: string
 ): Promise<TopSkuProduct[]> {
   const supabase = createClient();
 
@@ -57,7 +57,7 @@ async function fetchTopSkus(
     p_year: filters.year || new Date().getFullYear(),
     p_limit: filters.limit || 10,
     p_user_role: userRole || "",
-    p_organization_id: organizationId || null,
+    p_brand_id: brandId || null,
   };
 
   // Call the RPC function
@@ -115,10 +115,10 @@ export function useTopSkus({
       "top-skus",
       filters,
       profile?.role_name,
-      profile?.organization_id,
+      profile?.brand_id,
     ],
     queryFn: () =>
-      fetchTopSkus(filters, profile?.role_name, profile?.organization_id),
+      fetchTopSkus(filters, profile?.role_name, profile?.brand_id),
     enabled: enabled && !!user && !!profile,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,

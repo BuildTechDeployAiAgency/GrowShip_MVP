@@ -9,7 +9,7 @@ export type DistributorStatus = "active" | "inactive" | "archived";
 
 export interface Distributor {
   id: string;
-  org_id: string;
+  brand_id: string;
   name: string;
   code?: string;
   contact_name?: string;
@@ -48,7 +48,7 @@ interface DistributorFilters {
 interface UseDistributorsOptions {
   searchTerm: string;
   filters: DistributorFilters;
-  organizationId?: string;
+  brandId?: string;
   debounceMs?: number;
   isSuperAdmin?: boolean;
 }
@@ -67,15 +67,15 @@ interface UseDistributorsReturn {
 async function fetchDistributors(
   debouncedSearchTerm: string,
   filters: DistributorFilters,
-  organizationId?: string,
+  brandId?: string,
   isSuperAdmin: boolean = false
 ): Promise<{ distributors: Distributor[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("distributors").select("*", { count: "exact" });
 
-  // Only apply org_id filter if not Super Admin
-  if (organizationId && !isSuperAdmin) {
-    query = query.eq("org_id", organizationId);
+  // Only apply brand_id filter if not Super Admin
+  if (brandId && !isSuperAdmin) {
+    query = query.eq("brand_id", brandId);
   }
 
   if (debouncedSearchTerm.trim()) {
@@ -105,7 +105,7 @@ async function fetchDistributors(
 export function useDistributors({
   searchTerm,
   filters,
-  organizationId,
+  brandId,
   debounceMs = 300,
   isSuperAdmin = false,
 }: UseDistributorsOptions): UseDistributorsReturn {
@@ -121,8 +121,8 @@ export function useDistributors({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["distributors", debouncedSearchTerm, filters, organizationId, isSuperAdmin],
-    queryFn: () => fetchDistributors(debouncedSearchTerm, filters, organizationId, isSuperAdmin),
+    queryKey: ["distributors", debouncedSearchTerm, filters, brandId, isSuperAdmin],
+    queryFn: () => fetchDistributors(debouncedSearchTerm, filters, brandId, isSuperAdmin),
     staleTime: 0,
   });
 
@@ -131,9 +131,9 @@ export function useDistributors({
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Ensure org_id is set if not provided (for non-super-admin users)
-      if (!distributor.org_id && organizationId && !isSuperAdmin) {
-        distributor.org_id = organizationId;
+      // Ensure brand_id is set if not provided (for non-super-admin users)
+      if (!distributor.brand_id && brandId && !isSuperAdmin) {
+        distributor.brand_id = brandId;
       }
 
       const distributorData = {
