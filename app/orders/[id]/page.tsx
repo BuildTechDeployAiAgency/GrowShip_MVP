@@ -1,13 +1,15 @@
 "use client";
 
+import { use } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { OrderDetails } from "@/components/orders/order-details";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { ProtectedPage } from "@/components/common/protected-page";
 import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 
-export default function OrderDetailPage({ params }: { params: { id: string } }) {
+export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { user, profile, loading } = useRequireProfile();
+  const { id } = use(params);
 
   if (loading) {
     return (
@@ -26,7 +28,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           pageTitle="Order Details"
           pageSubtitle="View and manage order information"
         >
-          <OrderDetails orderId={params.id} />
+          <OrderDetails orderId={id} />
         </MainLayout>
       </ProtectedPage>
     </EnhancedAuthProvider>
