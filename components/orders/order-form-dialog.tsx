@@ -22,9 +22,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useOrders, Order, OrderStatus, PaymentStatus } from "@/hooks/use-orders";
 import { useDistributors, Distributor } from "@/hooks/use-distributors";
+import { useProducts, Product } from "@/hooks/use-products";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { toast } from "react-toastify";
-import { Plus, X, ShoppingCart } from "lucide-react";
+import { Plus, X, ShoppingCart, Package } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface OrderFormDialogProps {
@@ -113,6 +114,13 @@ export function OrderFormDialog({
     isSuperAdmin,
   });
 
+  const { products, loading: productsLoading } = useProducts({
+    searchTerm: "",
+    filters: { status: "all", category: "all" },
+    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    isSuperAdmin,
+  });
+
   const [formData, setFormData] = useState<OrderFormData>({
     distributor_id: "",
     brand_id: "", // Will be auto-populated from selected distributor
@@ -140,6 +148,8 @@ export function OrderFormDialog({
     tax_rate: 0,
     total: 0,
   });
+
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -320,8 +330,35 @@ export function OrderFormDialog({
       tax_rate: 0,
       total: 0,
     });
+    setSelectedProductId("");
 
     toast.success("Item added to order");
+  };
+
+  const handleProductSelect = (productId: string) => {
+    setSelectedProductId(productId);
+    
+    if (!productId) {
+      // Clear fields if no product selected
+      return;
+    }
+
+    const product = products.find((p) => p.id === productId);
+    if (product) {
+      setCurrentItem((prev) => ({
+        ...prev,
+        sku: product.sku,
+        product_name: product.product_name,
+        unit_price: product.unit_price,
+      }));
+
+      // Show stock warning if low
+      if (product.quantity_in_stock === 0) {
+        toast.warning(`${product.product_name} is out of stock!`);
+      } else if (product.reorder_level && product.quantity_in_stock <= product.reorder_level) {
+        toast.info(`${product.product_name} has low stock (${product.quantity_in_stock} available)`);
+      }
+    }
   };
 
   const handleRemoveItem = (itemId: string) => {
@@ -573,6 +610,40 @@ export function OrderFormDialog({
 
               {/* Add Item Form */}
               <div className="bg-muted/30 p-3 rounded-lg space-y-2.5">
+                {/* Product Lookup */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="product_lookup" className="text-sm flex items-center gap-2">
+                    <Package className="h-3 w-3" />
+                    Select from Product Catalog
+                  </Label>
+                  <Select
+                    value={selectedProductId}
+                    onValueChange={handleProductSelect}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a product or enter manually below..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Manual Entry</SelectItem>
+                      {products
+                        .filter((p) => p.status === "active")
+                        .map((product) => (
+                          <SelectItem key={product.id} value={product.id}>
+                            <div className="flex items-center justify-between w-full">
+                              <span>{product.product_name} ({product.sku})</span>
+                              <span className="text-xs text-gray-500 ml-2">
+                                ${product.unit_price.toFixed(2)} - Stock: {product.quantity_in_stock}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {productsLoading && (
+                    <p className="text-xs text-gray-500">Loading products...</p>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="sku" className="text-sm">SKU</Label>

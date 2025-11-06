@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { DistributorsList } from "@/components/distributors/distributors-list";
@@ -8,8 +9,14 @@ import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 
 export default function DistributorsPage() {
   const { user, profile, loading } = useRequireProfile();
+  const [mounted, setMounted] = useState(false);
 
-  if (loading) {
+  // Prevent hydration mismatch by only rendering after client mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || loading) {
     return (
       <MainLayout pageTitle="Distributors" pageSubtitle="Loading...">
         <div className="flex items-center justify-center h-64">

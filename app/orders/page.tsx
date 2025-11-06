@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { OrdersList } from "@/components/orders/orders-list";
@@ -12,16 +12,19 @@ import { Button } from "@/components/ui/button";
 
 export default function OrdersPage() {
   const { user, profile, loading } = useRequireProfile();
+  const [mounted, setMounted] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  // Debug profile data
-  console.log("OrdersPage Profile:", { user, profile, brand_id: profile?.brand_id });
+  // Prevent hydration mismatch by only rendering after client mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <MainLayout pageTitle="Orders" pageSubtitle="Loading...">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-4 w-8 border-b-2 border-teal-500"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
         </div>
       </MainLayout>
     );

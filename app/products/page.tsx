@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
-import { ManufacturersList } from "@/components/manufacturers/manufacturers-list";
+import { ProductsList } from "@/components/products/products-list";
 import { ProtectedPage } from "@/components/common/protected-page";
 import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 
-export default function ManufacturersPage() {
+export default function ProductsPage() {
   const { user, profile, loading } = useRequireProfile();
   const [mounted, setMounted] = useState(false);
 
@@ -18,7 +18,7 @@ export default function ManufacturersPage() {
 
   if (!mounted || loading) {
     return (
-      <MainLayout pageTitle="Manufacturers" pageSubtitle="Loading...">
+      <MainLayout pageTitle="Products" pageSubtitle="Loading...">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
         </div>
@@ -30,12 +30,16 @@ export default function ManufacturersPage() {
     <EnhancedAuthProvider>
       <ProtectedPage allowedStatuses={["approved"]}>
         <MainLayout
-          pageTitle="Manufacturers"
-          pageSubtitle="Manage your manufacturer relationships and supplier network"
+          pageTitle="Products"
+          pageSubtitle="Manage your product catalog and inventory"
         >
-          <ManufacturersList />
+          <ProductsList />
         </MainLayout>
       </ProtectedPage>
     </EnhancedAuthProvider>
   );
 }
+
+
+
+

@@ -701,9 +701,18 @@ export function DistributorFormDialog({
             <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button 
+              type="submit" 
+              disabled={loading || (!isSuperAdmin && !profile?.brand_id)}
+              title={!isSuperAdmin && !profile?.brand_id ? "Please wait while your profile loads..." : ""}
+            >
               {loading ? "Saving..." : distributor ? "Update Distributor" : "Create Distributor"}
             </Button>
+            {!isSuperAdmin && !profile?.brand_id && !loading && (
+              <p className="text-xs text-amber-600 ml-2">
+                Loading your profile...
+              </p>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
