@@ -1,16 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { OrdersList } from "@/components/orders/orders-list";
 import { OrderFormDialog } from "@/components/orders/order-form-dialog";
 import { ProtectedPage } from "@/components/common/protected-page";
 import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function OrdersPage() {
+  const router = useRouter();
   const { user, profile, loading } = useRequireProfile();
   const [mounted, setMounted] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -37,10 +39,19 @@ export default function OrdersPage() {
           pageTitle="Orders"
           pageSubtitle="Manage and track all your orders"
           actions={
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Order
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => router.push("/import?type=orders")}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Import Orders
+              </Button>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                New Order
+              </Button>
+            </div>
           }
         >
           <OrdersList 
