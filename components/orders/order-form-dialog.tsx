@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -121,10 +121,15 @@ export function OrderFormDialog({
     isSuperAdmin,
   });
 
+  // Memoize today's date to prevent hydration issues
+  const todayDate = useMemo(() => {
+    return new Date().toISOString().split("T")[0];
+  }, []);
+
   const [formData, setFormData] = useState<OrderFormData>({
     distributor_id: "",
     brand_id: "", // Will be auto-populated from selected distributor
-    order_date: new Date().toISOString().split("T")[0],
+    order_date: todayDate,
     order_status: "pending", // Default to pending
     customer_name: "",
     customer_type: "distributor",
@@ -200,7 +205,7 @@ export function OrderFormDialog({
       setFormData({
         distributor_id: "",
         brand_id: "", // Will be auto-populated from selected distributor
-        order_date: new Date().toISOString().split("T")[0],
+        order_date: todayDate,
         order_status: "pending",
         customer_name: "",
         customer_type: "distributor",
@@ -214,7 +219,7 @@ export function OrderFormDialog({
         payment_status: "pending",
       });
     }
-  }, [open, order, profileLoading]);
+  }, [open, order, profileLoading, todayDate]);
 
   // Auto-populate fields when distributor is selected
   useEffect(() => {
@@ -336,10 +341,10 @@ export function OrderFormDialog({
   };
 
   const handleProductSelect = (productId: string) => {
-    setSelectedProductId(productId);
+    setSelectedProductId(productId === "manual" ? "" : productId);
     
-    if (!productId) {
-      // Clear fields if no product selected
+    if (!productId || productId === "manual") {
+      // Clear fields if no product selected or manual entry
       return;
     }
 
@@ -617,14 +622,14 @@ export function OrderFormDialog({
                     Select from Product Catalog
                   </Label>
                   <Select
-                    value={selectedProductId}
+                    value={selectedProductId || "manual"}
                     onValueChange={handleProductSelect}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Choose a product or enter manually below..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Manual Entry</SelectItem>
+                      <SelectItem value="manual">Manual Entry</SelectItem>
                       {products
                         .filter((p) => p.status === "active")
                         .map((product) => (

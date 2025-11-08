@@ -44,15 +44,44 @@ function reconstructMenuIcons(menuItems: MenuItem[]): MenuItem[] {
   }));
 }
 
+// Safe localStorage wrapper to prevent SSR issues
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      return localStorage.getItem(key);
+    } catch (error) {
+      console.error(`Error reading from localStorage (${key}):`, error);
+      return null;
+    }
+  },
+  
+  setItem: (key: string, value: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(key, value);
+    } catch (error) {
+      console.error(`Error writing to localStorage (${key}):`, error);
+    }
+  },
+  
+  removeItem: (key: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.error(`Error removing from localStorage (${key}):`, error);
+    }
+  },
+};
+
 const MENU_STORAGE_KEY = "growship_menu_data";
 const PROFILE_STORAGE_KEY = "growship_user_profile";
 const USER_STORAGE_KEY = "growship_user_data";
 
 export function getStoredMenuData(userId: string): MenuItem[] | null {
-  if (typeof window === "undefined") return null;
-
   try {
-    const stored = localStorage.getItem(MENU_STORAGE_KEY);
+    const stored = safeLocalStorage.getItem(MENU_STORAGE_KEY);
     if (stored) {
       const data = JSON.parse(stored);
       const storedTime = data._storedAt;
@@ -62,42 +91,37 @@ export function getStoredMenuData(userId: string): MenuItem[] | null {
       if (data.userId === userId && now - storedTime < maxAge) {
         return reconstructMenuIcons(data.menuItems);
       } else {
-        localStorage.removeItem(MENU_STORAGE_KEY);
+        safeLocalStorage.removeItem(MENU_STORAGE_KEY);
       }
     }
   } catch (error) {
     console.error("Error reading menu data from localStorage:", error);
-    localStorage.removeItem(MENU_STORAGE_KEY);
+    safeLocalStorage.removeItem(MENU_STORAGE_KEY);
   }
 
   return null;
 }
 
 export function setStoredMenuData(userId: string, menuItems: MenuItem[]): void {
-  if (typeof window === "undefined") return;
-
   try {
     const dataWithTimestamp = {
       userId,
       menuItems,
       _storedAt: Date.now(),
     };
-    localStorage.setItem(MENU_STORAGE_KEY, JSON.stringify(dataWithTimestamp));
+    safeLocalStorage.setItem(MENU_STORAGE_KEY, JSON.stringify(dataWithTimestamp));
   } catch (error) {
     console.error("Error storing menu data to localStorage:", error);
   }
 }
 
 export function clearStoredMenuData(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(MENU_STORAGE_KEY);
+  safeLocalStorage.removeItem(MENU_STORAGE_KEY);
 }
 
 export function getStoredProfile(): UserProfile | null {
-  if (typeof window === "undefined") return null;
-
   try {
-    const stored = localStorage.getItem(PROFILE_STORAGE_KEY);
+    const stored = safeLocalStorage.getItem(PROFILE_STORAGE_KEY);
     if (stored) {
       const profile = JSON.parse(stored);
       const storedTime = profile._storedAt;
@@ -107,38 +131,30 @@ export function getStoredProfile(): UserProfile | null {
       if (now - storedTime < maxAge) {
         return profile;
       } else {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem(PROFILE_STORAGE_KEY);
-        }
+        safeLocalStorage.removeItem(PROFILE_STORAGE_KEY);
       }
     }
   } catch (error) {
     console.error("Error reading profile from localStorage:", error);
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(PROFILE_STORAGE_KEY);
-    }
+    safeLocalStorage.removeItem(PROFILE_STORAGE_KEY);
   }
 
   return null;
 }
 
 export function setStoredProfile(profile: UserProfile | null): void {
-  if (typeof window === "undefined") return;
-
   try {
     if (profile) {
       const profileWithTimestamp = {
         ...profile,
         _storedAt: Date.now(),
       };
-      localStorage.setItem(
+      safeLocalStorage.setItem(
         PROFILE_STORAGE_KEY,
         JSON.stringify(profileWithTimestamp)
       );
     } else {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem(PROFILE_STORAGE_KEY);
-      }
+      safeLocalStorage.removeItem(PROFILE_STORAGE_KEY);
     }
   } catch (error) {
     console.error("Error storing profile to localStorage:", error);
@@ -146,10 +162,8 @@ export function setStoredProfile(profile: UserProfile | null): void {
 }
 
 export function getStoredUserData(): { id: string; email: string } | null {
-  if (typeof window === "undefined") return null;
-
   try {
-    const stored = localStorage.getItem(USER_STORAGE_KEY);
+    const stored = safeLocalStorage.getItem(USER_STORAGE_KEY);
     if (stored) {
       const user = JSON.parse(stored);
       const storedTime = user._storedAt;
@@ -159,16 +173,12 @@ export function getStoredUserData(): { id: string; email: string } | null {
       if (now - storedTime < maxAge) {
         return { id: user.id, email: user.email };
       } else {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem(USER_STORAGE_KEY);
-        }
+        safeLocalStorage.removeItem(USER_STORAGE_KEY);
       }
     }
   } catch (error) {
     console.error("Error reading user data from localStorage:", error);
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(USER_STORAGE_KEY);
-    }
+    safeLocalStorage.removeItem(USER_STORAGE_KEY);
   }
 
   return null;
@@ -177,19 +187,15 @@ export function getStoredUserData(): { id: string; email: string } | null {
 export function setStoredUserData(
   user: { id: string; email: string } | null
 ): void {
-  if (typeof window === "undefined") return;
-
   try {
     if (user) {
       const userWithTimestamp = {
         ...user,
         _storedAt: Date.now(),
       };
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userWithTimestamp));
+      safeLocalStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userWithTimestamp));
     } else {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem(USER_STORAGE_KEY);
-      }
+      safeLocalStorage.removeItem(USER_STORAGE_KEY);
     }
   } catch (error) {
     console.error("Error storing user data to localStorage:", error);
@@ -197,11 +203,7 @@ export function setStoredUserData(
 }
 
 export function clearAllStoredData(): void {
-  if (typeof window === "undefined") return;
-
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(MENU_STORAGE_KEY);
-    localStorage.removeItem(PROFILE_STORAGE_KEY);
-    localStorage.removeItem(USER_STORAGE_KEY);
-  }
+  safeLocalStorage.removeItem(MENU_STORAGE_KEY);
+  safeLocalStorage.removeItem(PROFILE_STORAGE_KEY);
+  safeLocalStorage.removeItem(USER_STORAGE_KEY);
 }

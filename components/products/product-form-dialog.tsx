@@ -31,8 +31,8 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { useProducts, Product, ProductStatus } from "@/hooks/use-products";
+import { useManufacturers } from "@/hooks/use-manufacturers";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-toastify";
 
 interface ProductFormDialogProps {
@@ -59,6 +59,7 @@ interface ProductFormData {
   weight_unit: string;
   status: ProductStatus;
   tags: string;
+  supplier_id: string;
   supplier_sku: string;
   notes: string;
 }
@@ -69,11 +70,19 @@ export function ProductFormDialog({
   product,
   onSuccess,
 }: ProductFormDialogProps) {
-  const { profile } = useEnhancedAuth();
+  const { profile, canPerformAction } = useEnhancedAuth();
+  const isSuperAdmin = canPerformAction?.("view_all_users") ?? false;
   const { createProduct, updateProduct } = useProducts({
     searchTerm: "",
     filters: { status: "all", category: "all" },
-    brandId: profile?.brand_id,
+    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+  });
+
+  const { manufacturers, loading: manufacturersLoading } = useManufacturers({
+    searchTerm: "",
+    filters: { status: "all", country: "all" },
+    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    isSuperAdmin,
   });
 
   const isEditing = !!product;
@@ -95,6 +104,7 @@ export function ProductFormDialog({
     weight_unit: "kg",
     status: "active",
     tags: "",
+    supplier_id: "",
     supplier_sku: "",
     notes: "",
   });
@@ -121,6 +131,7 @@ export function ProductFormDialog({
         weight_unit: product.weight_unit || "kg",
         status: product.status || "active",
         tags: product.tags?.join(", ") || "",
+        supplier_id: product.supplier_id || "",
         supplier_sku: product.supplier_sku || "",
         notes: product.notes || "",
       });
@@ -143,6 +154,7 @@ export function ProductFormDialog({
         weight_unit: "kg",
         status: "active",
         tags: "",
+        supplier_id: "",
         supplier_sku: "",
         notes: "",
       });
@@ -214,6 +226,7 @@ export function ProductFormDialog({
         tags: formData.tags
           ? formData.tags.split(",").map((t) => t.trim()).filter((t) => t)
           : undefined,
+        supplier_id: formData.supplier_id || undefined,
         supplier_sku: formData.supplier_sku.trim() || undefined,
         notes: formData.notes.trim() || undefined,
       };
@@ -537,14 +550,45 @@ export function ProductFormDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="supplier_sku">Supplier SKU</Label>
-                  <Input
-                    id="supplier_sku"
-                    value={formData.supplier_sku}
-                    onChange={(e) => handleChange("supplier_sku", e.target.value)}
-                    placeholder="SUP-001"
-                  />
+                  <Label>Supplier (Manufacturer)</Label>
+                  <Select
+                    value={formData.supplier_id || "none"}
+                    onValueChange={(value) =>
+                      handleChange("supplier_id", value === "none" ? "" : value)
+                    }
+                    disabled={manufacturersLoading || (!manufacturers?.length && !formData.supplier_id)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select supplier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No supplier</SelectItem>
+                      {manufacturers?.map((manufacturer) => (
+                        <SelectItem key={manufacturer.id} value={manufacturer.id}>
+                          {manufacturer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {manufacturersLoading && (
+                    <p className="text-xs text-muted-foreground">Loading manufacturers...</p>
+                  )}
+                  {!manufacturersLoading && !manufacturers?.length && (
+                    <p className="text-xs text-muted-foreground">
+                      No manufacturers found for this brand yet.
+                    </p>
+                  )}
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="supplier_sku">Supplier SKU</Label>
+                <Input
+                  id="supplier_sku"
+                  value={formData.supplier_sku}
+                  onChange={(e) => handleChange("supplier_sku", e.target.value)}
+                  placeholder="SUP-001"
+                />
               </div>
 
               <div className="space-y-2">
@@ -597,5 +641,3 @@ export function ProductFormDialog({
     </Dialog>
   );
 }
-
-

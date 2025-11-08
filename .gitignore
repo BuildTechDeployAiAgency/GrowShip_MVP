@@ -60,3 +60,6 @@ next-env.d.ts
 .turbo
 *.pem
 
+# Changelogs (excluded from GitHub)
+ChangeLogs/
+

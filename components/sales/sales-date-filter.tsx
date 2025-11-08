@@ -90,14 +90,20 @@ interface SalesDateFilterProps {
 
 export function SalesDateFilter({ onDateChange }: SalesDateFilterProps) {
   const isMobile = useIsMobile();
-  const [dateRange, setDateRange] = React.useState<DateRange>(() =>
-    presetOptions[1].getValue()
-  );
-  const [tempDateRange, setTempDateRange] =
-    React.useState<DateRange>(dateRange);
+  
+  // Initialize with null and set on mount to prevent hydration issues
+  const [dateRange, setDateRange] = React.useState<DateRange | null>(null);
+  const [tempDateRange, setTempDateRange] = React.useState<DateRange | null>(null);
   const [selectedPreset, setSelectedPreset] =
     React.useState<string>("Last 30 Days");
   const [isOpen, setIsOpen] = React.useState(false);
+
+  // Initialize date ranges on mount (client-side only)
+  React.useEffect(() => {
+    const initialRange = presetOptions[1].getValue();
+    setDateRange(initialRange);
+    setTempDateRange(initialRange);
+  }, []);
 
   const handlePresetClick = (preset: PresetOption) => {
     const newRange = preset.getValue();
@@ -106,15 +112,24 @@ export function SalesDateFilter({ onDateChange }: SalesDateFilterProps) {
   };
 
   const handleApply = () => {
-    setDateRange(tempDateRange);
-    setIsOpen(false);
-    onDateChange?.(tempDateRange);
+    if (tempDateRange) {
+      setDateRange(tempDateRange);
+      setIsOpen(false);
+      onDateChange?.(tempDateRange);
+    }
   };
 
   const handleCancel = () => {
-    setTempDateRange(dateRange);
+    if (dateRange) {
+      setTempDateRange(dateRange);
+    }
     setIsOpen(false);
   };
+
+  // Don't render until date range is initialized
+  if (!dateRange || !tempDateRange) {
+    return null;
+  }
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>

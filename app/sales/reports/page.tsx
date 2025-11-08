@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
+import dynamic from "next/dynamic";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -47,6 +49,21 @@ import {
 } from "@/contexts/enhanced-auth-context";
 import { HeaderNotificationButton } from "@/components/sales/header-notification-button";
 import { FilePreviewDialog } from "@/components/ui/file-preview-dialog";
+
+// Loading skeleton for reports page
+function ReportsPageSkeleton() {
+  return (
+    <MainLayout
+      pageTitle="Sales Reports"
+      pageSubtitle="Upload, manage, and track your sales documents"
+    >
+      <div className="space-y-6">
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    </MainLayout>
+  );
+}
 
 interface UploadedReport {
   id: string;

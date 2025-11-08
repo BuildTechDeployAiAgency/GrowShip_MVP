@@ -18,9 +18,17 @@ interface DateFilterProps {
 }
 
 export function GlobalDateFilter({ onDateChange, className }: DateFilterProps) {
-  const currentYear = new Date().getFullYear();
-  const [year, setYear] = useState<number>(currentYear);
+  // Initialize with static value to prevent hydration mismatch
+  const [year, setYear] = useState<number>(2025);
   const [month, setMonth] = useState<number | null>(null);
+  const [currentYear, setCurrentYear] = useState<number>(2025);
+
+  // Set current year on mount (client-side only)
+  useEffect(() => {
+    const now = new Date().getFullYear();
+    setCurrentYear(now);
+    setYear(now);
+  }, []);
 
   // Apply filters on initial mount to trigger API calls
   useEffect(() => {

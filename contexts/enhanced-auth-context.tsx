@@ -85,17 +85,14 @@ export function EnhancedAuthProvider({
   initialUser?: AuthUser | null;
   initialProfile?: UserProfile | null;
 }) {
-  const cachedUser = getStoredUserData();
-  const cachedProfile = getStoredProfile();
-
-  const [user, setUser] = useState<AuthUser | null>(
-    initialUser || cachedUser || null
-  );
+  // Initialize without localStorage to prevent hydration mismatch
+  const [user, setUser] = useState<AuthUser | null>(initialUser || null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [currentOrganization, setCurrentOrganization] =
     useState<Organization | null>(null);
   const [memberships, setMemberships] = useState<UserMembership[]>([]);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const supabase = createClient();
   const router = useRouter();
 
@@ -155,12 +152,17 @@ export function EnhancedAuthProvider({
       setOrganizations(orgs);
       setMemberships(membershipData || []);
 
-      // Set current organization (first one or stored preference)
-      const storedOrgId = localStorage.getItem("currentOrganizationId");
-      const defaultOrg = orgs.find((org) => org.id === storedOrgId) || orgs[0];
-      if (defaultOrg) {
-        setCurrentOrganization(defaultOrg);
-        localStorage.setItem("currentOrganizationId", defaultOrg.id);
+      // Set current organization (first one or stored preference) - only on client
+      if (typeof window !== 'undefined') {
+        const storedOrgId = localStorage.getItem("currentOrganizationId");
+        const defaultOrg = orgs.find((org) => org.id === storedOrgId) || orgs[0];
+        if (defaultOrg) {
+          setCurrentOrganization(defaultOrg);
+          localStorage.setItem("currentOrganizationId", defaultOrg.id);
+        }
+      } else if (orgs.length > 0) {
+        // On server, just set the first org
+        setCurrentOrganization(orgs[0]);
       }
     } catch (error) {
       console.error("Error in loadUserOrganizations:", error);
@@ -168,6 +170,15 @@ export function EnhancedAuthProvider({
   };
 
   useEffect(() => {
+    // Mark component as mounted (client-side only)
+    setMounted(true);
+
+    // Load cached user data only on client-side after mount
+    const cachedUser = getStoredUserData();
+    if (cachedUser && !user) {
+      setUser(cachedUser);
+    }
+
     // Always verify cached user against Supabase auth
     const getUser = async () => {
       setLoading(true);
@@ -188,7 +199,8 @@ export function EnhancedAuthProvider({
           await loadUserOrganizations(user.id);
         } else {
           // No valid auth session - clear stale localStorage data
-          if (cachedUser) {
+          const cachedData = getStoredUserData();
+          if (cachedData) {
             console.log("Clearing stale localStorage data - no valid session");
             clearAllStoredData();
           }
@@ -248,6 +260,7 @@ export function EnhancedAuthProvider({
     });
 
     return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, queryClient]);
 
   const signUp = async (
@@ -256,11 +269,15 @@ export function EnhancedAuthProvider({
     role: string,
     brandId?: string
   ) => {
+    const redirectUrl = typeof window !== 'undefined'
+      ? `${window.location.origin}/auth/callback`
+      : '/auth/callback';
+    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: redirectUrl,
       },
     });
 
@@ -484,8 +501,12 @@ export function EnhancedAuthProvider({
 
   const resetPassword = async (email: string) => {
     try {
+      const redirectUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/reset-password`
+        : '/auth/reset-password';
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: redirectUrl,
       });
       return { error };
     } catch (error) {
@@ -543,7 +564,9 @@ export function EnhancedAuthProvider({
     const org = organizations.find((o) => o.id === brandId);
     if (org) {
       setCurrentOrganization(org);
-      localStorage.setItem("currentOrganizationId", brandId);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem("currentOrganizationId", brandId);
+      }
     }
   };
 

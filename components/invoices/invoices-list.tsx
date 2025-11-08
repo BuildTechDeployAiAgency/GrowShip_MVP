@@ -32,6 +32,7 @@ import {
 import { useInvoices, Invoice, PaymentStatus } from "@/hooks/use-invoices";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { format } from "date-fns";
+import { InvoiceFormDialog } from "./invoice-form-dialog";
 
 const paymentColors: Record<PaymentStatus, string> = {
   pending: "bg-gray-100 text-gray-800",
@@ -41,13 +42,20 @@ const paymentColors: Record<PaymentStatus, string> = {
   partially_paid: "bg-yellow-100 text-yellow-800",
 };
 
-export function InvoicesList() {
+interface InvoicesListProps {
+  onCreateClick?: () => void;
+}
+
+export function InvoicesList({ onCreateClick }: InvoicesListProps) {
   const { profile } = useEnhancedAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
     paymentStatus: "all",
     dateRange: "all",
   });
+
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   const {
     invoices,
@@ -70,6 +78,24 @@ export function InvoicesList() {
     if (confirm("Are you sure you want to delete this invoice?")) {
       await deleteInvoice(invoiceId);
     }
+  };
+
+  const handleEdit = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setIsFormOpen(true);
+  };
+
+  const handleCreate = () => {
+    setSelectedInvoice(null);
+    setIsFormOpen(true);
+    if (onCreateClick) {
+      onCreateClick();
+    }
+  };
+
+  const handleCloseForm = () => {
+    setIsFormOpen(false);
+    setSelectedInvoice(null);
   };
 
   if (loading) {
@@ -227,7 +253,7 @@ export function InvoicesList() {
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEdit(invoice)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
@@ -260,6 +286,15 @@ export function InvoicesList() {
           Showing {invoices.length} of {totalCount} invoices
         </div>
       )}
+
+      <InvoiceFormDialog
+        open={isFormOpen}
+        onClose={handleCloseForm}
+        invoice={selectedInvoice}
+        onSuccess={() => {
+          // Refetch is handled automatically by the hook
+        }}
+      />
     </div>
   );
 }

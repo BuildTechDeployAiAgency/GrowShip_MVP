@@ -62,13 +62,10 @@ export function AuthProvider({
   initialUser?: AuthUser | null;
   initialProfile?: UserProfile | null;
 }) {
-  const cachedUser = getStoredUserData();
-  const cachedProfile = getStoredProfile();
-
-  const [user, setUser] = useState<AuthUser | null>(
-    initialUser || cachedUser || null
-  );
+  // Initialize without localStorage to prevent hydration mismatch
+  const [user, setUser] = useState<AuthUser | null>(initialUser || null);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const supabase = createClient();
   const router = useRouter();
 
@@ -85,6 +82,15 @@ export function AuthProvider({
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    // Mark component as mounted (client-side only)
+    setMounted(true);
+
+    // Load cached user data only on client-side after mount
+    const cachedUser = getStoredUserData();
+    if (cachedUser && !user) {
+      setUser(cachedUser);
+    }
+
     // Always verify cached user against Supabase auth
     const getUser = async () => {
       setLoading(true);
@@ -102,7 +108,8 @@ export function AuthProvider({
           setStoredUserData(userData);
         } else {
           // No valid auth session - clear stale localStorage data
-          if (cachedUser) {
+          const cachedData = getStoredUserData();
+          if (cachedData) {
             console.log("Clearing stale localStorage data - no valid session");
             clearAllStoredData();
           }
@@ -150,6 +157,7 @@ export function AuthProvider({
     });
 
     return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, queryClient]);
 
   const signUp = async (
@@ -158,11 +166,15 @@ export function AuthProvider({
     role: string,
     brandId?: string
   ) => {
+    const redirectUrl = typeof window !== 'undefined' 
+      ? `${window.location.origin}/auth/callback`
+      : '/auth/callback';
+    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: redirectUrl,
       },
     });
 
@@ -406,8 +418,12 @@ export function AuthProvider({
   };
 
   const resetPassword = async (email: string) => {
+    const redirectUrl = typeof window !== 'undefined'
+      ? `${window.location.origin}/auth/reset-password`
+      : '/auth/reset-password';
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
+      redirectTo: redirectUrl,
     });
     return { error };
   };

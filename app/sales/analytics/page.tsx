@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { MainLayout } from "@/components/layout/main-layout";
 import {
   DateFilterProvider,
@@ -7,13 +8,49 @@ import {
 } from "@/contexts/date-filter-context";
 import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { GlobalDateFilter } from "@/components/sales/global-date-filter";
-import { SalesMetricsCards } from "@/components/sales/sales-metrics-cards";
-import { RevenueComparisonChart } from "@/components/sales/revenue-comparison-chart";
-import { SalesByCategoryChart } from "@/components/sales/sales-by-category-chart";
-import { RegionsAndCustomersTabs } from "@/components/sales/regions-and-customers-tabs";
-import { TopSkusTable } from "@/components/sales/top-skus-table";
-import { SeasonalAnalysisChart } from "@/components/sales/seasonal-analysis-chart";
 import { TrendingUp, BarChart3 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Lazy load heavy chart components for better performance
+const SalesMetricsCards = dynamic(
+  () => import("@/components/sales/sales-metrics-cards").then(mod => ({ default: mod.SalesMetricsCards })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const RevenueComparisonChart = dynamic(
+  () => import("@/components/sales/revenue-comparison-chart").then(mod => ({ default: mod.RevenueComparisonChart })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const SeasonalAnalysisChart = dynamic(
+  () => import("@/components/sales/seasonal-analysis-chart").then(mod => ({ default: mod.SeasonalAnalysisChart })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const SalesByCategoryChart = dynamic(
+  () => import("@/components/sales/sales-by-category-chart").then(mod => ({ default: mod.SalesByCategoryChart })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const RegionsAndCustomersTabs = dynamic(
+  () => import("@/components/sales/regions-and-customers-tabs").then(mod => ({ default: mod.RegionsAndCustomersTabs })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const TopSkusTable = dynamic(
+  () => import("@/components/sales/top-skus-table").then(mod => ({ default: mod.TopSkusTable })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+// Loading skeleton for charts
+function ChartSkeleton() {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <Skeleton className="h-8 w-48 mb-4" />
+      <Skeleton className="h-64 w-full" />
+    </div>
+  );
+}
 
 function AnalyticsContent() {
   const { setFilters } = useDateFilters();

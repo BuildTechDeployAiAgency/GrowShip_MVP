@@ -213,8 +213,14 @@ export function DistributorFormDialog({
       return false;
     }
 
-    if (!formData.brand_id) {
+    // Only validate brand_id for super admins or if it's still empty for regular users
+    if (isSuperAdmin && !formData.brand_id) {
       setError("Organization is required");
+      return false;
+    }
+    
+    if (!isSuperAdmin && !formData.brand_id) {
+      setError("Unable to determine your organization. Please refresh the page.");
       return false;
     }
 
@@ -284,19 +290,26 @@ export function DistributorFormDialog({
     }
   };
 
-  // Load organizations for Super Admin
-  const [availableOrgs, setAvailableOrgs] = useState<any[]>([]);
+  // Load brands for Super Admin
+  const [availableBrands, setAvailableBrands] = useState<any[]>([]);
   useEffect(() => {
     if (isSuperAdmin && open) {
-      const loadOrgs = async () => {
+      const loadBrands = async () => {
         const supabase = createClient();
-        const { data } = await supabase
-          .from("organizations")
+        const { data, error } = await supabase
+          .from("brands")
           .select("id, name, organization_type")
+          .eq("is_active", true)
           .order("name");
-        setAvailableOrgs(data || []);
+        
+        if (error) {
+          console.error("Error loading brands:", error);
+          setError("Failed to load organizations. Please try again.");
+        } else {
+          setAvailableBrands(data || []);
+        }
       };
-      loadOrgs();
+      loadBrands();
     }
   }, [isSuperAdmin, open]);
 
@@ -374,11 +387,17 @@ export function DistributorFormDialog({
                         <SelectValue placeholder="Select organization" />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableOrgs.map((org) => (
-                          <SelectItem key={org.id} value={org.id}>
-                            {org.name} ({org.organization_type})
-                          </SelectItem>
-                        ))}
+                        {availableBrands.length === 0 ? (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                            No organizations available
+                          </div>
+                        ) : (
+                          availableBrands.map((brand) => (
+                            <SelectItem key={brand.id} value={brand.id}>
+                              {brand.name} ({brand.organization_type})
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -704,7 +723,7 @@ export function DistributorFormDialog({
             <Button 
               type="submit" 
               disabled={loading || (!isSuperAdmin && !profile?.brand_id)}
-              title={!isSuperAdmin && !profile?.brand_id ? "Please wait while your profile loads..." : ""}
+              title={!isSuperAdmin && !profile?.brand_id ? "Waiting for your profile to load. If this persists, please refresh the page." : ""}
             >
               {loading ? "Saving..." : distributor ? "Update Distributor" : "Create Distributor"}
             </Button>

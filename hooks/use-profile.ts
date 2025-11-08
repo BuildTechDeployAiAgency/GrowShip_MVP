@@ -93,7 +93,7 @@ export function useUserProfile(userId: string | null) {
     queryKey: profileKeys.user(userId || ""),
     queryFn: () => fetchUserProfile(userId!),
     enabled: !!userId,
-    staleTime: Infinity, // Profile set by auth context is always fresh
+    staleTime: 10 * 60 * 1000, // 10 minutes - profile updates are infrequent but should refresh eventually
     gcTime: 60 * 60 * 1000, // 1 hour
     refetchOnWindowFocus: false,
     refetchOnMount: false, // Don't refetch, use data set by auth context
@@ -124,13 +124,15 @@ export function useUpdateProfile() {
       // Update localStorage
       setStoredProfile(updatedProfile);
 
-      // Broadcast storage event to notify other components
-      window.dispatchEvent(
-        new StorageEvent("storage", {
-          key: "user-profile",
-          newValue: JSON.stringify(updatedProfile),
-        })
-      );
+      // Broadcast storage event to notify other components (client-side only)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new StorageEvent("storage", {
+            key: "user-profile",
+            newValue: JSON.stringify(updatedProfile),
+          })
+        );
+      }
 
       // Invalidate and refetch related queries to ensure consistency
       queryClient.invalidateQueries({

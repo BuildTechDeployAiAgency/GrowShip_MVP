@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 interface DateFilters {
   year: number;
@@ -19,10 +19,16 @@ interface DateFilterProviderProps {
 }
 
 export function DateFilterProvider({ children }: DateFilterProviderProps) {
-  const currentYear = new Date().getFullYear();
+  // Initialize with a static value to prevent hydration mismatch
   const [filters, setFilters] = useState<DateFilters>({
-    year: currentYear,
+    year: 2025, // Will be updated on client mount
   });
+
+  // Update to current year after mount (client-side only)
+  useEffect(() => {
+    const currentYear = new Date().getFullYear();
+    setFilters((prev) => ({ ...prev, year: currentYear }));
+  }, []);
 
   return (
     <DateFilterContext.Provider value={{ filters, setFilters }}>

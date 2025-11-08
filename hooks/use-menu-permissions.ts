@@ -40,10 +40,10 @@ export function useUserMenuPermissions(userId: string | null) {
     initialData: cachedMenuData
       ? { menuItems: cachedMenuData, error: null }
       : undefined,
-    staleTime: 5 * 60 * 1000, // 5 minutes - will refetch in background after this
+    staleTime: 15 * 60 * 1000, // 15 minutes - menu permissions don't change often
     gcTime: 60 * 60 * 1000, // 1 hour
     refetchOnWindowFocus: false,
-    refetchOnMount: true, // Refetch on mount to ensure fresh data
+    refetchOnMount: false, // Don't refetch on mount - menu data is set by auth context
     refetchOnReconnect: true,
   });
 }

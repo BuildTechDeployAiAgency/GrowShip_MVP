@@ -3,3 +3,10 @@ alwaysApply: true
 ---
 
 When you finishe a development the .md file created for that development documeting all that has been done should be saved into the Project-Research-Files folder.
+
+Always keep in mind and alert me of any extra features we need to implement to escalability wise have ready to support when we implement the import featurs using ExcelJS library to allow Distirbutors users to import orders in bulk on monthly basis.
+Not necessaiy implement without my approval approval is needed always.
+
+At every GitHub Commit we Create a file in .md format in the ChangeLogs folder. the file is in .md format and should show all the changes for that day.
+
+Exclude these files in our GitHub commit.
