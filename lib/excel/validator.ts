@@ -117,15 +117,32 @@ export async function validateOrders(
 
     // Validate email format if provided
     if (order.customer_email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(order.customer_email)) {
+      // Trim email to handle whitespace issues
+      const trimmedEmail = order.customer_email.trim();
+      
+      // Skip validation if email becomes empty after trimming
+      if (!trimmedEmail) {
         orderErrors.push({
           row: order.row,
           field: "customer_email",
-          message: "Invalid email format",
+          message: "Email cannot be empty or whitespace only",
           code: "INVALID_EMAIL",
           value: order.customer_email,
         });
+      } else {
+        // More robust email regex pattern
+        // Allows: letters, numbers, dots, underscores, percent, plus, hyphens in local part
+        // Domain must have at least one dot and valid TLD (2+ letters)
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(trimmedEmail)) {
+          orderErrors.push({
+            row: order.row,
+            field: "customer_email",
+            message: `Invalid email format: "${trimmedEmail}"`,
+            code: "INVALID_EMAIL",
+            value: trimmedEmail,
+          });
+        }
       }
     }
 

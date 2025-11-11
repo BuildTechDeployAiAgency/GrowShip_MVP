@@ -4,8 +4,13 @@ import { getEnabledFields, getFieldConfig } from "./template-config";
 
 /**
  * Parse orders from an Excel file
+ * Returns orders and extracted distributor_id
  */
-export async function parseOrdersExcel(fileBuffer: Buffer): Promise<ParsedOrder[]> {
+export async function parseOrdersExcel(fileBuffer: Buffer): Promise<{
+  orders: ParsedOrder[];
+  extractedDistributorId?: string;
+  distributorIdConsistent: boolean;
+}> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(fileBuffer);
 
@@ -42,6 +47,7 @@ export async function parseOrdersExcel(fileBuffer: Buffer): Promise<ParsedOrder[
   // Parse rows into orders
   const ordersMap = new Map<string, ParsedOrder>();
   const rows: any[] = [];
+  const distributorIds = new Set<string>();
 
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return; // Skip header row
@@ -58,8 +64,30 @@ export async function parseOrdersExcel(fileBuffer: Buffer): Promise<ParsedOrder[
     // Only process rows with data
     if (hasData(rowData, headers)) {
       rows.push(rowData);
+      
+      // Collect distributor IDs from rows
+      const distributorId = String(rowData["Distributor ID"] || "").trim();
+      if (distributorId) {
+        distributorIds.add(distributorId);
+      }
     }
   });
+
+  // Extract and validate distributor ID
+  let extractedDistributorId: string | undefined;
+  let distributorIdConsistent = true;
+
+  if (distributorIds.size > 1) {
+    // Multiple different distributor IDs found
+    distributorIdConsistent = false;
+    throw new Error(
+      `Multiple distributor IDs found in sheet: ${Array.from(distributorIds).join(", ")}. Only one distributor per upload is allowed.`
+    );
+  } else if (distributorIds.size === 1) {
+    // Single distributor ID found
+    extractedDistributorId = Array.from(distributorIds)[0];
+  }
+  // If distributorIds.size === 0, all rows have empty distributor ID (allowed for distributor users)
 
   // Group rows by order (same order_date + customer_name = same order)
   for (const rowData of rows) {
@@ -81,7 +109,7 @@ export async function parseOrdersExcel(fileBuffer: Buffer): Promise<ParsedOrder[
         row: rowData.row,
         order_date: orderDate,
         customer_name: customerName,
-        customer_email: rowData["Customer Email"] || undefined,
+        customer_email: parseEmail(rowData["Customer Email"]),
         customer_phone: rowData["Customer Phone"] || undefined,
         customer_type: rowData["Customer Type"] || undefined,
         items: [],
@@ -98,7 +126,7 @@ export async function parseOrdersExcel(fileBuffer: Buffer): Promise<ParsedOrder[
         notes: rowData["Notes"] || undefined,
         payment_method: rowData["Payment Method"] || undefined,
         payment_status: rowData["Payment Status"] || undefined,
-        distributor_id: rowData["Distributor ID"] || undefined,
+        distributor_id: extractedDistributorId || rowData["Distributor ID"] || undefined,
       };
       ordersMap.set(orderKey, order);
     }
@@ -132,7 +160,11 @@ export async function parseOrdersExcel(fileBuffer: Buffer): Promise<ParsedOrder[
     }
   }
 
-  return Array.from(ordersMap.values());
+  return {
+    orders: Array.from(ordersMap.values()),
+    extractedDistributorId,
+    distributorIdConsistent,
+  };
 }
 
 /**
@@ -153,6 +185,11 @@ function getCellValue(cell: ExcelJS.Cell): any {
     return cell.value.result;
   }
 
+  // Handle hyperlinks (ExcelJS represents hyperlinks as objects with text property)
+  if (typeof cell.value === "object" && "text" in cell.value && typeof cell.value.text === "string") {
+    return cell.value.text;
+  }
+
   // Handle dates
   if (cell.type === ExcelJS.ValueType.Date) {
     return cell.value;
@@ -169,6 +206,51 @@ function hasData(rowData: any, headers: string[]): boolean {
     const value = rowData[header];
     return value !== undefined && value !== null && String(value).trim() !== "";
   });
+}
+
+/**
+ * Convert Excel date serial number to JavaScript Date
+ * Excel epoch: January 1, 1900 (day 1)
+ * JavaScript epoch: January 1, 1970
+ * 
+ * Excel incorrectly treats 1900 as a leap year, so we account for that.
+ * Excel day 1 = January 1, 1900
+ * Excel day 60 = February 29, 1900 (which doesn't exist, but Excel counts it)
+ */
+function excelSerialToJSDate(serial: number): Date {
+  // Excel serial date: days since 1900-01-01 (day 1)
+  // JavaScript Date: milliseconds since 1970-01-01
+  
+  // Days between 1900-01-01 and 1970-01-01 = 25569
+  // But Excel incorrectly counts 1900 as a leap year, so we adjust
+  const utcDays = Math.floor(serial - 25569);
+  const utcValue = utcDays * 86400; // Convert to seconds
+  
+  // Create base date from UTC
+  const dateInfo = new Date(utcValue * 1000);
+  
+  // Handle fractional day (time component)
+  const fractionalDay = serial - Math.floor(serial) + 0.0000001;
+  let totalSeconds = Math.floor(86400 * fractionalDay);
+  
+  const seconds = totalSeconds % 60;
+  totalSeconds -= seconds;
+  
+  const hours = Math.floor(totalSeconds / (60 * 60));
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  
+  // Create final date with time component
+  // Use UTC methods to avoid timezone issues
+  const finalDate = new Date(Date.UTC(
+    dateInfo.getUTCFullYear(),
+    dateInfo.getUTCMonth(),
+    dateInfo.getUTCDate(),
+    hours,
+    minutes,
+    seconds
+  ));
+  
+  return finalDate;
 }
 
 /**
@@ -200,11 +282,66 @@ function parseDate(value: any): string | undefined {
 
   // If it's a number (Excel date serial)
   if (typeof value === "number") {
-    const date = ExcelJS.Workbook.excelDateToJSDate(value);
+    const date = excelSerialToJSDate(value);
     return date.toISOString().split("T")[0];
   }
 
   return undefined;
+}
+
+/**
+ * Safely convert a value to a string for email fields
+ * Handles Date objects, other objects, and edge cases
+ */
+function parseEmail(value: any): string | undefined {
+  if (value === null || value === undefined || value === "") {
+    return undefined;
+  }
+
+  // If already a string, trim it
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+
+  // If it's a Date object, it's likely a mistake (email shouldn't be a date)
+  // Return undefined to let validation catch it
+  if (value instanceof Date) {
+    return undefined;
+  }
+
+  // If it's an object, try to extract meaningful string value
+  if (typeof value === "object") {
+    // Handle ExcelJS hyperlink objects: { text: "...", hyperlink: "..." }
+    if ("text" in value && typeof value.text === "string") {
+      return value.text.trim() || undefined;
+    }
+    
+    // Handle ExcelJS rich text objects: { richText: [...] }
+    if ("richText" in value && Array.isArray(value.richText)) {
+      const text = value.richText.map((t: any) => t.text || "").join("");
+      return text.trim() || undefined;
+    }
+    
+    // Handle formula result objects: { result: ... }
+    if ("result" in value) {
+      return parseEmail(value.result);
+    }
+    
+    // Check if it has a toString method that's not the default Object.toString
+    if (value.toString && typeof value.toString === "function") {
+      const str = value.toString();
+      if (str !== "[object Object]") {
+        return str.trim() || undefined;
+      }
+    }
+    
+    // Last resort: return undefined for objects we can't convert
+    return undefined;
+  }
+
+  // For other types (number, boolean, etc.), convert to string
+  return String(value).trim() || undefined;
 }
 
 /**
