@@ -190,6 +190,16 @@ export function TopRegionsCountriesChart() {
               <span>Loading regions data...</span>
             </div>
           </div>
+        ) : !data || data.length === 0 || cardData.length === 0 ? (
+          <div className="py-12 text-center">
+            <div className="text-gray-400 mb-2">
+              <MapPin className="mx-auto h-12 w-12" />
+            </div>
+            <p className="text-gray-500 text-sm font-medium">Data not available yet</p>
+            <p className="text-gray-400 text-xs mt-1">
+              No regional sales data for the selected period
+            </p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-6">
             {/* Full width chart */}

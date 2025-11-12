@@ -4,24 +4,61 @@ import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { ProfileSetup } from "@/components/auth/profile-setup";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 function ProfileSetupPageContent() {
   const { user, profile, loading, profileLoading } = useEnhancedAuth();
   const router = useRouter();
+  const redirectAttempted = useRef(false);
+  const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!loading && !profileLoading) {
+    // Clear any pending timeout
+    if (checkTimeoutRef.current) {
+      clearTimeout(checkTimeoutRef.current);
+    }
+
+    // Prevent multiple redirect attempts
+    if (redirectAttempted.current) {
+      return;
+    }
+
+    // Wait for loading to complete before checking
+    if (loading || profileLoading) {
+      return;
+    }
+
+    // Add a small delay to ensure profile data is stable
+    checkTimeoutRef.current = setTimeout(() => {
       if (!user) {
-        router.push("/");
+        console.log("[Profile Setup] No user found, redirecting to home");
+        redirectAttempted.current = true;
+        router.replace("/");
         return;
       }
 
-      if (profile && profile.is_profile_complete) {
-        router.push("/dashboard");
+      // Only redirect if profile is definitely complete
+      // This prevents redirect loops caused by stale cache data
+      if (profile?.is_profile_complete === true) {
+        console.log("[Profile Setup] Profile complete, redirecting to dashboard");
+        redirectAttempted.current = true;
+        // Use replace instead of push to prevent back navigation issues
+        router.replace("/dashboard");
         return;
       }
-    }
+
+      // If profile exists but is incomplete, allow setup to proceed
+      if (profile && profile.is_profile_complete === false) {
+        console.log("[Profile Setup] Profile incomplete, showing setup form");
+        redirectAttempted.current = false; // Reset to allow form submission
+      }
+    }, 100); // Small delay to ensure data consistency
+
+    return () => {
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+      }
+    };
   }, [user, profile, loading, profileLoading, router]);
 
   if (loading || profileLoading) {

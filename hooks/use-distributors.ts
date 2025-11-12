@@ -49,6 +49,7 @@ interface UseDistributorsOptions {
   searchTerm: string;
   filters: DistributorFilters;
   brandId?: string;
+  distributorId?: string; // For distributor_admin users, only return their own distributor
   debounceMs?: number;
   isSuperAdmin?: boolean;
 }
@@ -68,13 +69,17 @@ async function fetchDistributors(
   debouncedSearchTerm: string,
   filters: DistributorFilters,
   brandId?: string,
-  isSuperAdmin: boolean = false
+  isSuperAdmin: boolean = false,
+  distributorId?: string
 ): Promise<{ distributors: Distributor[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("distributors").select("*", { count: "exact" });
 
-  // Only apply brand_id filter if not Super Admin
-  if (brandId && !isSuperAdmin) {
+  // For distributor_admin users, only return their own distributor
+  if (distributorId) {
+    query = query.eq("id", distributorId);
+  } else if (brandId && !isSuperAdmin) {
+    // Only apply brand_id filter if not Super Admin and not filtering by distributor_id
     query = query.eq("brand_id", brandId);
   }
 
@@ -106,6 +111,7 @@ export function useDistributors({
   searchTerm,
   filters,
   brandId,
+  distributorId,
   debounceMs = 300,
   isSuperAdmin = false,
 }: UseDistributorsOptions): UseDistributorsReturn {
@@ -121,8 +127,8 @@ export function useDistributors({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["distributors", debouncedSearchTerm, filters, brandId, isSuperAdmin],
-    queryFn: () => fetchDistributors(debouncedSearchTerm, filters, brandId, isSuperAdmin),
+    queryKey: ["distributors", debouncedSearchTerm, filters, brandId, isSuperAdmin, distributorId],
+    queryFn: () => fetchDistributors(debouncedSearchTerm, filters, brandId, isSuperAdmin, distributorId),
     staleTime: 0,
   });
 

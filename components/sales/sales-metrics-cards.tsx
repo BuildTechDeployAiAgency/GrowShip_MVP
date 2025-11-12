@@ -132,9 +132,32 @@ export function SalesMetricsCards() {
   }, [data]);
 
   if (error) {
+    // Check if it's a connectivity issue vs missing function
+    const isConnectivityError = 
+      error.includes("Failed to fetch") ||
+      error.includes("NetworkError") ||
+      error.includes("timeout") ||
+      error.includes("ECONNREFUSED");
+
     return (
-      <div className="text-center py-8 text-red-600">
-        <p>Error loading metrics: {error}</p>
+      <div className="text-center py-8">
+        {isConnectivityError ? (
+          <div className="text-red-600">
+            <p className="font-semibold">Connection Error</p>
+            <p className="text-sm mt-1">Unable to connect to the server. Please check your connection.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+            >
+              Retry Connection
+            </button>
+          </div>
+        ) : (
+          <div className="text-amber-600">
+            <p className="font-semibold">Data Unavailable</p>
+            <p className="text-sm mt-1 text-gray-600">Metrics are not available at this time.</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -147,6 +170,31 @@ export function SalesMetricsCards() {
             <CardContent className="p-6">
               <div className="flex items-center justify-center h-48">
                 <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  // Check if data is null or all values are zero (no real data)
+  const hasNoData = !data || (
+    data.total_revenue === 0 &&
+    data.profit_margin === 0 &&
+    data.target_achievement === 0 &&
+    data.pending_orders_count === 0
+  );
+
+  if (hasNoData) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center justify-center h-48 text-gray-500">
+                <p className="text-sm font-medium">Data not available yet</p>
+                <p className="text-xs mt-1 text-gray-400">No metrics for selected period</p>
               </div>
             </CardContent>
           </Card>

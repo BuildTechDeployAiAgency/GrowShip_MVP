@@ -90,10 +90,12 @@ export function InvoiceFormDialog({
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
   });
 
+  const isDistributorAdmin = profile?.role_name?.startsWith("distributor_");
   const { distributors } = useDistributors({
     searchTerm: "",
     filters: { status: "all" },
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    distributorId: isDistributorAdmin ? profile.distributor_id : undefined,
     isSuperAdmin,
   });
 
@@ -106,6 +108,7 @@ export function InvoiceFormDialog({
       dateRange: "all",
     },
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    distributorId: isDistributorAdmin ? profile.distributor_id : undefined,
   });
 
   // Memoize today's date to prevent hydration issues
@@ -164,10 +167,16 @@ export function InvoiceFormDialog({
       setLinkToOrder(!!invoice.order_id);
     } else if (open && !profileLoading) {
       // Creating new invoice
+      // For distributor_admin users, auto-populate their distributor_id
       const initialDate = todayDate;
+      const initialDistributorId = isDistributorAdmin && profile?.distributor_id 
+        ? profile.distributor_id 
+        : undefined;
+      
       setFormData({
         customer_name: "",
         brand_id: profile?.brand_id || "",
+        distributor_id: initialDistributorId,
         subtotal: 0,
         tax_total: 0,
         discount_total: 0,
@@ -179,7 +188,7 @@ export function InvoiceFormDialog({
       });
       setLinkToOrder(false);
     }
-  }, [open, invoice, profileLoading, profile?.brand_id, todayDate]);
+  }, [open, invoice, profileLoading, profile?.brand_id, todayDate, isDistributorAdmin, profile?.distributor_id]);
 
   // Auto-populate from selected order
   useEffect(() => {

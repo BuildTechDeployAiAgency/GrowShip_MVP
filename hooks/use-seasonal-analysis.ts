@@ -60,8 +60,30 @@ async function fetchSeasonalAnalysis(
   );
 
   if (error) {
+    // Check if RPC function doesn't exist (404 or function not found error)
+    const isFunctionNotFound = 
+      error.code === "P0004" || 
+      error.message?.includes("Could not find the function") ||
+      error.message?.includes("does not exist") ||
+      error.code === "42883";
+
+    if (isFunctionNotFound) {
+      // eslint-disable-next-line no-console
+      console.warn("RPC function 'get_seasonal_analysis' not found. Returning empty data.", {
+        message: error.message,
+        code: error.code,
+      });
+      return []; // Return empty array instead of throwing
+    }
+
     // eslint-disable-next-line no-console
-    console.error("Error fetching seasonal analysis:", error);
+    console.error("Error fetching seasonal analysis:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      error: error,
+    });
     throw new Error(error.message || "Failed to fetch seasonal analysis");
   }
 
@@ -108,6 +130,7 @@ export function useSeasonalAnalysis({
     enabled: enabled && !!user && !!profile,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnMount: true, // Ensure data refreshes when component mounts
   });
 
   return {

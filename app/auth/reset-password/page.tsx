@@ -14,6 +14,7 @@ import {
 import { Lock, CheckCircle } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "react-toastify";
+import { createClient } from "@/lib/supabase/client";
 
 function ResetPasswordContent() {
   const [password, setPassword] = useState("");
@@ -21,29 +22,110 @@ function ResetPasswordContent() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [isValidSession, setIsValidSession] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const { updatePassword } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const supabase = createClient();
 
   useEffect(() => {
-    const code = searchParams.get("code");
+    const establishSession = async () => {
+      // First, check for hash parameters (for magic link/email confirmation flows)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      const type = hashParams.get("type");
 
-    if (code) {
-      setIsValidSession(true);
-    } else {
-      toast.error("Invalid or expired reset link");
-      const from = searchParams.get("from");
-      if (from === "manufacturer") {
-        router.push("/auth/manufacturer");
-      } else if (from === "distributor") {
-        router.push("/auth/distributor");
-      } else if (from === "brand") {
-        router.push("/auth/brand");
-      } else {
-        router.push("/");
+      // Check for code parameter (for PKCE flows)
+      const code = searchParams.get("code");
+
+      console.log("Reset password flow - checking parameters:", {
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        hasCode: !!code,
+        type,
+      });
+
+      // Handle hash-based session (magic link/email confirmation)
+      if (accessToken && refreshToken && type === "recovery") {
+        console.log("Using hash-based recovery tokens");
+        try {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (error) {
+            console.error("Error setting session from recovery tokens:", error);
+            setSessionError(error.message);
+            toast.error("Invalid or expired reset link. Please request a new one.");
+            redirectToLogin();
+            return;
+          }
+
+          if (data.session) {
+            setIsValidSession(true);
+            console.log("Password reset session established from hash tokens");
+            return;
+          }
+        } catch (err) {
+          console.error("Unexpected error setting session:", err);
+          setSessionError("An unexpected error occurred");
+          toast.error("An unexpected error occurred. Please try again.");
+          return;
+        }
       }
-    }
-  }, [searchParams, router]);
+
+      // Handle PKCE code-based session
+      if (code) {
+        console.log("Using PKCE code exchange");
+        try {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+          if (error) {
+            console.error("Error exchanging code for session:", error);
+            setSessionError(error.message);
+            toast.error("Invalid or expired reset link. Please request a new one.");
+            redirectToLogin();
+            return;
+          }
+
+          if (data.session) {
+            setIsValidSession(true);
+            console.log("Password reset session established from PKCE code");
+            return;
+          }
+        } catch (err) {
+          console.error("Unexpected error exchanging code:", err);
+          setSessionError("An unexpected error occurred");
+          toast.error("An unexpected error occurred. Please try again.");
+          return;
+        }
+      }
+
+      // No valid parameters found
+      console.error("No valid reset parameters found");
+      toast.error("Invalid or expired reset link");
+      redirectToLogin();
+    };
+
+    const redirectToLogin = () => {
+      setTimeout(() => {
+        const from = searchParams.get("from");
+        if (from === "manufacturer") {
+          router.push("/auth/manufacturer");
+        } else if (from === "distributor") {
+          router.push("/auth/distributor");
+        } else if (from === "brand") {
+          router.push("/auth/brand");
+        } else {
+          router.push("/");
+        }
+      }, 3000);
+    };
+
+    establishSession();
+  }, [searchParams, router, supabase.auth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +160,7 @@ function ResetPasswordContent() {
     }
   };
 
-  if (!isValidSession) {
+  if (!isValidSession && sessionError) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="max-w-md mx-auto">
@@ -92,6 +174,11 @@ function ResetPasswordContent() {
             <p className="text-gray-600 mb-4">
               This password reset link is invalid or has expired.
             </p>
+            {sessionError && (
+              <p className="text-sm text-red-600 mb-4">
+                Error: {sessionError}
+              </p>
+            )}
             <Button onClick={() => router.push("/auth/brand")}>
               Request New Reset Link
             </Button>

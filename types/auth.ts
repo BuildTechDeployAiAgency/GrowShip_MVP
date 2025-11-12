@@ -5,13 +5,16 @@ export type UserRoleName =
   | "brand_finance"
   | "brand_manager"
   | "brand_user"
+  | "brand_customer"
   | "distributor_admin"
   | "distributor_finance"
   | "distributor_manager"
   | "distributor_user"
+  | "distributor_customer"
   | "manufacturer_admin"
   | "manufacturer_finance"
-  | "manufacturer_manager";
+  | "manufacturer_manager"
+  | "manufacturer_customer";
 
 export type UserStatus = "pending" | "approved" | "suspended";
 
@@ -36,8 +39,14 @@ export interface UserProfile {
   user_status: UserStatus;
   brand_id?: string;
   parent_brand_id?: string;
+  distributor_id?: string;
   created_at: string;
   updated_at: string;
+  // Brand data from join (optional)
+  brand_name?: string;
+  brand_slug?: string;
+  organization_type?: Brand["organization_type"];
+  memberships?: Array<UserMembership & { brand?: Brand }>;
 }
 
 // Brand interface (formerly Organization)
@@ -63,6 +72,7 @@ export interface UserMembership {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  brand?: Brand;
 }
 
 export interface PermissionLevel {

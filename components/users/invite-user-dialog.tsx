@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Mail, User, Building, Shield } from "lucide-react";
+import { Mail, User, Building, Building2, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,20 +33,24 @@ interface InviteFormData {
   email: string;
   role: string;
   message: string;
+  brand_id: string;
 }
 
 export function InviteUserDialog({
   open,
   onOpenChange,
 }: InviteUserDialogProps) {
-  const { profile, currentOrganization } = useEnhancedAuth();
+  const { profile, currentOrganization, organizations, canPerformAction } = useEnhancedAuth();
   const [formData, setFormData] = useState<InviteFormData>({
     email: "",
     role: "",
     message: "",
+    brand_id: currentOrganization?.id || "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const isSuperAdmin = profile?.role_name === "super_admin";
 
   // Show info notification when dialog opens
   React.useEffect(() => {
@@ -81,6 +85,12 @@ export function InviteUserDialog({
       return;
     }
 
+    // Validate brand selection for super admins
+    if (isSuperAdmin && !formData.brand_id) {
+      setError("Please select a brand for this user");
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -104,7 +114,7 @@ export function InviteUserDialog({
           email: formData.email,
           role: formData.role,
           message: formData.message,
-          brand_id: currentOrganization?.id || profile?.brand_id,
+          brand_id: formData.brand_id || currentOrganization?.id || profile?.brand_id,
         }),
       });
 
@@ -142,6 +152,7 @@ export function InviteUserDialog({
         email: "",
         role: "",
         message: "",
+        brand_id: currentOrganization?.id || "",
       });
       setError(null);
       onOpenChange(false);
@@ -165,7 +176,7 @@ export function InviteUserDialog({
           "You are not authorized to send invitations. Please contact your administrator.";
       } else if (errorMessage.includes("Forbidden")) {
         notificationMessage =
-          "You don't have permission to invite users. Only brand administrators can send invitations.";
+          "You don't have permission to invite users. Only brand administrators and super administrators can send invitations.";
       } else if (errorMessage.includes("Missing required fields")) {
         notificationMessage =
           "Please fill in all required fields before sending the invitation.";
@@ -213,6 +224,7 @@ export function InviteUserDialog({
         email: "",
         role: "",
         message: "",
+        brand_id: currentOrganization?.id || "",
       });
       setError(null);
       onOpenChange(false);
@@ -254,6 +266,32 @@ export function InviteUserDialog({
               required
             />
           </div>
+
+          {isSuperAdmin && (
+            <div className="space-y-2">
+              <Label htmlFor="brand" className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Brand *
+              </Label>
+              <Select
+                value={formData.brand_id}
+                onValueChange={(value: string) =>
+                  handleInputChange("brand_id", value)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a brand" />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="role" className="flex items-center gap-2">

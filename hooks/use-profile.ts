@@ -135,7 +135,13 @@ export function useUpdateProfile() {
       }
 
       // Invalidate and refetch related queries to ensure consistency
+      // This ensures all components see the updated profile immediately
       queryClient.invalidateQueries({
+        queryKey: profileKeys.user(updatedProfile.user_id),
+      });
+      
+      // Force a refetch to ensure the latest data is loaded
+      queryClient.refetchQueries({
         queryKey: profileKeys.user(updatedProfile.user_id),
       });
     },

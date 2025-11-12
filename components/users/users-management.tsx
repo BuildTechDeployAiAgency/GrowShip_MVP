@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -40,11 +40,13 @@ import { useUsers } from "@/hooks/use-users";
 import { useCustomers } from "@/hooks/use-customers";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { MainLayout } from "@/components/layout/main-layout";
+import { useOrganizations } from "@/hooks/use-organizations";
+import { toast } from "react-toastify";
 
 type TabType = "users" | "customers";
 
 export function UsersManagement() {
-  const { currentOrganization, profile } = useEnhancedAuth();
+  const { currentOrganization, profile, profileLoading } = useEnhancedAuth();
   const [activeTab, setActiveTab] = useState<TabType>("users");
   const [searchTerm, setSearchTerm] = useState("");
   const [showInviteDialog, setShowInviteDialog] = useState(false);
@@ -54,14 +56,16 @@ export function UsersManagement() {
     useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
-
-  console.log("profile", profile);
+  const [passwordResettingUserId, setPasswordResettingUserId] = useState<
+    string | null
+  >(null);
 
   // Users filters
   const [usersFilters, setUsersFilters] = useState({
     role: "all",
     status: "all",
     company: "all",
+    organization: "all",
   });
 
   // Customers filters
@@ -71,6 +75,29 @@ export function UsersManagement() {
   });
 
   // Fetch users data
+  // Super admins should see all users (brandId = undefined), brand admins see only their brand
+  const isSuperAdmin = profile?.role_name === "super_admin";
+  
+  // Debug logging
+  useEffect(() => {
+    if (profile) {
+      console.log("[UsersManagement] Profile loaded:", {
+        userId: profile.user_id,
+        role_name: profile.role_name,
+        role_type: profile.role_type,
+        brand_id: profile.brand_id,
+        isSuperAdmin,
+        profileLoading,
+      });
+    }
+  }, [profile, isSuperAdmin, profileLoading]);
+  
+  const { organizations: allOrganizations, loading: organizationsLoading } =
+    useOrganizations({ enabled: isSuperAdmin });
+  const organizationMap = useMemo(() => {
+    return new Map(allOrganizations.map((org) => [org.id, org]));
+  }, [allOrganizations]);
+
   const {
     totalCount: usersTotalCount,
     users,
@@ -82,10 +109,13 @@ export function UsersManagement() {
   } = useUsers({
     searchTerm,
     filters: usersFilters,
-    brandId: profile?.brand_id,
+    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    isSuperAdmin: isSuperAdmin, // Pass explicit flag
+    enabled: !profileLoading, // Wait for profile to load
   });
 
   // Fetch customers data
+  // Super admins should see all customers (brandId = undefined), brand admins see only their brand
   const {
     totalCount: customersTotalCount,
     customers,
@@ -97,7 +127,9 @@ export function UsersManagement() {
   } = useCustomers({
     searchTerm,
     filters: customersFilters,
-    brandId: profile?.brand_id,
+    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    isSuperAdmin: isSuperAdmin, // Pass explicit flag
+    enabled: !profileLoading, // Wait for profile to load
   });
 
   const usersStatusCounts = users.reduce((acc, user) => {
@@ -110,11 +142,49 @@ export function UsersManagement() {
     return acc;
   }, {} as Record<string, number>);
 
+  const handleResetPassword = async (userId: string) => {
+    if (!isSuperAdmin || !userId) {
+      return;
+    }
+
+    try {
+      setPasswordResettingUserId(userId);
+      const response = await fetch("/api/users/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to trigger password reset.");
+      }
+
+      toast.success(
+        result?.message || "Password reset email has been sent successfully."
+      );
+    } catch (error: any) {
+      console.error("Error sending password reset:", error);
+      toast.error(
+        error?.message ||
+          "Unable to send password reset email. Please try again."
+      );
+    } finally {
+      setPasswordResettingUserId(null);
+    }
+  };
+
   const activeFiltersCount =
     activeTab === "users"
-      ? [usersFilters.role, usersFilters.status, usersFilters.company].filter(
-          (f) => f !== "all"
-        ).length
+      ? [
+          usersFilters.role,
+          usersFilters.status,
+          usersFilters.company,
+          usersFilters.organization,
+        ].filter((f) => f !== "all").length
       : [customersFilters.status, customersFilters.company].filter(
           (f) => f !== "all"
         ).length;
@@ -205,6 +275,35 @@ export function UsersManagement() {
       actions={headerActions}
     >
       <div className="space-y-6">
+        {/* Pending Approvals Banner - Show for super admins and brand admins */}
+        {(isSuperAdmin || profile?.role_name === "brand_admin") && 
+         currentData.statusCounts.pending > 0 && activeTab === "users" && (
+          <Card className="border-l-4 border-yellow-500 bg-yellow-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-yellow-900">
+                    {currentData.statusCounts.pending} User{currentData.statusCounts.pending > 1 ? "s" : ""} Awaiting Approval
+                  </h3>
+                  <p className="text-sm text-yellow-800 mt-1">
+                    {isSuperAdmin 
+                      ? "As a super admin, you can approve users from all brands."
+                      : "Review and approve pending users for your brand."}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => setUsersFilters({ ...usersFilters, status: "pending" })}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                >
+                  Review Pending Users
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tabs Section */}
         <Card className="border-0 shadow-sm bg-white">
           <CardContent className="p-0">
@@ -546,6 +645,85 @@ export function UsersManagement() {
                   </DropdownMenu>
                 )}
 
+                {activeTab === "users" && isSuperAdmin && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-1 sm:gap-2 h-10 sm:h-11 px-2 sm:px-4 flex-1 sm:flex-none"
+                      >
+                        <Building2 className="h-4 w-4" />
+                        <span className="text-xs sm:text-sm">Organization</span>
+                        {usersFilters.organization !== "all" && (
+                          <Badge
+                            variant="secondary"
+                            className="ml-1 h-4 sm:h-5 px-1.5 sm:px-2 text-xs"
+                          >
+                            1
+                          </Badge>
+                        )}
+                        <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-64 max-h-72 overflow-y-auto"
+                    >
+                      <DropdownMenuLabel>
+                        Filter by Organization
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() =>
+                          setUsersFilters({
+                            ...usersFilters,
+                            organization: "all",
+                          })
+                        }
+                        className="flex items-center justify-between"
+                      >
+                        All Organizations
+                        {usersFilters.organization === "all" && (
+                          <Check className="h-4 w-4" />
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {organizationsLoading && (
+                        <DropdownMenuItem disabled className="text-gray-500">
+                          Loading organizations...
+                        </DropdownMenuItem>
+                      )}
+                      {!organizationsLoading &&
+                        allOrganizations.map((organization) => (
+                          <DropdownMenuItem
+                            key={organization.id}
+                            onClick={() =>
+                              setUsersFilters({
+                                ...usersFilters,
+                                organization: organization.id,
+                              })
+                            }
+                            className="flex items-center justify-between gap-2"
+                          >
+                            <span className="truncate">{organization.name}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-[10px]">
+                                {organization.organization_type
+                                  ?.replace(/_/g, " ")
+                                  .replace(/\b\w/g, (l) => l.toUpperCase()) ||
+                                  "Brand"}
+                              </Badge>
+                              {usersFilters.organization === organization.id && (
+                                <Check className="h-4 w-4" />
+                              )}
+                            </div>
+                          </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -692,6 +870,14 @@ export function UsersManagement() {
                         usersFilters.status.slice(1)}
                     </Badge>
                   )}
+                  {activeTab === "users" &&
+                    usersFilters.organization !== "all" && (
+                      <Badge variant="outline" className="text-xs">
+                        Org:{" "}
+                        {organizationMap.get(usersFilters.organization)?.name ||
+                          "Unknown"}
+                      </Badge>
+                    )}
                   {activeTab === "customers" &&
                     customersFilters.status !== "all" && (
                       <Badge variant="outline" className="text-xs">
@@ -709,6 +895,7 @@ export function UsersManagement() {
                             role: "all",
                             status: "all",
                             company: "all",
+                            organization: "all",
                           })
                         : setCustomersFilters({ status: "all", company: "all" })
                     }
@@ -732,7 +919,10 @@ export function UsersManagement() {
             error={usersError}
             refetch={refetchUsers}
             updateUserStatus={updateUserStatus}
-            deleteUser={deleteUser}
+          deleteUser={deleteUser}
+          isSuperAdmin={isSuperAdmin}
+          onResetPassword={handleResetPassword}
+          passwordResettingUserId={passwordResettingUserId}
           />
         ) : (
           <CustomersList

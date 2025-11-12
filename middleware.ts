@@ -90,24 +90,49 @@ export async function middleware(request: NextRequest) {
     !request.nextUrl.pathname.startsWith("/profile/setup")
   ) {
     try {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("user_profiles")
-        .select("*")
+        .select("is_profile_complete")
         .eq("user_id", user.id)
         .single();
 
-      if (!profile || !profile.is_profile_complete) {
-        // Profile not complete, redirect to profile setup
+      // If there's an error fetching profile, allow access but log it
+      // This prevents redirect loops if there's a temporary DB issue
+      if (profileError) {
+        console.error("[Middleware] Error checking profile:", {
+          userId: user.id,
+          error: profileError.message,
+          path: request.nextUrl.pathname,
+        });
+        // Only redirect if it's a "not found" error, otherwise allow access
+        if (profileError.code === "PGRST116") {
+          // Profile not found - redirect to setup
+          const url = request.nextUrl.clone();
+          url.pathname = "/profile/setup";
+          return NextResponse.redirect(url);
+        }
+        // For other errors, allow access to prevent loops
+        return supabaseResponse;
+      }
+
+      // Only redirect if profile is explicitly incomplete
+      // Use strict equality check to avoid issues with null/undefined
+      if (!profile || profile.is_profile_complete === false) {
         const url = request.nextUrl.clone();
         url.pathname = "/profile/setup";
         return NextResponse.redirect(url);
       }
+
+      // Profile is complete, allow access
     } catch (error) {
-      console.error("Error checking profile in middleware:", error);
-      // If there's an error checking profile, redirect to profile setup
-      const url = request.nextUrl.clone();
-      url.pathname = "/profile/setup";
-      return NextResponse.redirect(url);
+      console.error("[Middleware] Unexpected error checking profile:", {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+        path: request.nextUrl.pathname,
+      });
+      // On unexpected errors, allow access to prevent redirect loops
+      // The client-side check will handle the redirect if needed
+      return supabaseResponse;
     }
   }
 

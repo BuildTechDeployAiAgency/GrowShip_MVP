@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
@@ -93,7 +93,7 @@ export function EnhancedAuthProvider({
   const [memberships, setMemberships] = useState<UserMembership[]>([]);
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
   const {
@@ -247,6 +247,10 @@ export function EnhancedAuthProvider({
 
         // Load user organizations
         await loadUserOrganizations(session.user.id);
+
+        // Invalidate users and customers queries to refresh stats on login
+        queryClient.invalidateQueries({ queryKey: ["users"] });
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
       } else if (event === "TOKEN_REFRESHED" && session?.user) {
         // Ensure user data is up to date after token refresh
         const userData = {
@@ -441,6 +445,10 @@ export function EnhancedAuthProvider({
 
       // Load user organizations
       await loadUserOrganizations(data.user.id);
+
+      // Invalidate users and customers queries to refresh stats on login
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
 
       return { error: null };
     } catch (error) {

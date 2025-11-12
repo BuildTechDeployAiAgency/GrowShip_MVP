@@ -46,6 +46,7 @@ interface UseShipmentsOptions {
   searchTerm: string;
   filters: ShipmentFilters;
   brandId?: string;
+  distributorId?: string; // For distributor_admin users, auto-filter by their distributor_id
   debounceMs?: number;
 }
 
@@ -63,7 +64,8 @@ interface UseShipmentsReturn {
 async function fetchShipments(
   debouncedSearchTerm: string,
   filters: ShipmentFilters,
-  brandId?: string
+  brandId?: string,
+  distributorId?: string
 ): Promise<{ shipments: Shipment[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("shipments").select("*", { count: "exact" });
@@ -72,8 +74,11 @@ async function fetchShipments(
     query = query.eq("brand_id", brandId);
   }
 
-  if (filters.distributorId && filters.distributorId !== "all") {
-    query = query.eq("distributor_id", filters.distributorId);
+  // For distributor_admin users, always filter by their distributor_id
+  const finalDistributorId = distributorId || (filters.distributorId && filters.distributorId !== "all" ? filters.distributorId : undefined);
+  
+  if (finalDistributorId) {
+    query = query.eq("distributor_id", finalDistributorId);
   }
 
   if (debouncedSearchTerm.trim()) {
@@ -128,6 +133,7 @@ export function useShipments({
   searchTerm,
   filters,
   brandId,
+  distributorId,
   debounceMs = 300,
 }: UseShipmentsOptions): UseShipmentsReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -142,8 +148,8 @@ export function useShipments({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["shipments", debouncedSearchTerm, filters, brandId],
-    queryFn: () => fetchShipments(debouncedSearchTerm, filters, brandId),
+    queryKey: ["shipments", debouncedSearchTerm, filters, brandId, distributorId],
+    queryFn: () => fetchShipments(debouncedSearchTerm, filters, brandId, distributorId),
     staleTime: 0,
   });
 

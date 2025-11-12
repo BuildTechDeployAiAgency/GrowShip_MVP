@@ -17,6 +17,20 @@ import {
   UsersIcon,
   Lock,
 } from "lucide-react";
+
+// Routes that should show "Coming Soon" badge
+const COMING_SOON_ROUTES = [
+  "/reports",
+  "/notifications",
+  "/calendar",
+  "/invoices",
+  "/shipments",
+  "/sales",
+  "/inventory",
+  "/forecasting",
+  "/marketing",
+  "/manufacturers",
+];
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -46,6 +60,7 @@ function MenuItemComponent({
   const router = useRouter();
   const isActive = pathname === item.route_path;
   const isDashboard = item.route_path === "/dashboard";
+  const isComingSoon = COMING_SOON_ROUTES.includes(item.route_path);
 
   const handleClick = (e: React.MouseEvent) => {
     if (isPendingUser && !isDashboard) {
@@ -86,9 +101,25 @@ function MenuItemComponent({
           `}
         />
         <span className="flex-1">{item.menu_label}</span>
-        {isPendingUser && !isDashboard && (
-          <Lock className="h-4 w-4 text-gray-300 ml-2" />
-        )}
+        <div className="flex items-center gap-2">
+          {isComingSoon && (
+            <span
+              className={`
+                text-xs px-2 py-0.5 rounded-full font-medium
+                ${
+                  isActive
+                    ? "bg-white/20 text-white"
+                    : "bg-amber-100 text-amber-700"
+                }
+              `}
+            >
+              Coming Soon
+            </span>
+          )}
+          {isPendingUser && !isDashboard && (
+            <Lock className="h-4 w-4 text-gray-300" />
+          )}
+        </div>
       </div>
     </Link>
   );
@@ -106,6 +137,7 @@ function MenuItemWithChildren({
   const router = useRouter();
   const isActive = pathname === item.route_path;
   const isDashboard = item.route_path === "/dashboard";
+  const isComingSoon = COMING_SOON_ROUTES.includes(item.route_path);
   const hasActiveChild = item.children?.some(
     (child) =>
       child.route_path === pathname ||
@@ -157,11 +189,27 @@ function MenuItemWithChildren({
               `}
             />
             <span className="flex-1">{item.menu_label}</span>
-            <ChevronDown
-              className={`h-4 w-4 transition-transform duration-200 ${
-                isOpen ? "rotate-180" : "rotate-0"
-              }`}
-            />
+            <div className="flex items-center gap-2">
+              {isComingSoon && (
+                <span
+                  className={`
+                    text-xs px-2 py-0.5 rounded-full font-medium
+                    ${
+                      isActive || hasActiveChild
+                        ? "bg-white/20 text-white"
+                        : "bg-amber-100 text-amber-700"
+                    }
+                  `}
+                >
+                  Coming Soon
+                </span>
+              )}
+              <ChevronDown
+                className={`h-4 w-4 transition-transform duration-200 ${
+                  isOpen ? "rotate-180" : "rotate-0"
+                }`}
+              />
+            </div>
           </button>
         ) : (
           <Link
@@ -192,9 +240,25 @@ function MenuItemWithChildren({
                 `}
               />
               <span className="flex-1">{item.menu_label}</span>
-              {isPendingUser && !isDashboard && (
-                <Lock className="h-4 w-4 text-gray-300 ml-2" />
-              )}
+              <div className="flex items-center gap-2">
+                {isComingSoon && (
+                  <span
+                    className={`
+                      text-xs px-2 py-0.5 rounded-full font-medium
+                      ${
+                        isActive
+                          ? "bg-white/20 text-white"
+                          : "bg-amber-100 text-amber-700"
+                      }
+                    `}
+                  >
+                    Coming Soon
+                  </span>
+                )}
+                {isPendingUser && !isDashboard && (
+                  <Lock className="h-4 w-4 text-gray-300" />
+                )}
+              </div>
             </div>
           </Link>
         )}
@@ -242,6 +306,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const menuError = menuData?.error || error?.message;
 
   const isPendingUser = profile?.user_status === "pending";
+
+  // Sort menu items: ready items first, then coming soon items
+  const sortedMenuItems = [...menuItems].sort((a, b) => {
+    const aIsComingSoon = COMING_SOON_ROUTES.includes(a.route_path);
+    const bIsComingSoon = COMING_SOON_ROUTES.includes(b.route_path);
+    
+    // If both are coming soon or both are ready, maintain original order
+    if (aIsComingSoon === bIsComingSoon) {
+      return a.menu_order - b.menu_order;
+    }
+    
+    // Ready items come before coming soon items
+    return aIsComingSoon ? 1 : -1;
+  });
 
   // Prevent hydration mismatch by only rendering client-specific content after mount
   useEffect(() => {
@@ -361,9 +439,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
 
           <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-            {menuItems && menuItems.length > 0 ? (
+            {sortedMenuItems && sortedMenuItems.length > 0 ? (
               <>
-                {menuItems.map((item) => (
+                {sortedMenuItems.map((item) => (
                   <MenuItemWithChildren
                     key={item.id}
                     item={item}

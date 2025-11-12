@@ -13,6 +13,7 @@ import {
   Users,
   Building,
   Filter,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +52,7 @@ interface UsersListProps {
     role: string;
     status: string;
     company: string;
+    organization?: string;
   };
   viewMode?: "grid" | "list";
   users: UserProfile[];
@@ -59,6 +61,9 @@ interface UsersListProps {
   refetch: () => void;
   updateUserStatus: (userId: string, status: UserStatus) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
+  isSuperAdmin?: boolean;
+  onResetPassword?: (userId: string) => Promise<void> | void;
+  passwordResettingUserId?: string | null;
 }
 
 export function UsersList({
@@ -71,6 +76,9 @@ export function UsersList({
   refetch,
   updateUserStatus,
   deleteUser,
+  isSuperAdmin = false,
+  onResetPassword,
+  passwordResettingUserId,
 }: UsersListProps) {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -127,6 +135,41 @@ export function UsersList({
           </Badge>
         );
     }
+  };
+
+  const formatOrganizationType = (type?: string | null) => {
+    if (!type) return null;
+    return type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+  };
+
+  const getPrimaryOrganization = (user: UserProfile) => {
+    if (user.brand_name) {
+      return {
+        name: user.brand_name,
+        type: user.organization_type || null,
+      };
+    }
+
+    const memberships = user.memberships || [];
+    const activeMembership =
+      memberships.find((membership) => membership.is_active) || memberships[0];
+
+    if (activeMembership?.brand) {
+      return {
+        name: activeMembership.brand.name,
+        type: activeMembership.brand.organization_type || null,
+      };
+    }
+
+    return null;
+  };
+
+  const getAdditionalOrganizationsCount = (user: UserProfile) => {
+    const memberships = user.memberships || [];
+    if (memberships.length <= 1) {
+      return 0;
+    }
+    return memberships.length - 1;
   };
 
   const handleUserAction = async (action: string, userId: string) => {
@@ -245,14 +288,16 @@ export function UsersList({
               {searchTerm ||
               filters.role !== "all" ||
               filters.status !== "all" ||
-              filters.company !== "all"
+              filters.company !== "all" ||
+              (filters.organization && filters.organization !== "all")
                 ? "Try adjusting your search or filters to find users"
                 : "Get started by inviting your first user to the platform"}
             </p>
             {(searchTerm ||
               filters.role !== "all" ||
               filters.status !== "all" ||
-              filters.company !== "all") && (
+              filters.company !== "all" ||
+              (filters.organization && filters.organization !== "all")) && (
               <Button variant="outline" onClick={() => {}} className="gap-2">
                 <Filter className="h-4 w-4" />
                 Clear Filters
@@ -266,14 +311,25 @@ export function UsersList({
                 <TableHead className="w-[300px]">User</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Company</TableHead>
+                <TableHead>Organization</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead className="w-[70px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id} className="group">
+              {users.map((user) => {
+                const primaryOrganization = getPrimaryOrganization(user);
+                const additionalOrganizations =
+                  getAdditionalOrganizationsCount(user);
+                const organizationTypeLabel = formatOrganizationType(
+                  primaryOrganization?.type || null
+                );
+                const isPasswordResetting =
+                  passwordResettingUserId === user.user_id;
+
+                return (
+                  <TableRow key={user.id} className="group">
                   <TableCell>
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-10 w-10 ring-2 ring-gray-100">
@@ -312,6 +368,30 @@ export function UsersList({
                         <Building className="h-3 w-3 text-gray-500" />
                         <span className="truncate">{user.company_name}</span>
                       </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                      {primaryOrganization ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge
+                            variant="outline"
+                            className="text-xs font-medium"
+                          >
+                            {primaryOrganization.name}
+                          </Badge>
+                          {organizationTypeLabel && (
+                            <span className="text-xs text-gray-500">
+                              {organizationTypeLabel}
+                            </span>
+                          )}
+                          {additionalOrganizations > 0 && (
+                            <span className="text-xs text-gray-400">
+                              +{additionalOrganizations} more
+                            </span>
+                          )}
+                        </div>
                     ) : (
                       <span className="text-sm text-gray-400">—</span>
                     )}
@@ -377,6 +457,19 @@ export function UsersList({
                           </DropdownMenuItem>
                         )}
 
+                        {isSuperAdmin && onResetPassword && (
+                          <DropdownMenuItem
+                            onClick={() => onResetPassword(user.user_id)}
+                            className="gap-2"
+                            disabled={isPasswordResetting}
+                          >
+                            <KeyRound className="h-4 w-4" />
+                            {isPasswordResetting
+                              ? "Sending reset link..."
+                              : "Send Password Reset"}
+                          </DropdownMenuItem>
+                        )}
+
                         <DropdownMenuSeparator />
 
                         <DropdownMenuItem
@@ -392,143 +485,189 @@ export function UsersList({
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
-                </TableRow>
-              ))}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
-            {users.map((user) => (
-              <Card
-                key={user.id}
-                className="hover:shadow-lg transition-all duration-200 group border-gray-200"
-              >
-                <CardContent className="p-6">
-                  <div className="flex flex-col items-center text-center space-y-4">
-                    <div className="relative">
-                      <Avatar className="h-20 w-20 ring-2 ring-gray-100 group-hover:ring-blue-200 transition-all">
-                        <AvatarImage src={user.avatar} />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-lg font-semibold">
-                          {user.contact_name
-                            ?.split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .toUpperCase() || "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
+            {users.map((user) => {
+              const primaryOrganization = getPrimaryOrganization(user);
+              const additionalOrganizations =
+                getAdditionalOrganizationsCount(user);
+              const organizationTypeLabel = formatOrganizationType(
+                primaryOrganization?.type || null
+              );
+              const isPasswordResetting =
+                passwordResettingUserId === user.user_id;
 
-                    <div className="space-y-2 w-full">
-                      <h3 className="text-base font-semibold text-gray-900 truncate">
-                        {user.contact_name || "Unknown User"}
-                      </h3>
-                      <p className="text-sm text-gray-600 truncate">
-                        {user.email}
-                      </p>
-                    </div>
-
-                    <div className="w-full space-y-3">
-                      <div className="flex flex-wrap items-center justify-center gap-2">
-                        <Badge
-                          variant={getRoleBadgeVariant(user.role_name)}
-                          className="text-xs font-medium"
-                        >
-                          {user.role_name
-                            .replace(/_/g, " ")
-                            .replace(/\b\w/g, (l) => l.toUpperCase())}
-                        </Badge>
-                        {getStatusBadge(user)}
+              return (
+                <Card
+                  key={user.id}
+                  className="hover:shadow-lg transition-all duration-200 group border-gray-200"
+                >
+                  <CardContent className="p-6">
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="relative">
+                        <Avatar className="h-20 w-20 ring-2 ring-gray-100 group-hover:ring-blue-200 transition-all">
+                          <AvatarImage src={user.avatar} />
+                          <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-lg font-semibold">
+                            {user.contact_name
+                              ?.split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase() || "U"}
+                          </AvatarFallback>
+                        </Avatar>
                       </div>
 
-                      {user.company_name && (
-                        <div className="flex items-center justify-center gap-1 text-xs text-gray-500">
-                          <Building className="h-3 w-3" />
-                          <span className="truncate">{user.company_name}</span>
+                      <div className="space-y-2 w-full">
+                        <h3 className="text-base font-semibold text-gray-900 truncate">
+                          {user.contact_name || "Unknown User"}
+                        </h3>
+                        <p className="text-sm text-gray-600 truncate">
+                          {user.email}
+                        </p>
+                      </div>
+
+                      <div className="w-full space-y-3">
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <Badge
+                            variant={getRoleBadgeVariant(user.role_name)}
+                            className="text-xs font-medium"
+                          >
+                            {user.role_name
+                              .replace(/_/g, " ")
+                              .replace(/\b\w/g, (l) => l.toUpperCase())}
+                          </Badge>
+                          {getStatusBadge(user)}
                         </div>
-                      )}
 
-                      <div className="text-xs text-gray-500">
-                        Joined {new Date(user.created_at).toLocaleDateString()}
+                        {user.company_name && (
+                          <div className="flex items-center justify-center gap-1 text-xs text-gray-500">
+                            <Building className="h-3 w-3" />
+                            <span className="truncate">{user.company_name}</span>
+                          </div>
+                        )}
+
+                        {primaryOrganization && (
+                          <div className="flex items-center justify-center gap-2 text-xs text-gray-600 flex-wrap">
+                            <Badge variant="outline" className="text-xs">
+                              {primaryOrganization.name}
+                            </Badge>
+                            {organizationTypeLabel && (
+                              <span className="text-[11px] text-gray-500">
+                                {organizationTypeLabel}
+                              </span>
+                            )}
+                            {additionalOrganizations > 0 && (
+                              <span className="text-[11px] text-gray-400">
+                                +{additionalOrganizations} more
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="text-xs text-gray-500">
+                          Joined{" "}
+                          {new Date(user.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+
+                      <div className="w-full pt-4 border-t border-gray-100">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full gap-2"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                              Actions
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="center" className="w-52">
+                            <DropdownMenuLabel className="text-xs text-gray-500">
+                              User Actions
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleUserAction("edit", user.user_id)
+                              }
+                              className="gap-2"
+                            >
+                              <Edit className="h-4 w-4" />
+                              Edit User
+                            </DropdownMenuItem>
+
+                            {user.user_status !== "approved" && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleUserAction("approve", user.user_id)
+                                }
+                                className="gap-2 text-green-700 focus:text-green-700"
+                                disabled={
+                                  actionLoading === `approve${user.user_id}`
+                                }
+                              >
+                                <UserCheck className="h-4 w-4" />
+                                Approve Access
+                              </DropdownMenuItem>
+                            )}
+
+                            {user.user_status !== "suspended" && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleUserAction("suspend", user.user_id)
+                                }
+                                className="gap-2 text-orange-700 focus:text-orange-700"
+                                disabled={
+                                  actionLoading === `suspend${user.user_id}`
+                                }
+                              >
+                                <UserX className="h-4 w-4" />
+                                Suspend User
+                              </DropdownMenuItem>
+                            )}
+
+                            {isSuperAdmin && onResetPassword && (
+                              <DropdownMenuItem
+                                onClick={() => onResetPassword(user.user_id)}
+                                className="gap-2"
+                                disabled={isPasswordResetting}
+                              >
+                                <KeyRound className="h-4 w-4" />
+                                {isPasswordResetting
+                                  ? "Sending reset link..."
+                                  : "Send Password Reset"}
+                              </DropdownMenuItem>
+                            )}
+
+                            <DropdownMenuSeparator />
+
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleUserAction("delete", user.user_id)
+                              }
+                              className="gap-2 text-red-600 focus:text-red-600"
+                              disabled={
+                                actionLoading === `delete${user.user_id}`
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete User
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
-
-                    <div className="w-full pt-4 border-t border-gray-100">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full gap-2"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                            Actions
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="center" className="w-52">
-                          <DropdownMenuLabel className="text-xs text-gray-500">
-                            User Actions
-                          </DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-
-                          <DropdownMenuItem
-                            onClick={() =>
-                              handleUserAction("edit", user.user_id)
-                            }
-                            className="gap-2"
-                          >
-                            <Edit className="h-4 w-4" />
-                            Edit User
-                          </DropdownMenuItem>
-
-                          {user.user_status !== "approved" && (
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleUserAction("approve", user.user_id)
-                              }
-                              className="gap-2 text-green-700 focus:text-green-700"
-                              disabled={
-                                actionLoading === `approve${user.user_id}`
-                              }
-                            >
-                              <UserCheck className="h-4 w-4" />
-                              Approve Access
-                            </DropdownMenuItem>
-                          )}
-
-                          {user.user_status !== "suspended" && (
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleUserAction("suspend", user.user_id)
-                              }
-                              className="gap-2 text-orange-700 focus:text-orange-700"
-                              disabled={
-                                actionLoading === `suspend${user.user_id}`
-                              }
-                            >
-                              <UserX className="h-4 w-4" />
-                              Suspend User
-                            </DropdownMenuItem>
-                          )}
-
-                          <DropdownMenuSeparator />
-
-                          <DropdownMenuItem
-                            onClick={() =>
-                              handleUserAction("delete", user.user_id)
-                            }
-                            className="gap-2 text-red-600 focus:text-red-600"
-                            disabled={actionLoading === `delete${user.user_id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Delete User
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </CardContent>

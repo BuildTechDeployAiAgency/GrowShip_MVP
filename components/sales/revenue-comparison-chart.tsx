@@ -117,9 +117,9 @@ export function RevenueComparisonChart() {
                 />
               </svg>
             </div>
-            <p className="text-gray-500 text-sm">No data available</p>
+            <p className="text-gray-500 text-sm font-medium">Data not available yet</p>
             <p className="text-gray-400 text-xs mt-1">
-              Try adjusting your date filters
+              No revenue data for the selected period
             </p>
           </div>
         ) : (

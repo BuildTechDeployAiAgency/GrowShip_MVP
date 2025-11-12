@@ -3,10 +3,23 @@ import { ParsedOrder, ParsedOrderItem } from "@/types/import";
 import { getEnabledFields, getFieldConfig } from "./template-config";
 
 /**
+ * Auto-population data for orders
+ */
+export interface AutoPopulationData {
+  brandId: string;
+  distributorId?: string;
+  customerName?: string;
+  customerEmail?: string;
+}
+
+/**
  * Parse orders from an Excel file
  * Returns orders and extracted distributor_id
  */
-export async function parseOrdersExcel(fileBuffer: Buffer): Promise<{
+export async function parseOrdersExcel(
+  fileBuffer: Buffer,
+  autoPopulate?: AutoPopulationData
+): Promise<{
   orders: ParsedOrder[];
   extractedDistributorId?: string;
   distributorIdConsistent: boolean;
@@ -86,16 +99,25 @@ export async function parseOrdersExcel(fileBuffer: Buffer): Promise<{
   } else if (distributorIds.size === 1) {
     // Single distributor ID found
     extractedDistributorId = Array.from(distributorIds)[0];
+  } else if (autoPopulate?.distributorId) {
+    // No distributor ID in sheet, use auto-populated one
+    extractedDistributorId = autoPopulate.distributorId;
   }
-  // If distributorIds.size === 0, all rows have empty distributor ID (allowed for distributor users)
+  // If distributorIds.size === 0 and no autoPopulate.distributorId, will be caught in validation
 
   // Group rows by order (same order_date + customer_name = same order)
   for (const rowData of rows) {
     const orderDate = parseDate(rowData["Order Date"]);
-    const customerName = String(rowData["Customer Name"] || "").trim();
+    // Auto-populate customer_name if empty
+    const customerName = String(rowData["Customer Name"] || "").trim() || autoPopulate?.customerName || "";
     
-    if (!orderDate || !customerName) {
+    if (!orderDate) {
       continue; // Skip invalid rows (will be caught in validation)
+    }
+    
+    // If customer_name is still empty after auto-population, skip (will be caught in validation)
+    if (!customerName) {
+      continue;
     }
 
     // Create unique key for the order
@@ -105,11 +127,20 @@ export async function parseOrdersExcel(fileBuffer: Buffer): Promise<{
     let order = ordersMap.get(orderKey);
     
     if (!order) {
+      // Auto-populate distributor_id if empty
+      const distributorId = extractedDistributorId || 
+                          String(rowData["Distributor ID"] || "").trim() || 
+                          autoPopulate?.distributorId || 
+                          undefined;
+      
+      // Auto-populate customer_email if empty
+      const customerEmail = parseEmail(rowData["Customer Email"]) || autoPopulate?.customerEmail || undefined;
+      
       order = {
         row: rowData.row,
         order_date: orderDate,
         customer_name: customerName,
-        customer_email: parseEmail(rowData["Customer Email"]),
+        customer_email: customerEmail,
         customer_phone: rowData["Customer Phone"] || undefined,
         customer_type: rowData["Customer Type"] || undefined,
         items: [],
@@ -126,7 +157,7 @@ export async function parseOrdersExcel(fileBuffer: Buffer): Promise<{
         notes: rowData["Notes"] || undefined,
         payment_method: rowData["Payment Method"] || undefined,
         payment_status: rowData["Payment Status"] || undefined,
-        distributor_id: extractedDistributorId || rowData["Distributor ID"] || undefined,
+        distributor_id: distributorId,
       };
       ordersMap.set(orderKey, order);
     }

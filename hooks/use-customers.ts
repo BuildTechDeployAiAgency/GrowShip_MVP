@@ -15,6 +15,8 @@ interface UseCustomersOptions {
   searchTerm: string;
   filters: CustomerFilters;
   brandId?: string;
+  isSuperAdmin?: boolean;
+  enabled?: boolean;
   debounceMs?: number;
 }
 
@@ -36,7 +38,8 @@ interface UseCustomersReturn {
 async function fetchCustomers(
   debouncedSearchTerm: string,
   filters: CustomerFilters,
-  brandId?: string
+  brandId?: string,
+  isSuperAdmin?: boolean
 ): Promise<{ customers: UserProfile[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("user_profiles").select("*", { count: "exact" });
@@ -44,8 +47,8 @@ async function fetchCustomers(
   // Filter for customer roles only
   query = query.ilike("role_name", "%customer%");
 
-  // Apply organization filter - only show customers from the same organization
-  if (brandId) {
+  // Apply organization filter - only show customers from the same organization (unless super admin)
+  if (brandId && !isSuperAdmin) {
     query = query.eq("brand_id", brandId);
   }
 
@@ -85,6 +88,8 @@ export function useCustomers({
   searchTerm,
   filters,
   brandId,
+  isSuperAdmin = false,
+  enabled = true,
   debounceMs = 300,
 }: UseCustomersOptions): UseCustomersReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -101,8 +106,9 @@ export function useCustomers({
 
   // Use React Query for fetching customers
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ["customers", debouncedSearchTerm, filters, brandId],
-    queryFn: () => fetchCustomers(debouncedSearchTerm, filters, brandId),
+    queryKey: ["customers", debouncedSearchTerm, filters, brandId, isSuperAdmin],
+    queryFn: () => fetchCustomers(debouncedSearchTerm, filters, brandId, isSuperAdmin),
+    enabled: enabled, // Wait for profile to load before querying
     staleTime: 0, // Always refetch to ensure fresh data
   });
 

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     // Get user profile
     const { data: profile, error: profileError } = await supabase
       .from("user_profiles")
-      .select("role_name, brand_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 
@@ -38,7 +38,11 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get("type") || "orders";
     const brandId = searchParams.get("brandId") || profile.brand_id;
-    const distributorId = searchParams.get("distributorId") || undefined;
+    
+    // For distributor_admin, auto-populate distributorId from profile
+    const isDistributorAdmin = profile.role_name?.startsWith("distributor_");
+    const distributorId = searchParams.get("distributorId") || 
+                         (isDistributorAdmin && profile.distributor_id ? profile.distributor_id : undefined);
 
     // Validate type
     if (type !== "orders") {
@@ -57,6 +61,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // For distributor_admin, ensure they can only download template for their distributor
+    if (isDistributorAdmin && profile.distributor_id && distributorId) {
+      if (distributorId !== profile.distributor_id) {
+        return NextResponse.json(
+          { error: "You can only download templates for your assigned distributor" },
+          { status: 403 }
+        );
+      }
+    }
+
     // Generate template
     const buffer = await generateOrderTemplate({
       brandId: brandId!,
@@ -68,8 +82,20 @@ export async function GET(request: NextRequest) {
     // Get filename
     const filename = getTemplateFilename(type);
 
-    // Return file
-    return new NextResponse(buffer, {
+    // Return file using a Uint8Array to satisfy the Edge runtime type expectations
+    const fileArray: Uint8Array =
+      buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+
+    const underlyingBuffer = fileArray.buffer as ArrayBuffer;
+    const payload =
+      fileArray.byteOffset === 0 && fileArray.byteLength === underlyingBuffer.byteLength
+        ? underlyingBuffer
+        : underlyingBuffer.slice(
+            fileArray.byteOffset,
+            fileArray.byteOffset + fileArray.byteLength
+          );
+
+    return new NextResponse(payload, {
       status: 200,
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -87,4 +113,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

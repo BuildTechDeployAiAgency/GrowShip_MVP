@@ -85,6 +85,7 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
     searchTerm,
     filters,
     brandId: profile?.brand_id,
+    distributorId: profile?.role_name?.startsWith("distributor_") ? profile.distributor_id : undefined,
   });
 
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {

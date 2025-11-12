@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { 
+import {
   Building2, 
   Users, 
   TrendingUp, 
@@ -26,7 +26,8 @@ import {
   Edit,
   Trash2,
   Shield,
-  Globe
+  Globe,
+  AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,7 +41,7 @@ interface OrganizationStats {
 }
 
 export function SuperAdminDashboard() {
-  const { user, profile, organizations, canPerformAction } = useEnhancedAuth();
+  const { user, profile, organizations, canPerformAction, profileLoading } = useEnhancedAuth();
   const [stats, setStats] = useState<OrganizationStats>({
     totalOrganizations: 0,
     activeOrganizations: 0,
@@ -56,45 +57,31 @@ export function SuperAdminDashboard() {
   const [filterType, setFilterType] = useState<string>("all");
   const [showCreateOrgDialog, setShowCreateOrgDialog] = useState(false);
   const [showCreateUserDialog, setShowCreateUserDialog] = useState(false);
+  const [orgName, setOrgName] = useState("");
+  const [orgType, setOrgType] = useState<"brand" | "distributor" | "manufacturer">("brand");
+  const [creatingOrg, setCreatingOrg] = useState(false);
+  const [activeTab, setActiveTab] = useState("organizations");
   const supabase = createClient();
 
-  // Check if user has super admin access
-  if (!canPerformAction("view_all_users")) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-96">
-          <CardHeader>
-            <CardTitle className="text-center text-red-600">Access Denied</CardTitle>
-            <CardDescription className="text-center">
-              You don't have permission to access the Super Admin portal.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
-
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
+  // Define loadDashboardData BEFORE useEffect
   const loadDashboardData = async () => {
     try {
       setLoading(true);
 
-      // Load all organizations
+      // Load all organizations (brands)
       const { data: orgs, error: orgError } = await supabase
-        .from("organizations")
+        .from("brands")
         .select("*")
         .order("created_at", { ascending: false });
 
       if (orgError) throw orgError;
       setAllOrganizations(orgs || []);
 
-      // Load all users
+      // Load all users - order by status to show pending first
       const { data: users, error: usersError } = await supabase
         .from("user_profiles")
         .select("*")
+        .order("user_status", { ascending: true })
         .order("created_at", { ascending: false });
 
       if (usersError) throw usersError;
@@ -123,6 +110,91 @@ export function SuperAdminDashboard() {
     }
   };
 
+  // Load dashboard data
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  // Create organization function
+  const handleCreateOrganization = async () => {
+    if (!orgName.trim()) {
+      toast.error("Organization name is required");
+      return;
+    }
+
+    setCreatingOrg(true);
+    try {
+      const slug = orgName
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "");
+
+      const { data, error } = await supabase
+        .from("brands")
+        .insert({
+          name: orgName.trim(),
+          slug,
+          organization_type: orgType,
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success("Organization created successfully");
+      setShowCreateOrgDialog(false);
+      setOrgName("");
+      setOrgType("brand");
+      await loadDashboardData(); // Refresh the list
+    } catch (error: any) {
+      console.error("Error creating organization:", error);
+      toast.error(error?.message || "Failed to create organization");
+    } finally {
+      setCreatingOrg(false);
+    }
+  };
+
+  // Show loading state while profile is loading
+  if (profileLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user has super admin access - AFTER profile is loaded
+  // Only check permissions if profile exists and is not loading
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!canPerformAction("view_all_users")) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-96">
+          <CardHeader>
+            <CardTitle className="text-center text-red-600">Access Denied</CardTitle>
+            <CardDescription className="text-center">
+              You don't have permission to access the Super Admin portal.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
   const filteredOrganizations = allOrganizations.filter(org => {
     const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          org.slug.toLowerCase().includes(searchTerm.toLowerCase());
@@ -140,7 +212,7 @@ export function SuperAdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-2 text-gray-600">Loading dashboard...</p>
@@ -150,27 +222,48 @@ export function SuperAdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Super Admin Portal</h1>
-              <p className="text-gray-600 mt-1">Manage all organizations and users across GrowShip</p>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={() => setShowCreateOrgDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Organization
-              </Button>
-              <Button onClick={() => setShowCreateUserDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create User
-              </Button>
-            </div>
-          </div>
-        </div>
+    <div>
+      {/* Action Buttons */}
+      <div className="flex justify-end gap-2 mb-6">
+        <Button onClick={() => setShowCreateOrgDialog(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Create Organization
+        </Button>
+        <Button onClick={() => setShowCreateUserDialog(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Create User
+        </Button>
+      </div>
+
+        {/* Pending Approvals Banner */}
+        {allUsers.filter(u => u.user_status === "pending").length > 0 && (
+          <Card className="border-l-4 border-yellow-500 bg-yellow-50 mb-8">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-yellow-900">
+                    {allUsers.filter(u => u.user_status === "pending").length} User{allUsers.filter(u => u.user_status === "pending").length > 1 ? "s" : ""} Awaiting Approval
+                  </h3>
+                  <p className="text-sm text-yellow-800 mt-1">
+                    Review and approve pending users from all brands.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setFilterType("all");
+                    setSearchTerm("");
+                    setActiveTab("users");
+                  }}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                >
+                  Review Pending Users
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -228,7 +321,7 @@ export function SuperAdminDashboard() {
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="organizations" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="organizations">Organizations</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
@@ -422,7 +515,17 @@ export function SuperAdminDashboard() {
         </Tabs>
 
         {/* Create Organization Dialog */}
-        <Dialog open={showCreateOrgDialog} onOpenChange={setShowCreateOrgDialog}>
+        <Dialog 
+          open={showCreateOrgDialog} 
+          onOpenChange={(open) => {
+            setShowCreateOrgDialog(open);
+            if (!open) {
+              // Reset form when dialog closes
+              setOrgName("");
+              setOrgType("brand");
+            }
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New Organization</DialogTitle>
@@ -433,11 +536,17 @@ export function SuperAdminDashboard() {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="orgName">Organization Name</Label>
-                <Input id="orgName" placeholder="Enter organization name" />
+                <Input 
+                  id="orgName" 
+                  placeholder="Enter organization name"
+                  value={orgName}
+                  onChange={(e) => setOrgName(e.target.value)}
+                  disabled={creatingOrg}
+                />
               </div>
               <div>
                 <Label htmlFor="orgType">Organization Type</Label>
-                <Select>
+                <Select value={orgType} onValueChange={(value: "brand" | "distributor" | "manufacturer") => setOrgType(value)} disabled={creatingOrg}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
@@ -449,15 +558,22 @@ export function SuperAdminDashboard() {
                 </Select>
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowCreateOrgDialog(false)}>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowCreateOrgDialog(false);
+                    setOrgName("");
+                    setOrgType("brand");
+                  }}
+                  disabled={creatingOrg}
+                >
                   Cancel
                 </Button>
-                <Button onClick={() => {
-                  // TODO: Implement organization creation
-                  setShowCreateOrgDialog(false);
-                  toast.success("Organization created successfully");
-                }}>
-                  Create Organization
+                <Button 
+                  onClick={handleCreateOrganization}
+                  disabled={creatingOrg || !orgName.trim()}
+                >
+                  {creatingOrg ? "Creating..." : "Create Organization"}
                 </Button>
               </div>
             </div>
@@ -525,7 +641,6 @@ export function SuperAdminDashboard() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
     </div>
   );
 }

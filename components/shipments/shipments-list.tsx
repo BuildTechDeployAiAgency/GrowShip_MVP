@@ -61,6 +61,7 @@ export function ShipmentsList() {
     searchTerm,
     filters,
     brandId: profile?.brand_id,
+    distributorId: profile?.role_name?.startsWith("distributor_") ? profile.distributor_id : undefined,
   });
 
   const handleStatusChange = async (shipmentId: string, status: ShipmentStatus) => {

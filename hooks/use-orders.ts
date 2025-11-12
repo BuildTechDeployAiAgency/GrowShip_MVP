@@ -60,6 +60,7 @@ interface UseOrdersOptions {
   searchTerm: string;
   filters: OrderFilters;
   brandId?: string;
+  distributorId?: string; // For distributor_admin users, auto-filter by their distributor_id
   debounceMs?: number;
 }
 
@@ -78,17 +79,23 @@ interface UseOrdersReturn {
 async function fetchOrders(
   debouncedSearchTerm: string,
   filters: OrderFilters,
-  brandId?: string
+  brandId?: string,
+  distributorId?: string
 ): Promise<{ orders: Order[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("orders").select("*", { count: "exact" });
 
-  if (brandId) {
-    query = query.eq("brand_id", brandId);
+  // For distributor_admin users, always filter by their distributor_id
+  // This ensures they only see their own distributor's orders
+  const finalDistributorId = distributorId || (filters.distributorId && filters.distributorId !== "all" ? filters.distributorId : undefined);
+  
+  if (finalDistributorId) {
+    query = query.eq("distributor_id", finalDistributorId);
   }
 
-  if (filters.distributorId && filters.distributorId !== "all") {
-    query = query.eq("distributor_id", filters.distributorId);
+  // Apply brand_id filter only if provided (super admins may not have brandId)
+  if (brandId) {
+    query = query.eq("brand_id", brandId);
   }
 
   if (debouncedSearchTerm.trim()) {
@@ -138,6 +145,14 @@ async function fetchOrders(
   const { data, error: fetchError, count } = await query;
 
   if (fetchError) {
+    console.error("[fetchOrders] Error fetching orders:", {
+      error: fetchError,
+      message: fetchError.message,
+      code: fetchError.code,
+      details: fetchError.details,
+      filters,
+      brandId,
+    });
     throw fetchError;
   }
 
@@ -151,6 +166,7 @@ export function useOrders({
   searchTerm,
   filters,
   brandId,
+  distributorId,
   debounceMs = 300,
 }: UseOrdersOptions): UseOrdersReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -165,8 +181,8 @@ export function useOrders({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ["orders", debouncedSearchTerm, filters, brandId],
-    queryFn: () => fetchOrders(debouncedSearchTerm, filters, brandId),
+    queryKey: ["orders", debouncedSearchTerm, filters, brandId, distributorId],
+    queryFn: () => fetchOrders(debouncedSearchTerm, filters, brandId, distributorId),
     staleTime: 0,
   });
 

@@ -68,7 +68,7 @@ function InviteHandlerContent() {
 
           const { data: profile, error: profileError } = await supabase
             .from("user_profiles")
-            .select("id, role_type, user_status")
+            .select("id, role_type, user_status, is_profile_complete")
             .eq("user_id", data.user?.id)
             .maybeSingle();
 
@@ -83,6 +83,14 @@ function InviteHandlerContent() {
             console.error("❌ No user profile found");
             toast.error("User profile not found. Please contact support.");
             router.push("/");
+            return;
+          }
+
+          // Check if password is already set
+          if (profile.is_profile_complete) {
+            console.log("✅ Profile already complete, redirecting to dashboard");
+            toast.info("Your account is already set up. Redirecting to dashboard...");
+            router.push("/dashboard");
             return;
           }
 

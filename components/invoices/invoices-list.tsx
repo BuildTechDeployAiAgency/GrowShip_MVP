@@ -68,6 +68,7 @@ export function InvoicesList({ onCreateClick }: InvoicesListProps) {
     searchTerm,
     filters,
     brandId: profile?.brand_id,
+    distributorId: profile?.role_name?.startsWith("distributor_") ? profile.distributor_id : undefined,
   });
 
   const handlePaymentStatusChange = async (invoiceId: string, status: PaymentStatus) => {

@@ -25,6 +25,7 @@ import { Distributor } from "@/hooks/use-distributors";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import { OrderFormDialog } from "./order-form-dialog";
+import { OrderHistory } from "./order-history";
 
 const statusColors: Record<OrderStatus, string> = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -477,6 +478,9 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
           )}
         </div>
       </div>
+
+      {/* Order History */}
+      <OrderHistory orderId={order.id} />
     </div>
   );
 }

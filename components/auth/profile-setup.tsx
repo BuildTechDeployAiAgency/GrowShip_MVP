@@ -199,7 +199,11 @@ export function ProfileSetup({ role }: ProfileSetupProps) {
         toast.error(error.message);
       } else {
         toast.success("Profile setup completed successfully!");
-        router.push("/dashboard");
+        // Use replace to prevent back navigation and ensure clean redirect
+        // Small delay to ensure cache is updated
+        setTimeout(() => {
+          router.replace("/dashboard");
+        }, 300);
       }
     } catch (error) {
       toast.error("An unexpected error occurred");

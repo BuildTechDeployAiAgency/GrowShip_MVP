@@ -131,8 +131,26 @@ export function TopSkusTable({ filters }: TopSkusTableProps = {}) {
                 </tr>
               ) : skus.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-gray-500">
-                    No SKU data available
+                  <td colSpan={8} className="py-8 text-center">
+                    <div className="flex flex-col items-center justify-center text-gray-500">
+                      <svg
+                        className="h-12 w-12 mb-2 text-gray-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1}
+                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                        />
+                      </svg>
+                      <p className="text-sm font-medium">Data not available yet</p>
+                      <p className="text-xs mt-1 text-gray-400">
+                        No SKU data for the selected period
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (

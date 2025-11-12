@@ -50,6 +50,7 @@ function SetupPasswordContent() {
           type,
         });
 
+        // Set session from hash parameters if available
         if (accessToken && refreshToken && type === "invite") {
           console.log("Setting session from invitation link...");
 
@@ -68,8 +69,12 @@ function SetupPasswordContent() {
           }
 
           console.log("Session set successfully from invitation");
+          
+          // Give time for session to be fully established
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
 
+        // Now get the session
         const {
           data: { session },
           error,
@@ -83,26 +88,39 @@ function SetupPasswordContent() {
         }
 
         if (session?.user) {
-          const { data: profile } = await supabase
+          console.log("Valid session found for user:", session.user.id);
+          
+          const { data: profile, error: profileError } = await supabase
             .from("user_profiles")
-            .select("contact_name, role_name, role_type, is_profile_complete")
+            .select("contact_name, role_name, role_type, is_profile_complete, user_status")
             .eq("user_id", session.user.id)
             .single();
 
+          if (profileError) {
+            console.error("Error fetching profile:", profileError);
+            toast.error("Unable to load user profile. Please contact support.");
+            router.push("/");
+            return;
+          }
+
           if (profile && !profile.is_profile_complete) {
+            console.log("Profile incomplete, allowing password setup");
             setIsValidSession(true);
             setUserEmail(session.user.email || "");
             setUserName(profile.contact_name || "");
           } else if (profile && profile.is_profile_complete) {
+            console.log("Profile already complete, redirecting to dashboard");
             toast.info(
               "You already have a password set. Redirecting to dashboard..."
             );
             router.push("/dashboard");
           } else {
+            console.error("No profile found for user");
             toast.error("Invalid invitation. No profile found.");
             router.push("/");
           }
         } else {
+          console.error("No valid session found");
           toast.error("Invalid or expired invitation link");
           router.push("/");
         }

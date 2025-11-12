@@ -111,6 +111,11 @@ export interface FileUploadResponse {
     orders: ParsedOrder[];
     totalCount: number;
     fileHash: string;
+    fileName: string;
+    fileSize: number;
+    brandId: string;
+    extractedDistributorId?: string;
+    distributorIdConsistent: boolean;
   };
   error?: string;
 }

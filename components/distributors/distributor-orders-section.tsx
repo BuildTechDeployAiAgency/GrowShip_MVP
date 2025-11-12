@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Search, MoreHorizontal, Eye, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,9 @@ import { useOrders, Order, OrderStatus } from "@/hooks/use-orders";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { format } from "date-fns";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 
-const statusColors: Record<OrderStatus, string> = {
+const statusColors: Record<OrderStatus | "confirmed" | "cancelled", string> = {
   pending: "bg-yellow-100 text-yellow-800",
   confirmed: "bg-blue-100 text-blue-800",
   processing: "bg-purple-100 text-purple-800",
@@ -47,6 +48,7 @@ export function DistributorOrdersSection({
 }: DistributorOrdersSectionProps) {
   const router = useRouter();
   const { profile, canPerformAction } = useEnhancedAuth();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
     status: "all",
@@ -55,45 +57,46 @@ export function DistributorOrdersSection({
 
   const isSuperAdmin = canPerformAction("view_all_users");
 
+  // Refetch orders when distributorId changes or when component mounts
+  useEffect(() => {
+    // Invalidate orders query to ensure fresh data
+    queryClient.invalidateQueries({ 
+      queryKey: ["orders"],
+      exact: false 
+    });
+  }, [distributorId, queryClient]);
+
   const {
     orders,
     loading,
     error,
     totalCount,
+    refetch,
   } = useOrders({
-    searchTerm: "",
+    searchTerm: searchTerm,
     filters: {
       ...filters,
       paymentStatus: "all",
-      customerType: "distributor",
+      customerType: "all", // Remove customerType filter to show all orders for this distributor
+      distributorId: distributorId,
     },
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
   });
 
-  // Filter orders by distributor name (since we don't have distributor_id in orders table)
-  // Also apply search filter and status filter if provided
-  const filteredOrders = orders.filter((order) => {
-    const matchesDistributor = order.customer_name?.toLowerCase() === distributorName.toLowerCase();
-    
-    if (!matchesDistributor) return false;
-    
-    // Apply status filter if not "all"
-    if (filters.status !== "all" && order.order_status !== filters.status) {
-      return false;
-    }
-    
-    // Apply search filter if provided
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase();
-      return (
-        order.order_number?.toLowerCase().includes(searchLower) ||
-        order.customer_name?.toLowerCase().includes(searchLower) ||
-        order.customer_email?.toLowerCase().includes(searchLower)
-      );
-    }
-    
-    return true;
-  });
+  // Debug logging
+  useEffect(() => {
+    console.log("[DistributorOrdersSection] Orders fetched", {
+      distributorId,
+      ordersCount: orders.length,
+      loading,
+      error,
+      filters,
+      brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    });
+  }, [orders, loading, error, distributorId, filters, isSuperAdmin, profile?.brand_id]);
+
+  // Orders are already filtered by distributor_id via the useOrders hook
+  const filteredOrders = orders;
 
   if (loading) {
     return (

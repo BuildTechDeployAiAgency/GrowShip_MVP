@@ -107,10 +107,12 @@ export function OrderFormDialog({
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
   });
 
+  const isDistributorAdmin = profile?.role_name?.startsWith("distributor_");
   const { distributors } = useDistributors({
     searchTerm: "",
     filters: { status: "all" },
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    distributorId: isDistributorAdmin ? profile.distributor_id : undefined,
     isSuperAdmin,
   });
 
@@ -202,8 +204,13 @@ export function OrderFormDialog({
       });
     } else if (open && !profileLoading) {
       // Creating new order - brand will be auto-populated from distributor
+      // For distributor_admin users, auto-populate their distributor_id
+      const initialDistributorId = isDistributorAdmin && profile?.distributor_id 
+        ? profile.distributor_id 
+        : "";
+      
       setFormData({
-        distributor_id: "",
+        distributor_id: initialDistributorId,
         brand_id: "", // Will be auto-populated from selected distributor
         order_date: todayDate,
         order_status: "pending",
@@ -219,7 +226,7 @@ export function OrderFormDialog({
         payment_status: "pending",
       });
     }
-  }, [open, order, profileLoading, todayDate]);
+  }, [open, order, profileLoading, todayDate, isDistributorAdmin, profile?.distributor_id]);
 
   // Auto-populate fields when distributor is selected
   useEffect(() => {

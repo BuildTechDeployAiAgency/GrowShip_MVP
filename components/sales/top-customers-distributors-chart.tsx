@@ -12,6 +12,9 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, Store, Building2 } from "lucide-react";
 
+// TODO: Replace hardcoded data with real API integration
+// This component currently uses mock data and should be updated to fetch real customer/distributor data
+
 const data = [
   {
     name: "Walmart",

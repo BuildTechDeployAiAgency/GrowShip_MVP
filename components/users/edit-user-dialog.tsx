@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { createClient } from "@/lib/supabase/client";
-import { UserProfile } from "@/types/auth";
+import { UserProfile, Brand } from "@/types/auth";
+import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 
 interface EditUserDialogProps {
   open: boolean;
@@ -37,6 +38,7 @@ interface UserFormData {
   email: string;
   companyName: string;
   roleName: string;
+  brandId: string;
   phone: string;
   address: string;
   city: string;
@@ -54,11 +56,15 @@ export function EditUserDialog({
   user,
   onUserUpdated,
 }: EditUserDialogProps) {
+  const { profile } = useEnhancedAuth();
+  const isSuperAdmin = profile?.role_name === "super_admin";
+  
   const [formData, setFormData] = useState<UserFormData>({
     contactName: "",
     email: "",
     companyName: "",
     roleName: "",
+    brandId: "",
     phone: "",
     address: "",
     city: "",
@@ -71,6 +77,27 @@ export function EditUserDialog({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [brands, setBrands] = useState<Brand[]>([]);
+
+  // Load brands when dialog opens
+  useEffect(() => {
+    if (open) {
+      const loadBrands = async () => {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("brands")
+          .select("id, name, slug, organization_type, is_active, created_at, updated_at")
+          .eq("is_active", true)
+          .order("name");
+        
+        if (!error && data) {
+          setBrands(data);
+        }
+      };
+      
+      loadBrands();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (user) {
@@ -79,6 +106,7 @@ export function EditUserDialog({
         email: user.email || "",
         companyName: user.company_name || "",
         roleName: user.role_name || "",
+        brandId: user.brand_id || "",
         phone: user.phone || "",
         address: user.address || "",
         city: user.city || "",
@@ -112,28 +140,99 @@ export function EditUserDialog({
       setLoading(true);
       setError(null);
 
-      const supabase = createClient();
+      const updatesPayload = {
+        contact_name: formData.contactName,
+        company_name: formData.companyName,
+        role_name: formData.roleName,
+        brand_id: formData.brandId || null,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zip_code: formData.zipCode,
+        country: formData.country,
+        website: formData.website,
+        description: formData.description,
+        is_profile_complete: formData.isProfileComplete,
+      };
 
-      const { error: updateError } = await supabase
-        .from("user_profiles")
-        .update({
-          contact_name: formData.contactName,
-          company_name: formData.companyName,
-          role_name: formData.roleName,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zip_code: formData.zipCode,
-          country: formData.country,
-          website: formData.website,
-          description: formData.description,
-          is_profile_complete: formData.isProfileComplete,
-        })
-        .eq("user_id", user.user_id);
+      if (isSuperAdmin) {
+        const response = await fetch("/api/users/manage", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: user.user_id,
+            updates: updatesPayload,
+          }),
+        });
 
-      if (updateError) {
-        throw updateError;
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            result?.error || "Failed to update user with elevated access."
+          );
+        }
+      } else {
+        const supabase = createClient();
+        const brandChanged = formData.brandId !== user.brand_id;
+
+        const { error: updateError } = await supabase
+          .from("user_profiles")
+          .update({
+            ...updatesPayload,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.user_id);
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        if (brandChanged && formData.brandId) {
+          const { data: existingMembership } = await supabase
+            .from("user_memberships")
+            .select("id")
+            .eq("user_id", user.user_id)
+            .eq("brand_id", user.brand_id)
+            .single();
+
+          if (existingMembership) {
+            const { error: membershipUpdateError } = await supabase
+              .from("user_memberships")
+              .update({
+                brand_id: formData.brandId,
+                role_name: formData.roleName,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", existingMembership.id);
+
+            if (membershipUpdateError) {
+              console.error(
+                "Error updating membership:",
+                membershipUpdateError
+              );
+            }
+          } else {
+            const { error: membershipInsertError } = await supabase
+              .from("user_memberships")
+              .insert({
+                user_id: user.user_id,
+                brand_id: formData.brandId,
+                role_name: formData.roleName,
+                is_active: true,
+              });
+
+            if (membershipInsertError) {
+              console.error(
+                "Error creating membership:",
+                membershipInsertError
+              );
+            }
+          }
+        }
       }
 
       // Show success notification
@@ -259,6 +358,9 @@ export function EditUserDialog({
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
+                  {isSuperAdmin && (
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                  )}
                   <SelectItem value="brand_admin">Brand Admin</SelectItem>
                   <SelectItem value="brand_finance">Brand Finance</SelectItem>
                   <SelectItem value="brand_operations">
@@ -285,6 +387,36 @@ export function EditUserDialog({
                   </SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="brandId" className="flex items-center gap-2">
+                <Building className="h-4 w-4" />
+                Brand {isSuperAdmin && "*"}
+              </Label>
+              <Select
+                value={formData.brandId}
+                onValueChange={(value: string) =>
+                  handleInputChange("brandId", value)
+                }
+                disabled={!isSuperAdmin}
+              >
+                <SelectTrigger className={!isSuperAdmin ? "bg-gray-50" : ""}>
+                  <SelectValue placeholder={user?.brand_name || "Select a brand"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {brands.map((brand) => (
+                    <SelectItem key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!isSuperAdmin && (
+                <p className="text-xs text-gray-500">
+                  Only super admins can change brand assignments
+                </p>
+              )}
             </div>
 
             <div className="flex items-center space-x-2">

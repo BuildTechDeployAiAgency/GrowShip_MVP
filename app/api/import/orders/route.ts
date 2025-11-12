@@ -23,10 +23,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user profile with role
+    // Get user profile with role and contact info
     const { data: profile, error: profileError } = await supabase
       .from("user_profiles")
-      .select("role_name, brand_id")
+      .select("role_name, brand_id, distributor_id, contact_name, company_name, email")
       .eq("user_id", user.id)
       .single();
 
@@ -73,19 +73,55 @@ export async function POST(request: NextRequest) {
     // Get file statistics
     const stats = getFileStats(fileBuffer);
 
+    // Check if user is distributor_admin and auto-populate distributor_id
+    const isDistributorAdmin = profile.role_name?.startsWith("distributor_");
+    const distributorId = isDistributorAdmin && profile.distributor_id 
+      ? profile.distributor_id 
+      : undefined;
+
+    // Prepare auto-population data (distributor ID will be set during validation/confirmation)
+    // For distributor_admin, auto-populate distributor_id from profile
+    const autoPopulate = profile.brand_id ? {
+      brandId: profile.brand_id,
+      distributorId: distributorId,
+      customerName: profile.contact_name || profile.company_name || undefined,
+      customerEmail: profile.email || undefined,
+    } : undefined;
+
     // Parse the Excel file
-    let orders;
+    let parseResult;
     try {
-      orders = await parseOrdersExcel(fileBuffer);
+      console.log("[Import Upload] Parsing Excel file", {
+        fileName: file.name,
+        fileSize: file.size,
+        userId: user.id,
+        autoPopulate,
+      });
+      parseResult = await parseOrdersExcel(fileBuffer, autoPopulate);
+      console.log("[Import Upload] File parsed successfully", {
+        ordersCount: parseResult.orders.length,
+        extractedDistributorId: parseResult.extractedDistributorId,
+        distributorIdConsistent: parseResult.distributorIdConsistent,
+        fileName: file.name,
+      });
     } catch (parseError: any) {
-      console.error("Error parsing Excel file:", parseError);
+      console.error("[Import Upload] Error parsing Excel file", {
+        error: parseError,
+        message: parseError.message,
+        stack: parseError.stack,
+        fileName: file.name,
+        fileSize: file.size,
+      });
       return NextResponse.json(
         {
+          success: false,
           error: `Failed to parse Excel file: ${parseError.message}`,
         },
         { status: 400 }
       );
     }
+
+    const orders = parseResult.orders;
 
     // Validate file constraints
     const constraintErrors = validateFileConstraints(fileBuffer.length, orders.length);
@@ -101,7 +137,18 @@ export async function POST(request: NextRequest) {
     // Generate file hash for idempotency
     const fileHash = await generateFileHash(fileBuffer);
 
+    // Log brandId status for debugging
+    console.log("[Import Upload] User profile info", {
+      userId: user.id,
+      roleName: profile.role_name,
+      brandId: profile.brand_id,
+      hasBrandId: !!profile.brand_id,
+    });
+
     // Return parsed orders for preview
+    // For distributor_admin, use their distributor_id if not extracted from sheet
+    const finalDistributorId = parseResult.extractedDistributorId || distributorId;
+    
     return NextResponse.json({
       success: true,
       data: {
@@ -111,12 +158,21 @@ export async function POST(request: NextRequest) {
         fileName: file.name,
         fileSize: stats.size,
         brandId: profile.brand_id,
+        extractedDistributorId: parseResult.extractedDistributorId,
+        distributorIdConsistent: parseResult.distributorIdConsistent,
+        distributorId: finalDistributorId, // Include distributor_id for distributor_admin
       },
     });
   } catch (error: any) {
-    console.error("Error in import orders API:", error);
+    console.error("[Import Upload] Fatal error in import orders API", {
+      error: error,
+      message: error.message,
+      stack: error.stack,
+      fileName: (error as any).fileName,
+    });
     return NextResponse.json(
       {
+        success: false,
         error: error.message || "Internal server error",
       },
       { status: 500 }

@@ -67,7 +67,29 @@ async function fetchTopSkus(
   );
 
   if (error) {
-    console.error("Error fetching top SKUs:", error);
+    // Check if RPC function doesn't exist (404 or function not found error)
+    const isFunctionNotFound = 
+      error.code === "P0004" || 
+      error.message?.includes("Could not find the function") ||
+      error.message?.includes("does not exist") ||
+      error.code === "42883";
+
+    if (isFunctionNotFound) {
+      // eslint-disable-next-line no-console
+      console.warn("RPC function 'get_top_products_by_revenue1' not found. Returning empty data.", {
+        message: error.message,
+        code: error.code,
+      });
+      return []; // Return empty array instead of throwing
+    }
+
+    console.error("Error fetching top SKUs:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      error: error,
+    });
     throw new Error(error.message || "Failed to fetch top SKUs");
   }
 
@@ -122,6 +144,7 @@ export function useTopSkus({
     enabled: enabled && !!user && !!profile,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
+    refetchOnMount: true, // Ensure data refreshes when component mounts
   });
 
   return {

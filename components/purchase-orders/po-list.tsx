@@ -3,26 +3,11 @@
 import { useState } from "react";
 import {
   Search,
-  MoreHorizontal,
-  Eye,
-  Edit,
-  Trash2,
-  Package,
-  CheckCircle,
-  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -34,6 +19,8 @@ import { usePurchaseOrders, PurchaseOrder, POStatus } from "@/hooks/use-purchase
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { MainLayout } from "@/components/layout/main-layout";
 import { format } from "date-fns";
+import { POActionsMenu } from "./po-actions-menu";
+import { useRouter } from "next/navigation";
 
 const statusColors: Record<POStatus, string> = {
   draft: "bg-gray-100 text-gray-800",
@@ -55,6 +42,7 @@ const paymentColors: Record<string, string> = {
 
 export function PurchaseOrdersList() {
   const { profile } = useEnhancedAuth();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
     status: "all",
@@ -69,20 +57,35 @@ export function PurchaseOrdersList() {
     totalCount,
     deletePurchaseOrder,
     updatePurchaseOrder,
+    refetch,
   } = usePurchaseOrders({
     searchTerm,
     filters,
     brandId: profile?.brand_id,
+    distributorId: profile?.role_name?.startsWith("distributor_") ? profile.distributor_id : undefined,
   });
 
-  const handleStatusChange = async (poId: string, status: POStatus) => {
-    await updatePurchaseOrder(poId, { po_status: status });
+  const handleStatusChange = () => {
+    refetch();
   };
 
   const handleDelete = async (poId: string) => {
     if (confirm("Are you sure you want to delete this purchase order?")) {
       await deletePurchaseOrder(poId);
+      refetch();
     }
+  };
+
+  const handleViewDetails = (poId: string) => {
+    // TODO: Navigate to PO details page when implemented
+    // router.push(`/purchase-orders/${poId}`);
+    console.log("View PO details:", poId);
+  };
+
+  const handleEdit = (poId: string) => {
+    // TODO: Navigate to PO edit page when implemented
+    // router.push(`/purchase-orders/${poId}/edit`);
+    console.log("Edit PO:", poId);
   };
 
   if (loading) {
@@ -247,53 +250,13 @@ export function PurchaseOrdersList() {
                         </Badge>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            {po.po_status === "draft" && (
-                              <>
-                                <DropdownMenuItem onClick={() => handleStatusChange(po.id, "submitted")}>
-                                  <CheckCircle className="mr-2 h-4 w-4" />
-                                  Submit for Approval
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            {po.po_status === "submitted" && (
-                              <>
-                                <DropdownMenuItem onClick={() => handleStatusChange(po.id, "approved")}>
-                                  <CheckCircle className="mr-2 h-4 w-4" />
-                                  Approve
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleStatusChange(po.id, "rejected")}>
-                                  <XCircle className="mr-2 h-4 w-4" />
-                                  Reject
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => handleDelete(po.id)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <POActionsMenu
+                          po={po}
+                          onStatusChange={handleStatusChange}
+                          onDelete={handleDelete}
+                          onViewDetails={handleViewDetails}
+                          onEdit={handleEdit}
+                        />
                       </td>
                     </tr>
                   ))

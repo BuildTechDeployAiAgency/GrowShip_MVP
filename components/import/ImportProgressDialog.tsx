@@ -19,6 +19,8 @@ interface ImportProgressDialogProps {
   status: "processing" | "completed" | "failed";
   summary?: ImportSummary;
   onClose: () => void;
+  title?: string;
+  description?: string;
 }
 
 export function ImportProgressDialog({
@@ -27,25 +29,35 @@ export function ImportProgressDialog({
   status,
   summary,
   onClose,
+  title,
+  description,
 }: ImportProgressDialogProps) {
   const isProcessing = status === "processing";
   const isCompleted = status === "completed";
   const isFailed = status === "failed";
 
+  const dialogTitle = title || (
+    isProcessing ? "Processing File..." :
+    isCompleted && summary && summary.failed === 0 ? "Import Complete!" :
+    isCompleted && summary && summary.successful > 0 ? "Import Partially Complete" :
+    isCompleted ? "Import Complete!" :
+    "Import Failed"
+  );
+
+  const dialogDescription = description || (
+    isProcessing ? "Please wait while we process your file" :
+    isCompleted && summary && summary.failed === 0 ? `All ${summary.successful} orders were imported successfully` :
+    isCompleted && summary && summary.successful > 0 ? `${summary.successful} orders imported, ${summary.failed} failed` :
+    isCompleted ? "Your orders have been imported" :
+    "An error occurred during the import"
+  );
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && !isProcessing && onClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>
-            {isProcessing && "Importing Orders..."}
-            {isCompleted && "Import Complete!"}
-            {isFailed && "Import Failed"}
-          </DialogTitle>
-          <DialogDescription>
-            {isProcessing && "Please wait while we process your orders"}
-            {isCompleted && "Your orders have been successfully imported"}
-            {isFailed && "An error occurred during the import"}
-          </DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
@@ -92,18 +104,51 @@ export function ImportProgressDialog({
 
           {/* Error Details */}
           {summary && summary.errors && summary.errors.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4 max-h-32 overflow-y-auto">
-              <p className="text-sm font-medium text-red-900 mb-2">Errors:</p>
-              <ul className="space-y-1">
-                {summary.errors.slice(0, 5).map((error, idx) => (
-                  <li key={idx} className="text-sm text-red-700">
-                    • {error.message}
-                  </li>
+            <div className="bg-red-50 border border-red-200 rounded-md p-4 max-h-64 overflow-y-auto">
+              <p className="text-sm font-medium text-red-900 mb-3">
+                Error Details ({summary.errors.length} error{summary.errors.length !== 1 ? 's' : ''}):
+              </p>
+              <div className="space-y-2">
+                {summary.errors.slice(0, 10).map((error: any, idx: number) => (
+                  <div key={idx} className="text-sm text-red-700 border-b border-red-100 pb-2 last:border-0">
+                    {error.batch ? (
+                      <div>
+                        <p className="font-medium">Batch {error.batch}:</p>
+                        <p className="ml-4">{error.error || error.message}</p>
+                        {error.rows && error.rows.length > 0 && (
+                          <p className="ml-4 text-xs text-gray-600">
+                            Rows: {error.rows.join(", ")}
+                          </p>
+                        )}
+                        {error.details && (
+                          <p className="ml-4 text-xs text-gray-600">
+                            {error.details}
+                          </p>
+                        )}
+                        {error.hint && (
+                          <p className="ml-4 text-xs text-amber-600">
+                            Hint: {error.hint}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <p>
+                          {error.row && <span className="font-medium">Row {error.row}: </span>}
+                          {error.field && <span className="text-gray-600">({error.field}) </span>}
+                          {error.message}
+                        </p>
+                        {error.code && (
+                          <p className="text-xs text-gray-500 ml-4">Code: {error.code}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 ))}
-              </ul>
-              {summary.errors.length > 5 && (
-                <p className="text-xs text-red-600 mt-2">
-                  And {summary.errors.length - 5} more errors...
+              </div>
+              {summary.errors.length > 10 && (
+                <p className="text-xs text-red-600 mt-3 pt-2 border-t border-red-200">
+                  And {summary.errors.length - 10} more errors. See full details on the import page.
                 </p>
               )}
             </div>

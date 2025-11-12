@@ -48,6 +48,7 @@ interface UsePurchaseOrdersOptions {
   searchTerm: string;
   filters: POFilters;
   brandId?: string;
+  distributorId?: string; // For distributor_admin users, auto-filter by their distributor_id
   debounceMs?: number;
 }
 
@@ -65,7 +66,8 @@ interface UsePurchaseOrdersReturn {
 async function fetchPurchaseOrders(
   debouncedSearchTerm: string,
   filters: POFilters,
-  brandId?: string
+  brandId?: string,
+  distributorId?: string
 ): Promise<{ purchaseOrders: PurchaseOrder[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("purchase_orders").select("*", { count: "exact" });
@@ -74,8 +76,11 @@ async function fetchPurchaseOrders(
     query = query.eq("brand_id", brandId);
   }
 
-  if (filters.distributorId && filters.distributorId !== "all") {
-    query = query.eq("distributor_id", filters.distributorId);
+  // For distributor_admin users, always filter by their distributor_id
+  const finalDistributorId = distributorId || (filters.distributorId && filters.distributorId !== "all" ? filters.distributorId : undefined);
+  
+  if (finalDistributorId) {
+    query = query.eq("distributor_id", finalDistributorId);
   }
 
   if (debouncedSearchTerm.trim()) {
@@ -134,6 +139,7 @@ export function usePurchaseOrders({
   searchTerm,
   filters,
   brandId,
+  distributorId,
   debounceMs = 300,
 }: UsePurchaseOrdersOptions): UsePurchaseOrdersReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -148,8 +154,8 @@ export function usePurchaseOrders({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["purchaseOrders", debouncedSearchTerm, filters, brandId],
-    queryFn: () => fetchPurchaseOrders(debouncedSearchTerm, filters, brandId),
+    queryKey: ["purchaseOrders", debouncedSearchTerm, filters, brandId, distributorId],
+    queryFn: () => fetchPurchaseOrders(debouncedSearchTerm, filters, brandId, distributorId),
     staleTime: 0,
   });
 

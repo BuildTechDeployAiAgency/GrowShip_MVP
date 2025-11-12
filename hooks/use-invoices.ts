@@ -46,6 +46,7 @@ interface UseInvoicesOptions {
   searchTerm: string;
   filters: InvoiceFilters;
   brandId?: string;
+  distributorId?: string; // For distributor_admin users, auto-filter by their distributor_id
   debounceMs?: number;
 }
 
@@ -63,7 +64,8 @@ interface UseInvoicesReturn {
 async function fetchInvoices(
   debouncedSearchTerm: string,
   filters: InvoiceFilters,
-  brandId?: string
+  brandId?: string,
+  distributorId?: string
 ): Promise<{ invoices: Invoice[]; totalCount: number }> {
   const supabase = createClient();
   let query = supabase.from("invoices").select("*", { count: "exact" });
@@ -72,8 +74,11 @@ async function fetchInvoices(
     query = query.eq("brand_id", brandId);
   }
 
-  if (filters.distributorId && filters.distributorId !== "all") {
-    query = query.eq("distributor_id", filters.distributorId);
+  // For distributor_admin users, always filter by their distributor_id
+  const finalDistributorId = distributorId || (filters.distributorId && filters.distributorId !== "all" ? filters.distributorId : undefined);
+  
+  if (finalDistributorId) {
+    query = query.eq("distributor_id", finalDistributorId);
   }
 
   if (debouncedSearchTerm.trim()) {
@@ -128,6 +133,7 @@ export function useInvoices({
   searchTerm,
   filters,
   brandId,
+  distributorId,
   debounceMs = 300,
 }: UseInvoicesOptions): UseInvoicesReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -142,8 +148,8 @@ export function useInvoices({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["invoices", debouncedSearchTerm, filters, brandId],
-    queryFn: () => fetchInvoices(debouncedSearchTerm, filters, brandId),
+    queryKey: ["invoices", debouncedSearchTerm, filters, brandId, distributorId],
+    queryFn: () => fetchInvoices(debouncedSearchTerm, filters, brandId, distributorId),
     staleTime: 0,
   });
 
