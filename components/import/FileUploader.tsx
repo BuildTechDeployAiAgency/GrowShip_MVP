@@ -112,9 +112,9 @@ export function FileUploader({
       />
 
       {!selectedFile ? (
-        <Card
+        <div
           className={`
-            border-2 border-dashed cursor-pointer transition-all relative
+            border-2 border-dashed cursor-pointer transition-all relative rounded-lg bg-white shadow-sm
             ${dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-gray-400"}
             ${loading ? "opacity-50 cursor-not-allowed" : ""}
           `}
@@ -122,6 +122,15 @@ export function FileUploader({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onClick={handleClick}
+          role="button"
+          tabIndex={0}
+          aria-label="Click to upload file or drag and drop"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleClick();
+            }
+          }}
         >
           {loading && (
             <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
@@ -140,7 +149,7 @@ export function FileUploader({
               Accepts {acceptedTypes.join(", ")} files up to {maxSizeMB}MB
             </p>
           </div>
-        </Card>
+        </div>
       ) : (
         <Card className="p-4 relative">
           {loading && (

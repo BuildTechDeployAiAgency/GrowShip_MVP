@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNotifications } from "@/hooks/use-notifications";
 import { Notification } from "@/hooks/use-notifications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Check, CheckCheck, Filter, AlertCircle } from "lucide-react";
+import { Bell, Check, CheckCheck, Filter, AlertCircle, Trash2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -14,19 +14,53 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format } from "date-fns";
+import { format, subDays, isAfter } from "date-fns";
 import Link from "next/link";
 
 export function NotificationList() {
   const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [entityFilter, setEntityFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all");
 
   const { notifications, isLoading, markAsRead, markAllAsRead, unreadCount } = useNotifications({
     isRead: filter === "all" ? undefined : filter === "read",
     type: typeFilter !== "all" ? typeFilter : undefined,
     priority: priorityFilter !== "all" ? priorityFilter : undefined,
+    limit: 100,
   });
+
+  // Client-side filtering for entity type and date
+  const filteredNotifications = useMemo(() => {
+    let filtered = [...notifications];
+
+    // Filter by entity type
+    if (entityFilter !== "all") {
+      filtered = filtered.filter(
+        (n: Notification) => n.related_entity_type === entityFilter
+      );
+    }
+
+    // Filter by date
+    if (dateFilter !== "all") {
+      const now = new Date();
+      const filterDateMap: Record<string, Date> = {
+        today: subDays(now, 0),
+        week: subDays(now, 7),
+        month: subDays(now, 30),
+      };
+      const filterDate = filterDateMap[dateFilter];
+
+      if (filterDate) {
+        filtered = filtered.filter((n: Notification) =>
+          isAfter(new Date(n.created_at), filterDate)
+        );
+      }
+    }
+
+    return filtered;
+  }, [notifications, entityFilter, dateFilter]);
 
   const priorityColors: Record<string, string> = {
     urgent: "bg-red-100 text-red-800 border-red-200",
@@ -81,53 +115,89 @@ export function NotificationList() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-4">
-          <Select value={filter} onValueChange={(v: any) => setFilter(v)}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="unread">Unread</SelectItem>
-              <SelectItem value="read">Read</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="order">Order</SelectItem>
-              <SelectItem value="payment">Payment</SelectItem>
-              <SelectItem value="shipment">Shipment</SelectItem>
-              <SelectItem value="warning">Warning</SelectItem>
-              <SelectItem value="info">Info</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="space-y-3 mt-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={filter} onValueChange={(v: any) => setFilter(v)}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="unread">Unread</SelectItem>
+                <SelectItem value="read">Read</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="order">Order</SelectItem>
+                <SelectItem value="payment">Payment</SelectItem>
+                <SelectItem value="shipment">Shipment</SelectItem>
+                <SelectItem value="warning">Warning</SelectItem>
+                <SelectItem value="info">Info</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priorities</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={entityFilter} onValueChange={setEntityFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Entity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Entities</SelectItem>
+                <SelectItem value="po">Purchase Order</SelectItem>
+                <SelectItem value="order">Order</SelectItem>
+                <SelectItem value="invoice">Invoice</SelectItem>
+                <SelectItem value="inventory">Inventory</SelectItem>
+                <SelectItem value="shipment">Shipment</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Date" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">Last 7 Days</SelectItem>
+                <SelectItem value="month">Last 30 Days</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="text-sm text-gray-600 ml-auto">
+              Showing {filteredNotifications.length} of {notifications.length} notifications
+            </div>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
-        {notifications.length === 0 ? (
+        {filteredNotifications.length === 0 ? (
           <div className="text-center py-12">
             <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">No notifications found</p>
+            {notifications.length > 0 && (
+              <p className="text-sm text-gray-500 mt-2">
+                Try adjusting your filters
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
-            {notifications.map((notification: Notification) => {
+            {filteredNotifications.map((notification: Notification) => {
               const Icon = typeIcons[notification.type] || Bell;
               return (
                 <div

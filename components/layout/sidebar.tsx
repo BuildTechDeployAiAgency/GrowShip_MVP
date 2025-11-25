@@ -21,13 +21,9 @@ import {
 // Routes that should show "Coming Soon" badge
 const COMING_SOON_ROUTES = [
   "/reports",
-  "/notifications",
-  "/calendar",
   "/invoices",
   "/shipments",
   "/sales",
-  "/inventory",
-  "/forecasting",
   "/marketing",
   "/manufacturers",
 ];

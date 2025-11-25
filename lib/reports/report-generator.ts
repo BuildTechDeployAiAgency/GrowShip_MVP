@@ -105,7 +105,7 @@ export async function generateExcelReport(reportData: ReportData): Promise<Buffe
         const cell = summaryRow.getCell(colIndex + 1);
         const startRow = 2;
         const endRow = reportData.data.length + 1;
-        cell.formula = `SUM(${worksheet.getCell(startRow, colIndex + 1).address}:${worksheet.getCell(endRow, colIndex + 1).address})`;
+        (cell as any).formula = `SUM(${worksheet.getCell(startRow, colIndex + 1).address}:${worksheet.getCell(endRow, colIndex + 1).address})`;
         cell.font = { bold: true };
         if (col.format === "currency") {
           cell.numFmt = '$#,##0.00';

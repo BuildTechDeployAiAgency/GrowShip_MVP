@@ -95,7 +95,7 @@ export function InvoiceFormDialog({
     searchTerm: "",
     filters: { status: "all" },
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
-    distributorId: isDistributorAdmin ? profile.distributor_id : undefined,
+    distributorId: isDistributorAdmin ? profile?.distributor_id : undefined,
     isSuperAdmin,
   });
 
@@ -108,7 +108,7 @@ export function InvoiceFormDialog({
       dateRange: "all",
     },
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
-    distributorId: isDistributorAdmin ? profile.distributor_id : undefined,
+    distributorId: isDistributorAdmin ? profile?.distributor_id : undefined,
   });
 
   // Memoize today's date to prevent hydration issues

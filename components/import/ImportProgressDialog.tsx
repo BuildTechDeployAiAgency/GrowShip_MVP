@@ -21,6 +21,7 @@ interface ImportProgressDialogProps {
   onClose: () => void;
   title?: string;
   description?: string;
+  entityName?: string;
 }
 
 export function ImportProgressDialog({
@@ -31,6 +32,7 @@ export function ImportProgressDialog({
   onClose,
   title,
   description,
+  entityName = "Orders",
 }: ImportProgressDialogProps) {
   const isProcessing = status === "processing";
   const isCompleted = status === "completed";
@@ -46,9 +48,9 @@ export function ImportProgressDialog({
 
   const dialogDescription = description || (
     isProcessing ? "Please wait while we process your file" :
-    isCompleted && summary && summary.failed === 0 ? `All ${summary.successful} orders were imported successfully` :
-    isCompleted && summary && summary.successful > 0 ? `${summary.successful} orders imported, ${summary.failed} failed` :
-    isCompleted ? "Your orders have been imported" :
+    isCompleted && summary && summary.failed === 0 ? `All ${summary.successful} ${entityName.toLowerCase()} were imported successfully` :
+    isCompleted && summary && summary.successful > 0 ? `${summary.successful} ${entityName.toLowerCase()} imported, ${summary.failed} failed` :
+    isCompleted ? `Your ${entityName.toLowerCase()} have been imported` :
     "An error occurred during the import"
   );
 

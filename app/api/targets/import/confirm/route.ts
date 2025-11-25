@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
-import { ParsedTarget } from "@/lib/excel/target-parser";
+import { ParsedTarget } from "@/types/import";
 import { createImportLog, updateImportLog } from "@/utils/import-log";
 import { validateTargets } from "@/lib/excel/target-validator";
 
@@ -115,14 +115,14 @@ export async function POST(request: NextRequest) {
     if (!validationResult.valid) {
       console.log("[Target Import Confirm] Validation failed", {
         errorsCount: validationResult.errors.length,
-        validCount: validationResult.validTargets.length,
-        invalidCount: validationResult.invalidTargets.length,
+        validCount: validationResult.validTargets?.length || 0,
+        invalidCount: validationResult.invalidTargets?.length || 0,
       });
 
       // Update import log with validation errors
       await updateImportLog(importLogId, {
         status: "failed",
-        failedRows: validationResult.invalidTargets.length,
+        failedRows: validationResult.invalidTargets?.length || 0,
         successfulRows: 0,
         errorDetails: validationResult.errors,
       });
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const validTargets = validationResult.validTargets as ParsedTarget[];
+    const validTargets = validationResult.validTargets || [];
 
     if (validTargets.length === 0) {
       await updateImportLog(importLogId, {
@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
     await adminSupabase.rpc("refresh_target_vs_actual_view");
 
     // Update import log with success
-    const failedCount = validationResult.invalidTargets.length;
+    const failedCount = validationResult.invalidTargets?.length || 0;
     await updateImportLog(importLogId, {
       status: failedCount > 0 ? "partial" : "completed",
       successfulRows: insertedTargets?.length || 0,

@@ -10,6 +10,7 @@ interface ValidationResultsPanelProps {
   onDownloadErrors?: () => void;
   onProceed?: () => void;
   loading?: boolean;
+  entityName?: string;
 }
 
 export function ValidationResultsPanel({
@@ -17,15 +18,26 @@ export function ValidationResultsPanel({
   onDownloadErrors,
   onProceed,
   loading = false,
+  entityName = "Orders",
 }: ValidationResultsPanelProps) {
   const hasErrors = results.errors.length > 0;
-  const errorsByRow = results.errors.reduce((acc, error) => {
-    if (!acc[error.row]) {
-      acc[error.row] = [];
-    }
-    acc[error.row].push(error);
-    return acc;
-  }, {} as Record<number, typeof results.errors>);
+  
+  // Determine entity type and get counts dynamically
+  const validCount = 
+    results.validProducts?.length || 
+    results.validSalesRows?.length || 
+    results.validOrders?.length || 
+    results.validTargets?.length || 
+    0;
+  
+  const invalidCount = 
+    results.invalidProducts?.length || 
+    results.invalidSalesRows?.length || 
+    results.invalidOrders?.length || 
+    results.invalidTargets?.length || 
+    0;
+  
+  const totalCount = validCount + invalidCount;
 
   return (
     <Card className="p-6">
@@ -45,9 +57,9 @@ export function ValidationResultsPanel({
         {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-sm font-medium text-gray-600 mb-1">Total Orders</p>
+            <p className="text-sm font-medium text-gray-600 mb-1">Total {entityName}</p>
             <p className="text-2xl font-bold text-gray-900">
-              {results.validOrders.length + results.invalidOrders.length}
+              {totalCount}
             </p>
           </div>
 
@@ -57,7 +69,7 @@ export function ValidationResultsPanel({
               <p className="text-sm font-medium text-green-600">Valid</p>
             </div>
             <p className="text-2xl font-bold text-green-600">
-              {results.validOrders.length}
+              {validCount}
             </p>
           </div>
 
@@ -67,7 +79,7 @@ export function ValidationResultsPanel({
               <p className="text-sm font-medium text-red-600">Invalid</p>
             </div>
             <p className="text-2xl font-bold text-red-600">
-              {results.invalidOrders.length}
+              {invalidCount}
             </p>
           </div>
 
@@ -133,7 +145,7 @@ export function ValidationResultsPanel({
                   Validation Successful!
                 </h4>
                 <p className="text-sm text-green-700">
-                  All {results.validOrders.length} orders passed validation and are ready to import.
+                  All {validCount} {entityName.toLowerCase()} passed validation and are ready to import.
                 </p>
               </div>
             </div>
@@ -156,9 +168,9 @@ export function ValidationResultsPanel({
           {!hasErrors && onProceed && (
             <Button
               onClick={onProceed}
-              disabled={loading || results.validOrders.length === 0}
+              disabled={loading || validCount === 0}
             >
-              {loading ? "Processing..." : `Proceed with ${results.validOrders.length} Orders`}
+              {loading ? "Processing..." : `Proceed with ${validCount} ${entityName}`}
             </Button>
           )}
         </div>

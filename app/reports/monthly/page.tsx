@@ -1,0 +1,41 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { MainLayout } from "@/components/layout/main-layout";
+import { useRequireProfile } from "@/hooks/use-auth";
+import { ProtectedPage } from "@/components/common/protected-page";
+import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
+import { MonthlyReportsDashboard } from "@/components/reports/monthly-reports-dashboard";
+
+export default function MonthlyReportsPage() {
+  const { user, profile, loading } = useRequireProfile();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || loading) {
+    return (
+      <MainLayout pageTitle="Monthly Reports" pageSubtitle="Loading...">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  return (
+    <EnhancedAuthProvider>
+      <ProtectedPage allowedStatuses={["approved"]}>
+        <MainLayout
+          pageTitle="Monthly Reports"
+          pageSubtitle="View monthly distributor performance and sales reports"
+        >
+          <MonthlyReportsDashboard />
+        </MainLayout>
+      </ProtectedPage>
+    </EnhancedAuthProvider>
+  );
+}
+

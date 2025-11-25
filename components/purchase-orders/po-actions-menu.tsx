@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Eye, Edit, Trash2, CheckCircle, XCircle, Package, Truck, FileText, X } from "lucide-react";
-import { PurchaseOrder, POStatus } from "@/hooks/use-purchase-orders";
+import type { PurchaseOrder, POStatus } from "@/types/purchase-orders";
 import { POApprovalDialog } from "./po-approval-dialog";
 import { POHistoryTimeline } from "./po-history-timeline";
 import {
@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { getAvailableActions } from "@/lib/po/workflow-engine";
+import { getAvailableActions } from "@/lib/po/workflow-utils";
 
 interface POActionsMenuProps {
   po: PurchaseOrder;

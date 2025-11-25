@@ -171,8 +171,8 @@ export async function validateTargets(
   return {
     valid: errors.length === 0,
     errors,
-    validTargets: validTargets as any,
-    invalidTargets: invalidTargets as any,
+    validTargets,
+    invalidTargets,
   };
 }
 

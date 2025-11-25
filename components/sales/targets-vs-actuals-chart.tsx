@@ -55,7 +55,7 @@ export function TargetsVsActualsChart() {
       { target: number; actual: number; count: number }
     > = {};
 
-    targetData.forEach((item) => {
+    targetData.forEach((item: any) => {
       const monthKey = format(parseISO(item.target_period), "MMM");
       if (!monthlyData[monthKey]) {
         monthlyData[monthKey] = { target: 0, actual: 0, count: 0 };

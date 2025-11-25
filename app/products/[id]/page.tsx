@@ -6,7 +6,7 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { ProtectedPage } from "@/components/common/protected-page";
 import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { useRequireProfile } from "@/hooks/use-auth";
-import { Product } from "@/hooks/use-products";
+import type { Product } from "@/types/products";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Edit, Trash2, BarChart3, Package, History, ShoppingCart } from "lucide-react";
@@ -17,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ProductDetailsContent } from "@/components/products/product-details-content";
 import { ProductOrdersSection } from "@/components/products/product-orders-section";
+import { ProductInventoryBreakdown } from "@/components/products/product-inventory-breakdown";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function ProductDetailPage() {
@@ -217,12 +218,6 @@ export default function ProductDetailPage() {
                 >
                   <History className="mr-2 h-4 w-4" />
                   Stock History
-                  <Badge
-                    variant="outline"
-                    className="ml-2 h-4 px-1.5 text-xs border-gray-300 text-gray-500"
-                  >
-                    Soon
-                  </Badge>
                 </TabsTrigger>
                 <TabsTrigger
                   value="analytics"
@@ -241,7 +236,24 @@ export default function ProductDetailPage() {
 
               <div className="mt-6">
                 <TabsContent value="overview" className="mt-0">
-                  <ProductDetailsContent product={product} />
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2">
+                      <ProductDetailsContent product={product} />
+                    </div>
+                    <div className="lg:col-span-1">
+                      <ProductInventoryBreakdown
+                        productId={product.id}
+                        sku={product.sku}
+                        quantityInStock={product.quantity_in_stock}
+                        allocatedStock={product.allocated_stock}
+                        inboundStock={product.inbound_stock}
+                        availableStock={product.available_stock}
+                        reorderLevel={product.reorder_level}
+                        lowStockThreshold={product.low_stock_threshold}
+                        criticalStockThreshold={product.critical_stock_threshold}
+                      />
+                    </div>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="orders" className="mt-0">
@@ -253,17 +265,17 @@ export default function ProductDetailPage() {
                 </TabsContent>
 
                 <TabsContent value="stock-history" className="mt-0">
-                  <Card>
-                    <CardContent className="p-12 text-center">
-                      <History className="mx-auto h-12 w-12 text-gray-400" />
-                      <h3 className="mt-4 text-lg font-medium text-gray-900">
-                        Stock History Coming Soon
-                      </h3>
-                      <p className="mt-2 text-sm text-gray-500">
-                        Track inventory movements and changes over time.
-                      </p>
-                    </CardContent>
-                  </Card>
+                  <ProductInventoryBreakdown
+                    productId={product.id}
+                    sku={product.sku}
+                    quantityInStock={product.quantity_in_stock}
+                    allocatedStock={product.allocated_stock}
+                    inboundStock={product.inbound_stock}
+                    availableStock={product.available_stock}
+                    reorderLevel={product.reorder_level}
+                    lowStockThreshold={product.low_stock_threshold}
+                    criticalStockThreshold={product.critical_stock_threshold}
+                  />
                 </TabsContent>
 
                 <TabsContent value="analytics" className="mt-0">

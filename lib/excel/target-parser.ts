@@ -1,14 +1,6 @@
 import ExcelJS from "exceljs";
 import { getEnabledTargetFields } from "./target-template-config";
-
-export interface ParsedTarget {
-  row: number;
-  sku: string;
-  target_period: string;
-  period_type: "monthly" | "quarterly" | "yearly";
-  target_quantity?: number;
-  target_revenue?: number;
-}
+import { ParsedTarget } from "@/types/import";
 
 /**
  * Parse targets from an Excel file
@@ -19,7 +11,7 @@ export async function parseTargetsExcel(
   targets: ParsedTarget[];
 }> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(fileBuffer);
+  await workbook.xlsx.load(fileBuffer as any);
 
   // Get the first worksheet
   const worksheet = workbook.worksheets[0];

@@ -30,7 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { useProducts, Product, ProductStatus } from "@/hooks/use-products";
+import { useProducts } from "@/hooks/use-products";
+import type { Product, ProductStatus } from "@/types/products";
 import { useManufacturers } from "@/hooks/use-manufacturers";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { toast } from "react-toastify";

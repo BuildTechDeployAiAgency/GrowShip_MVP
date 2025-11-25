@@ -1,55 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-toastify";
-
-export type POStatus = "draft" | "submitted" | "approved" | "rejected" | "ordered" | "received" | "cancelled";
-export type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "partially_paid";
-
-export interface PurchaseOrder {
-  id: string;
-  po_number: string;
-  po_date: string;
-  user_id?: string;
-  brand_id: string;
-  distributor_id?: string;
-  supplier_id?: string;
-  supplier_name: string;
-  supplier_email?: string;
-  supplier_phone?: string;
-  items: any[];
-  subtotal?: number;
-  tax_total?: number;
-  shipping_cost?: number;
-  total_amount?: number;
-  currency?: string;
-  po_status: POStatus;
-  payment_status: PaymentStatus;
-  expected_delivery_date?: string;
-  actual_delivery_date?: string;
-  notes?: string;
-  tags?: string[];
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
-  updated_by?: string;
-}
-
-interface POFilters {
-  status: string;
-  paymentStatus: string;
-  dateRange: string;
-  distributorId?: string;
-}
+import { usePaginatedResource } from "./use-paginated-resource";
+import type { PurchaseOrder, PurchaseOrderFilters } from "@/types/purchase-orders";
+import { updatePaginatedCaches } from "@/lib/react-query/paginated-cache";
+import { postJson } from "@/lib/api/json-client";
 
 interface UsePurchaseOrdersOptions {
   searchTerm: string;
-  filters: POFilters;
+  filters: PurchaseOrderFilters;
   brandId?: string;
-  distributorId?: string; // For distributor_admin users, auto-filter by their distributor_id
+  distributorId?: string;
   debounceMs?: number;
+  pageSize?: number;
 }
 
 interface UsePurchaseOrdersReturn {
@@ -58,81 +24,146 @@ interface UsePurchaseOrdersReturn {
   error: string | null;
   refetch: () => void;
   createPurchaseOrder: (po: Partial<PurchaseOrder>) => Promise<PurchaseOrder>;
-  updatePurchaseOrder: (poId: string, updates: Partial<PurchaseOrder>) => Promise<void>;
+  updatePurchaseOrder: (
+    poId: string,
+    updates: Partial<PurchaseOrder>
+  ) => Promise<void>;
   deletePurchaseOrder: (poId: string) => Promise<void>;
   totalCount: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  setPage: (page: number) => void;
+  setPageSize: (size: number) => void;
 }
 
-async function fetchPurchaseOrders(
-  debouncedSearchTerm: string,
-  filters: POFilters,
-  brandId?: string,
-  distributorId?: string
-): Promise<{ purchaseOrders: PurchaseOrder[]; totalCount: number }> {
-  const supabase = createClient();
-  let query = supabase.from("purchase_orders").select("*", { count: "exact" });
+interface PurchaseOrdersRequestPayload {
+  page: number;
+  pageSize: number;
+  filters: PurchaseOrderFilters;
+  searchTerm?: string;
+  brandId?: string;
+  distributorId?: string;
+}
 
-  if (brandId) {
-    query = query.eq("brand_id", brandId);
+async function requestPurchaseOrdersPage(
+  payload: PurchaseOrdersRequestPayload
+): Promise<{ data: PurchaseOrder[]; totalCount: number }> {
+  const json = await postJson<
+    PurchaseOrdersRequestPayload,
+    { data: PurchaseOrder[]; totalCount: number }
+  >("/api/purchase-orders/list", payload);
+  return {
+    data: json.data ?? [],
+    totalCount: json.totalCount ?? 0,
+  };
+}
+
+function purchaseOrderMatchesFilters(
+  po: PurchaseOrder,
+  filters: PurchaseOrderFilters | null,
+  searchTerm: string
+) {
+  if (searchTerm) {
+    return false;
   }
 
-  // For distributor_admin users, always filter by their distributor_id
-  const finalDistributorId = distributorId || (filters.distributorId && filters.distributorId !== "all" ? filters.distributorId : undefined);
-  
-  if (finalDistributorId) {
-    query = query.eq("distributor_id", finalDistributorId);
+  if (!filters) {
+    return true;
   }
 
-  if (debouncedSearchTerm.trim()) {
-    query = query.or(
-      `po_number.ilike.%${debouncedSearchTerm}%,supplier_name.ilike.%${debouncedSearchTerm}%,supplier_email.ilike.%${debouncedSearchTerm}%`
-    );
+  if (filters.status && filters.status !== "all" && po.po_status !== filters.status) {
+    return false;
   }
 
-  if (filters.status !== "all") {
-    query = query.eq("po_status", filters.status);
+  if (
+    filters.paymentStatus &&
+    filters.paymentStatus !== "all" &&
+    po.payment_status !== filters.paymentStatus
+  ) {
+    return false;
   }
 
-  if (filters.paymentStatus !== "all") {
-    query = query.eq("payment_status", filters.paymentStatus);
+  if (
+    filters.distributorId &&
+    filters.distributorId !== "all" &&
+    po.distributor_id !== filters.distributorId
+  ) {
+    return false;
   }
 
-  if (filters.dateRange !== "all") {
-    const now = new Date();
-    let startDate: Date;
-    
-    switch (filters.dateRange) {
-      case "today":
-        startDate = new Date(now.setHours(0, 0, 0, 0));
-        break;
-      case "week":
-        startDate = new Date(now.setDate(now.getDate() - 7));
-        break;
-      case "month":
-        startDate = new Date(now.setMonth(now.getMonth() - 1));
-        break;
-      case "year":
-        startDate = new Date(now.setFullYear(now.getFullYear() - 1));
-        break;
-      default:
-        startDate = new Date(0);
+  if (filters.dateRange && filters.dateRange !== "all") {
+    return false;
+  }
+
+  return true;
+}
+
+function prependPurchaseOrder(
+  queryClient: ReturnType<typeof useQueryClient>,
+  po: PurchaseOrder
+) {
+  updatePaginatedCaches<PurchaseOrder, PurchaseOrderFilters>(
+    queryClient,
+    "purchaseOrders",
+    (cache, meta) => {
+      if (
+        meta.page !== 0 ||
+        !purchaseOrderMatchesFilters(po, meta.filters, meta.searchTerm)
+      ) {
+        return null;
+      }
+
+      const deduped = cache.data.filter((existing) => existing.id !== po.id);
+
+      return {
+        data: [po, ...deduped].slice(0, meta.pageSize),
+        totalCount: (cache.totalCount ?? 0) + 1,
+      };
     }
-    
-    query = query.gte("po_date", startDate.toISOString());
-  }
+  );
+}
 
-  query = query.order("po_date", { ascending: false });
+function updatePurchaseOrderInCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  po: PurchaseOrder
+) {
+  updatePaginatedCaches<PurchaseOrder, PurchaseOrderFilters>(
+    queryClient,
+    "purchaseOrders",
+    (cache) => {
+      if (!cache.data.some((existing) => existing.id === po.id)) {
+        return null;
+      }
 
-  const { data, error: fetchError, count } = await query;
+      return {
+        data: cache.data.map((existing) =>
+          existing.id === po.id ? { ...existing, ...po } : existing
+        ),
+        totalCount: cache.totalCount,
+      };
+    }
+  );
+}
 
-  if (fetchError) {
-    throw fetchError;
+function removePurchaseOrderFromCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  poId: string
+) {
+  updatePaginatedCaches<PurchaseOrder, PurchaseOrderFilters>(
+    queryClient,
+    "purchaseOrders",
+    (cache) => {
+      if (!cache.data.some((existing) => existing.id === poId)) {
+        return null;
   }
 
   return {
-    purchaseOrders: data || [],
-    totalCount: count || 0,
+        data: cache.data.filter((existing) => existing.id !== poId),
+        totalCount: Math.max(0, (cache.totalCount ?? 0) - 1),
   };
+    }
+  );
 }
 
 export function usePurchaseOrders({
@@ -141,6 +172,7 @@ export function usePurchaseOrders({
   brandId,
   distributorId,
   debounceMs = 300,
+  pageSize = 25,
 }: UsePurchaseOrdersOptions): UsePurchaseOrdersReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
   const queryClient = useQueryClient();
@@ -153,11 +185,39 @@ export function usePurchaseOrders({
     return () => clearTimeout(timer);
   }, [searchTerm, debounceMs]);
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["purchaseOrders", debouncedSearchTerm, filters, brandId, distributorId],
-    queryFn: () => fetchPurchaseOrders(debouncedSearchTerm, filters, brandId, distributorId),
-    staleTime: 0,
+  const resolvedDistributorId =
+    distributorId ||
+    (filters.distributorId && filters.distributorId !== "all"
+      ? filters.distributorId
+      : undefined);
+
+  const normalizedFilters: PurchaseOrderFilters =
+    resolvedDistributorId && filters.distributorId !== resolvedDistributorId
+      ? { ...filters, distributorId: resolvedDistributorId }
+      : filters;
+
+  const paginated = usePaginatedResource({
+    queryKey: "purchaseOrders",
+    filters: normalizedFilters,
+    searchTerm: debouncedSearchTerm,
+    initialPageSize: pageSize,
+    identityKey: [brandId ?? "brand:none", resolvedDistributorId ?? "distributor:all"],
+    fetcher: ({ page, pageSize: size, filters: currentFilters, searchTerm }) =>
+      requestPurchaseOrdersPage({
+        page,
+        pageSize: size,
+        filters: currentFilters,
+        searchTerm,
+        brandId,
+        distributorId: resolvedDistributorId,
+      }),
   });
+
+  useEffect(() => {
+    paginated.setPage(0);
+  }, [brandId, resolvedDistributorId, paginated.setPage]);
+
+  const { isLoading, error, refetch } = paginated.query;
 
   const createPOMutation = useMutation({
     mutationFn: async (po: Partial<PurchaseOrder>): Promise<PurchaseOrder> => {
@@ -183,9 +243,34 @@ export function usePurchaseOrders({
         throw createError;
       }
 
+      // Trigger notification creation via API
+      if (newPO && user?.id && newPO.brand_id) {
+        try {
+          await fetch("/api/notifications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "order",
+              title: "New Purchase Order Created",
+              message: `Purchase Order ${newPO.po_number} has been created and requires review`,
+              brand_id: newPO.brand_id,
+              related_entity_type: "po",
+              related_entity_id: newPO.id,
+              priority: "medium",
+              action_required: true,
+              action_url: `/purchase-orders/${newPO.id}`,
+            }),
+          });
+        } catch (notifError) {
+          console.error("Error creating PO notification:", notifError);
+          // Don't fail the PO creation if notification fails
+        }
+      }
+
       return newPO;
     },
-    onSuccess: () => {
+    onSuccess: (newPO) => {
+      prependPurchaseOrder(queryClient, newPO);
       queryClient.invalidateQueries({ queryKey: ["purchaseOrders"] });
       toast.success("Purchase order created successfully!");
     },
@@ -202,24 +287,31 @@ export function usePurchaseOrders({
     }: {
       poId: string;
       updates: Partial<PurchaseOrder>;
-    }): Promise<void> => {
+    }): Promise<PurchaseOrder> => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
-      const { error } = await supabase
+      const { data: updatedPO, error } = await supabase
         .from("purchase_orders")
         .update({
           ...updates,
           updated_by: user?.id,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", poId);
+        .eq("id", poId)
+        .select()
+        .single();
 
       if (error) {
         throw error;
       }
+
+      return updatedPO;
     },
-    onSuccess: () => {
+    onSuccess: (updatedPO) => {
+      if (updatedPO) {
+        updatePurchaseOrderInCaches(queryClient, updatedPO);
+      }
       queryClient.invalidateQueries({ queryKey: ["purchaseOrders"] });
       toast.success("Purchase order updated successfully!");
     },
@@ -242,7 +334,8 @@ export function usePurchaseOrders({
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, poId) => {
+      removePurchaseOrderFromCaches(queryClient, poId);
       queryClient.invalidateQueries({ queryKey: ["purchaseOrders"] });
       toast.success("Purchase order deleted successfully!");
     },
@@ -253,7 +346,7 @@ export function usePurchaseOrders({
   });
 
   return {
-    purchaseOrders: data?.purchaseOrders || [],
+    purchaseOrders: paginated.data,
     loading: isLoading,
     error: error ? (error as Error).message : null,
     refetch: () => {
@@ -268,7 +361,12 @@ export function usePurchaseOrders({
     deletePurchaseOrder: async (poId: string) => {
       await deletePOMutation.mutateAsync(poId);
     },
-    totalCount: data?.totalCount || 0,
+    totalCount: paginated.totalCount,
+    page: paginated.page,
+    pageSize: paginated.pageSize,
+    pageCount: paginated.pageCount,
+    setPage: paginated.setPage,
+    setPageSize: paginated.setPageSize,
   };
 }
 

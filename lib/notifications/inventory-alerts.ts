@@ -1,63 +1,268 @@
+// ================================================
+// INVENTORY ALERTS NOTIFICATION SERVICE
+// ================================================
+// Creates notifications for inventory threshold events
+
 import { createClient } from "@/lib/supabase/server";
 import { createNotificationsForBrand } from "./alert-generator";
 
-export async function checkInventoryAlerts(brandId: string): Promise<void> {
+export type InventoryAlertLevel = "critical" | "low" | "overstock";
+
+/**
+ * Create low or critical stock alert notification
+ */
+export async function createLowStockAlert(
+  productId: string,
+  level: InventoryAlertLevel
+): Promise<void> {
   const supabase = await createClient();
 
-  // Get low stock products
-  const { data: lowStockProducts, error } = await supabase.rpc(
-    "get_low_stock_products",
-    { p_brand_id: brandId }
-  );
+  // Get product details
+  const { data: product, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", productId)
+    .single();
 
-  if (error) {
-    console.error("Error checking inventory alerts:", error);
+  if (error || !product) {
+    console.error("Product not found for alert:", productId);
     return;
   }
 
-  if (!lowStockProducts || lowStockProducts.length === 0) {
-    return;
+  const currentStock = product.quantity_in_stock || 0;
+  const availableStock = product.available_stock || 0;
+  const threshold = level === "critical" ? product.critical_stock_threshold : product.low_stock_threshold;
+
+  // Determine priority based on level
+  const priority = level === "critical" ? "urgent" : "high";
+  const title = level === "critical" 
+    ? currentStock === 0 ? "Product Out of Stock" : "Critical Stock Level"
+    : "Low Stock Alert";
+
+  // Create notification message
+  let message = `${product.product_name} (${product.sku})`;
+  if (currentStock === 0) {
+    message += " is out of stock";
+  } else {
+    message += ` has ${currentStock} units remaining`;
+    if (availableStock < currentStock) {
+      message += ` (${availableStock} available after allocations)`;
+    }
   }
 
-  // Create alerts for out-of-stock items
-  const outOfStockItems = lowStockProducts.filter(
-    (p: any) => p.quantity_in_stock === 0
+  // Create notification for all brand users
+  await createNotificationsForBrand(
+    {
+      type: "warning",
+      title,
+      message,
+      related_entity_type: "inventory",
+      related_entity_id: productId,
+      priority,
+      action_required: true,
+      action_url: `/products/${productId}`,
+    },
+    product.brand_id
   );
 
-  if (outOfStockItems.length > 0) {
-    await createNotificationsForBrand(
-      {
-        type: "warning",
-        title: "Out of Stock Alert",
-        message: `${outOfStockItems.length} product(s) are out of stock`,
-        related_entity_type: "inventory",
-        priority: "high",
-        action_required: true,
-        action_url: "/inventory",
-      },
-      brandId
-    );
-  }
+  // Also create calendar event for restock reminder if critically low
+  if (level === "critical" && currentStock > 0) {
+    const restockDate = new Date();
+    restockDate.setDate(restockDate.getDate() + 3); // Suggest restock in 3 days
 
-  // Create alerts for low stock items
-  const lowStockItems = lowStockProducts.filter(
-    (p: any) => p.quantity_in_stock > 0 && p.quantity_in_stock <= p.reorder_level
-  );
-
-  if (lowStockItems.length > 0) {
-    await createNotificationsForBrand(
-      {
-        type: "warning",
-        title: "Low Stock Alert",
-        message: `${lowStockItems.length} product(s) are below reorder level`,
-        related_entity_type: "inventory",
-        priority: "medium",
-        action_required: true,
-        action_url: "/inventory",
-      },
-      brandId
-    );
+    await supabase.from("calendar_events").insert({
+      brand_id: product.brand_id,
+      event_type: "custom",
+      title: `Restock Reminder: ${product.product_name}`,
+      description: `${product.product_name} (${product.sku}) is at critical stock level (${currentStock} units). Consider reordering.`,
+      event_date: restockDate.toISOString().split("T")[0],
+      related_entity_type: "inventory",
+      related_entity_id: productId,
+      is_all_day: true,
+      status: "upcoming",
+      created_by: null, // System-generated
+    });
   }
 }
 
+/**
+ * Create stock restored notification (when stock goes from low/critical to healthy)
+ */
+export async function createStockRestoredAlert(productId: string): Promise<void> {
+  const supabase = await createClient();
 
+  // Get product details
+  const { data: product, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", productId)
+    .single();
+
+  if (error || !product) {
+    console.error("Product not found for alert:", productId);
+    return;
+  }
+
+  const currentStock = product.quantity_in_stock || 0;
+
+  // Create success notification
+  await createNotificationsForBrand(
+    {
+      type: "success",
+      title: "Stock Replenished",
+      message: `${product.product_name} (${product.sku}) stock has been replenished to ${currentStock} units`,
+      related_entity_type: "inventory",
+      related_entity_id: productId,
+      priority: "low",
+      action_required: false,
+      action_url: `/products/${productId}`,
+    },
+    product.brand_id
+  );
+
+  // Remove any pending restock reminders from calendar
+  await supabase
+    .from("calendar_events")
+    .delete()
+    .eq("related_entity_type", "inventory")
+    .eq("related_entity_id", productId)
+    .eq("status", "upcoming");
+}
+
+/**
+ * Create overstock alert notification
+ */
+export async function createOverstockAlert(productId: string): Promise<void> {
+  const supabase = await createClient();
+
+  // Get product details
+  const { data: product, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", productId)
+    .single();
+
+  if (error || !product || !product.max_stock_threshold) {
+    return;
+  }
+
+  const currentStock = product.quantity_in_stock || 0;
+  const overstockAmount = currentStock - product.max_stock_threshold;
+
+  // Create warning notification
+  await createNotificationsForBrand(
+    {
+      type: "warning",
+      title: "Overstock Alert",
+      message: `${product.product_name} (${product.sku}) has ${currentStock} units, which is ${overstockAmount} units over the maximum threshold (${product.max_stock_threshold})`,
+      related_entity_type: "inventory",
+      related_entity_id: productId,
+      priority: "medium",
+      action_required: false,
+      action_url: `/products/${productId}`,
+    },
+    product.brand_id
+  );
+}
+
+/**
+ * Create notification for products running out soon (predictive alert)
+ */
+export async function createRunningOutSoonAlert(
+  productId: string,
+  daysUntilOut: number
+): Promise<void> {
+  const supabase = await createClient();
+
+  // Get product details
+  const { data: product, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", productId)
+    .single();
+
+  if (error || !product) {
+    console.error("Product not found for alert:", productId);
+    return;
+  }
+
+  const currentStock = product.quantity_in_stock || 0;
+
+  // Create predictive warning
+  await createNotificationsForBrand(
+    {
+      type: "warning",
+      title: "Stock Running Out Soon",
+      message: `${product.product_name} (${product.sku}) has ${currentStock} units and is projected to run out in approximately ${daysUntilOut} days based on recent sales velocity`,
+      related_entity_type: "inventory",
+      related_entity_id: productId,
+      priority: "high",
+      action_required: true,
+      action_url: `/products/${productId}`,
+    },
+    product.brand_id
+  );
+
+  // Create calendar event for predicted stock-out date
+  const stockOutDate = new Date();
+  stockOutDate.setDate(stockOutDate.getDate() + daysUntilOut);
+
+  await supabase.from("calendar_events").insert({
+    brand_id: product.brand_id,
+    event_type: "custom",
+    title: `Predicted Stock-Out: ${product.product_name}`,
+    description: `${product.product_name} (${product.sku}) is projected to run out of stock on this date based on recent sales trends.`,
+    event_date: stockOutDate.toISOString().split("T")[0],
+    related_entity_type: "inventory",
+    related_entity_id: productId,
+    is_all_day: true,
+    status: "upcoming",
+    created_by: null, // System-generated
+  });
+}
+
+/**
+ * Batch create alerts for multiple products
+ */
+export async function createBatchStockAlerts(
+  alerts: Array<{
+    product_id: string;
+    alert_type: "low" | "critical" | "overstock" | "running_out_soon";
+    days_until_out?: number;
+  }>
+): Promise<void> {
+  for (const alert of alerts) {
+    try {
+      if (alert.alert_type === "running_out_soon" && alert.days_until_out) {
+        await createRunningOutSoonAlert(alert.product_id, alert.days_until_out);
+      } else if (alert.alert_type === "overstock") {
+        await createOverstockAlert(alert.product_id);
+      } else {
+        await createLowStockAlert(alert.product_id, alert.alert_type);
+      }
+    } catch (error) {
+      console.error(`Failed to create alert for product ${alert.product_id}:`, error);
+    }
+  }
+}
+
+/**
+ * Clean up old inventory-related notifications
+ * Should be called periodically (e.g., daily cron job)
+ */
+export async function cleanupOldInventoryAlerts(olderThanDays: number = 30): Promise<void> {
+  const supabase = await createClient();
+
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+
+  // Delete old read inventory notifications
+  await supabase
+    .from("notifications")
+    .delete()
+    .eq("related_entity_type", "inventory")
+    .eq("is_read", true)
+    .lt("created_at", cutoffDate.toISOString());
+
+  console.log(`Cleaned up inventory notifications older than ${olderThanDays} days`);
+}

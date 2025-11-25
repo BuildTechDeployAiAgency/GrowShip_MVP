@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateOrderTemplate, getTemplateFilename } from "@/lib/excel/template-generator";
+import { generateSalesTemplate, getSalesTemplateFilename } from "@/lib/excel/sales-template-generator";
+import { generateProductTemplate, getProductTemplateFilename } from "@/lib/excel/product-template-generator";
 
 /**
  * GET /api/import/template
@@ -45,10 +47,18 @@ export async function GET(request: NextRequest) {
                          (isDistributorAdmin && profile.distributor_id ? profile.distributor_id : undefined);
 
     // Validate type
-    if (type !== "orders") {
+    if (type !== "orders" && type !== "sales" && type !== "products") {
       return NextResponse.json(
-        { error: "Invalid import type. Currently only 'orders' is supported" },
+        { error: "Invalid import type. Supported types: 'orders', 'sales', 'products'" },
         { status: 400 }
+      );
+    }
+
+    // For products, only super_admin can access
+    if (type === "products" && profile.role_name !== "super_admin") {
+      return NextResponse.json(
+        { error: "Only Super Admins can access product import templates" },
+        { status: 403 }
       );
     }
 
@@ -71,16 +81,35 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Generate template
-    const buffer = await generateOrderTemplate({
-      brandId: brandId!,
-      distributorId,
-      includeInstructions: true,
-      includeSampleData: true,
-    });
+    // Generate template based on type
+    let buffer: Buffer;
+    let filename: string;
 
-    // Get filename
-    const filename = getTemplateFilename(type);
+    if (type === "sales") {
+      buffer = await generateSalesTemplate({
+        brandId: brandId!,
+        distributorId,
+        includeInstructions: true,
+        includeSampleData: true,
+      });
+      filename = getSalesTemplateFilename();
+    } else if (type === "products") {
+      buffer = await generateProductTemplate({
+        brandId: brandId!,
+        includeInstructions: true,
+        includeSampleData: true,
+      });
+      filename = getProductTemplateFilename();
+    } else {
+      // Default to orders
+      buffer = await generateOrderTemplate({
+        brandId: brandId!,
+        distributorId,
+        includeInstructions: true,
+        includeSampleData: true,
+      });
+      filename = getTemplateFilename(type);
+    }
 
     // Return file using a Uint8Array to satisfy the Edge runtime type expectations
     const fileArray: Uint8Array =

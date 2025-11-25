@@ -71,6 +71,7 @@ function formatOrderNumber(distributorCode: string, sequence: number): string {
  */
 export async function POST(request: NextRequest) {
   let importLogId: string | null = null;
+  let currentUserId: string | null = null;
 
   try {
     // Authenticate user
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    currentUserId = user.id;
 
     // Get user profile
     const { data: profile, error: profileError } = await supabase
@@ -100,18 +102,20 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { orders, distributorId, fileHash, fileName, brandId } = body as {
+    const { orders, distributorId, fileHash, fileName, brandId, purchaseOrderId } = body as {
       orders: ParsedOrder[];
       distributorId: string;
       fileHash: string;
       fileName: string;
       brandId: string;
+      purchaseOrderId?: string;  // NEW: Optional PO linkage
     };
 
     console.log("[Import Confirm] Starting import", {
       ordersCount: orders?.length || 0,
       distributorId,
       brandId,
+      purchaseOrderId,
       fileName,
       userId: user.id,
     });
@@ -157,6 +161,49 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: "You can only import orders for your assigned distributor" },
           { status: 403 }
+        );
+      }
+    }
+
+    // NEW: Validate purchase order if provided
+    if (purchaseOrderId) {
+      const adminSupabase = createAdminClient();
+      const { data: po, error: poError } = await adminSupabase
+        .from("purchase_orders")
+        .select("brand_id, distributor_id, po_status")
+        .eq("id", purchaseOrderId)
+        .single();
+
+      if (poError || !po) {
+        return NextResponse.json(
+          { error: "Purchase order not found" },
+          { status: 404 }
+        );
+      }
+
+      // Validate PO belongs to the same brand
+      if (po.brand_id !== brandId) {
+        return NextResponse.json(
+          { error: "Purchase order does not belong to the specified brand" },
+          { status: 400 }
+        );
+      }
+
+      // Validate PO distributor matches
+      if (po.distributor_id && po.distributor_id !== distributorId) {
+        return NextResponse.json(
+          { error: "Purchase order distributor does not match the specified distributor" },
+          { status: 400 }
+        );
+      }
+
+      // Validate PO status
+      if (po.po_status !== "approved" && po.po_status !== "ordered") {
+        return NextResponse.json(
+          {
+            error: `Purchase order must be approved or ordered. Current status: ${po.po_status}`,
+          },
+          { status: 400 }
         );
       }
     }
@@ -237,6 +284,7 @@ export async function POST(request: NextRequest) {
             user_id: user.id,
             brand_id: brandId,
             distributor_id: distributorId,
+            purchase_order_id: purchaseOrderId || null,  // NEW: Link to PO if provided
             customer_name: order.customer_name,
             customer_email: order.customer_email || null,
             customer_phone: order.customer_phone || null,
@@ -368,7 +416,7 @@ export async function POST(request: NextRequest) {
       message: error.message,
       stack: error.stack,
       importLogId,
-      userId: user?.id,
+      userId: currentUserId,
     });
 
     // Update import log with failure if we have an ID

@@ -11,7 +11,8 @@ The user was experiencing an infinite redirect loop between `/profile/setup` and
 
 1. **Race Condition**: The client-side check (`app/profile/setup/page.tsx`) and server-side check (`middleware.ts`) were checking `is_profile_complete` at different times, potentially seeing different values due to cache inconsistencies.
 
-2. **Redirect Logic Issues**: 
+2. **Redirect Logic Issues**:
+
    - Using `router.push()` instead of `router.replace()` caused navigation history issues
    - No guards to prevent multiple redirect attempts
    - No error handling for database query failures in middleware
@@ -23,6 +24,7 @@ The user was experiencing an infinite redirect loop between `/profile/setup` and
 ### 1. Profile Setup Page (`app/profile/setup/page.tsx`)
 
 **Changes:**
+
 - Added `redirectAttempted` ref to prevent multiple redirect attempts
 - Added `checkTimeoutRef` to debounce redirect checks
 - Changed `router.push()` to `router.replace()` to prevent back navigation issues
@@ -31,6 +33,7 @@ The user was experiencing an infinite redirect loop between `/profile/setup` and
 - Added console logging for debugging
 
 **Key Code:**
+
 ```typescript
 const redirectAttempted = useRef(false);
 const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -45,10 +48,12 @@ if (profile?.is_profile_complete === true) {
 ### 2. Profile Setup Component (`components/auth/profile-setup.tsx`)
 
 **Changes:**
+
 - Changed `router.push()` to `router.replace()` after successful profile update
 - Added 300ms delay before redirect to ensure cache is updated
 
 **Key Code:**
+
 ```typescript
 if (error) {
   toast.error(error.message);
@@ -63,6 +68,7 @@ if (error) {
 ### 3. Middleware (`middleware.ts`)
 
 **Changes:**
+
 - Added proper error handling for profile queries
 - Only redirect on "not found" errors (PGRST116), allow access on other errors to prevent loops
 - Changed to select only `is_profile_complete` field instead of `*` for better performance
@@ -70,6 +76,7 @@ if (error) {
 - Added detailed error logging
 
 **Key Code:**
+
 ```typescript
 const { data: profile, error: profileError } = await supabase
   .from("user_profiles")
@@ -94,10 +101,12 @@ if (!profile || profile.is_profile_complete === false) {
 ### 4. Profile Hook (`hooks/use-profile.ts`)
 
 **Changes:**
+
 - Added `refetchQueries()` after cache invalidation to ensure latest data is loaded
 - This ensures all components see the updated profile immediately
 
 **Key Code:**
+
 ```typescript
 // Invalidate and refetch related queries to ensure consistency
 queryClient.invalidateQueries({
@@ -113,6 +122,7 @@ queryClient.refetchQueries({
 ### 5. Middleware Enhanced (`middleware-enhanced.ts`)
 
 **Changes:**
+
 - Applied the same error handling improvements as `middleware.ts`
 - Prevents redirect loops in the enhanced middleware as well
 
@@ -128,11 +138,13 @@ Created a new `proxy.ts` file for Next.js 16+ migration. This file:
 - Will be used when upgrading to Next.js 16
 
 **Migration Path:**
+
 1. Currently on Next.js 15.5.4 - `middleware.ts` is still active
 2. When upgrading to Next.js 16, rename `middleware.ts` to `proxy.ts` (or use the codemod)
 3. The `proxy.ts` file is ready and can be used immediately
 
 **To migrate:**
+
 ```bash
 npx @next/codemod@canary middleware-to-proxy .
 ```
@@ -140,6 +152,7 @@ npx @next/codemod@canary middleware-to-proxy .
 ## Testing Recommendations
 
 1. **Test the specific user:**
+
    - Log in as `Isabellarxpedro@gmail.com`
    - Navigate to `/profile/setup`
    - Verify no redirect loop occurs
@@ -147,6 +160,7 @@ npx @next/codemod@canary middleware-to-proxy .
    - Verify redirect to dashboard works correctly
 
 2. **Test edge cases:**
+
    - User with incomplete profile accessing protected routes
    - User with complete profile accessing setup page
    - Database errors during profile check
@@ -179,4 +193,3 @@ npx @next/codemod@canary middleware-to-proxy .
 - Both `middleware.ts` and `proxy.ts` exist - only one will be active based on Next.js version
 - Error handling is now more robust and prevents redirect loops
 - Cache invalidation ensures data consistency across components
-

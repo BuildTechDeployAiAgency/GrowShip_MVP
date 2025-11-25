@@ -1,44 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-toastify";
-
-export type ProductStatus = "active" | "inactive" | "discontinued" | "out_of_stock";
-
-export interface Product {
-  id: string;
-  brand_id: string;
-  sku: string;
-  product_name: string;
-  description?: string;
-  product_category?: string;
-  unit_price: number;
-  cost_price?: number;
-  currency?: string;
-  quantity_in_stock: number;
-  reorder_level?: number;
-  reorder_quantity?: number;
-  barcode?: string;
-  product_image_url?: string;
-  weight?: number;
-  weight_unit?: string;
-  status: ProductStatus;
-  tags?: string[];
-  supplier_id?: string;
-  supplier_sku?: string;
-  notes?: string;
-  created_by?: string;
-  updated_by?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface ProductFilters {
-  status: string;
-  category: string;
-}
+import { usePaginatedResource } from "./use-paginated-resource";
+import type { Product, ProductFilters } from "@/types/products";
+import { updatePaginatedCaches } from "@/lib/react-query/paginated-cache";
+import { postJson } from "@/lib/api/json-client";
 
 interface UseProductsOptions {
   searchTerm: string;
@@ -46,6 +15,7 @@ interface UseProductsOptions {
   brandId?: string;
   debounceMs?: number;
   isSuperAdmin?: boolean;
+  pageSize?: number;
 }
 
 interface UseProductsReturn {
@@ -54,51 +24,131 @@ interface UseProductsReturn {
   error: string | null;
   refetch: () => void;
   createProduct: (product: Partial<Product>) => Promise<Product>;
-  updateProduct: (productId: string, updates: Partial<Product>) => Promise<void>;
+  updateProduct: (
+    productId: string,
+    updates: Partial<Product>
+  ) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
   totalCount: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  setPage: (page: number) => void;
+  setPageSize: (size: number) => void;
 }
 
-async function fetchProducts(
-  debouncedSearchTerm: string,
-  filters: ProductFilters,
-  brandId?: string,
-  isSuperAdmin: boolean = false
-): Promise<{ products: Product[]; totalCount: number }> {
-  const supabase = createClient();
-  let query = supabase.from("products").select("*", { count: "exact" });
+interface ProductsRequestPayload {
+  page: number;
+  pageSize: number;
+  filters: ProductFilters;
+  searchTerm?: string;
+  brandId?: string;
+  isSuperAdmin?: boolean;
+}
 
-  // Only apply brand_id filter if not Super Admin
-  if (brandId && !isSuperAdmin) {
-    query = query.eq("brand_id", brandId);
-  }
-
-  if (debouncedSearchTerm.trim()) {
-    query = query.or(
-      `sku.ilike.%${debouncedSearchTerm}%,product_name.ilike.%${debouncedSearchTerm}%,product_category.ilike.%${debouncedSearchTerm}%,barcode.ilike.%${debouncedSearchTerm}%`
-    );
-  }
-
-  if (filters.status !== "all") {
-    query = query.eq("status", filters.status);
-  }
-
-  if (filters.category !== "all") {
-    query = query.eq("product_category", filters.category);
-  }
-
-  query = query.order("created_at", { ascending: false });
-
-  const { data, error: fetchError, count } = await query;
-
-  if (fetchError) {
-    throw fetchError;
-  }
-
+async function requestProductsPage(
+  payload: ProductsRequestPayload
+): Promise<{ data: Product[]; totalCount: number }> {
+  const json = await postJson<
+    ProductsRequestPayload,
+    { data: Product[]; totalCount: number }
+  >("/api/products/list", payload);
   return {
-    products: data || [],
-    totalCount: count || 0,
+    data: json.data ?? [],
+    totalCount: json.totalCount ?? 0,
   };
+}
+
+function productMatchesFilters(
+  product: Product,
+  filters: ProductFilters | null,
+  searchTerm: string
+) {
+  if (searchTerm) {
+    return false;
+  }
+
+  if (!filters) {
+    return true;
+  }
+
+  if (filters.status && filters.status !== "all" && product.status !== filters.status) {
+    return false;
+  }
+
+  if (
+    filters.category &&
+    filters.category !== "all" &&
+    product.product_category !== filters.category
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function prependProductToCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  product: Product
+) {
+  updatePaginatedCaches<Product, ProductFilters>(
+    queryClient,
+    "products",
+    (cache, meta) => {
+      if (meta.page !== 0 || !productMatchesFilters(product, meta.filters, meta.searchTerm)) {
+        return null;
+      }
+
+      const deduped = cache.data.filter((existing) => existing.id !== product.id);
+
+      return {
+        data: [product, ...deduped].slice(0, meta.pageSize),
+        totalCount: (cache.totalCount ?? 0) + 1,
+      };
+    }
+  );
+}
+
+function updateProductInCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  product: Product
+) {
+  updatePaginatedCaches<Product, ProductFilters>(
+    queryClient,
+    "products",
+    (cache) => {
+      if (!cache.data.some((existing) => existing.id === product.id)) {
+        return null;
+      }
+
+      return {
+        data: cache.data.map((existing) =>
+          existing.id === product.id ? { ...existing, ...product } : existing
+        ),
+        totalCount: cache.totalCount,
+      };
+    }
+  );
+}
+
+function removeProductFromCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  productId: string
+) {
+  updatePaginatedCaches<Product, ProductFilters>(
+    queryClient,
+    "products",
+    (cache) => {
+      if (!cache.data.some((existing) => existing.id === productId)) {
+        return null;
+      }
+
+      return {
+        data: cache.data.filter((existing) => existing.id !== productId),
+        totalCount: Math.max(0, (cache.totalCount ?? 0) - 1),
+      };
+    }
+  );
 }
 
 export function useProducts({
@@ -107,9 +157,11 @@ export function useProducts({
   brandId,
   debounceMs = 300,
   isSuperAdmin = false,
+  pageSize = 25,
 }: UseProductsOptions): UseProductsReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
   const queryClient = useQueryClient();
+  const enabled = Boolean(brandId || isSuperAdmin);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -121,16 +173,29 @@ export function useProducts({
     };
   }, [searchTerm, debounceMs]);
 
-  const {
-    data,
-    isLoading: loading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ["products", debouncedSearchTerm, filters, brandId, isSuperAdmin],
-    queryFn: () => fetchProducts(debouncedSearchTerm, filters, brandId, isSuperAdmin),
-    enabled: !!brandId || isSuperAdmin,
+  const paginated = usePaginatedResource({
+    queryKey: "products",
+    filters,
+    searchTerm: debouncedSearchTerm,
+    enabled,
+    initialPageSize: pageSize,
+    identityKey: [brandId ?? "brand:none", isSuperAdmin ? "role:super" : "role:standard"],
+    fetcher: ({ page, pageSize: size, filters: currentFilters, searchTerm }) =>
+      requestProductsPage({
+        page,
+        pageSize: size,
+        filters: currentFilters,
+        searchTerm,
+        brandId,
+        isSuperAdmin,
+      }),
   });
+
+  useEffect(() => {
+    paginated.setPage(0);
+  }, [enabled, brandId, isSuperAdmin, paginated.setPage]);
+
+  const { isLoading: loading, error, refetch } = paginated.query;
 
   const createMutation = useMutation({
     mutationFn: async (productData: Partial<Product>) => {
@@ -158,7 +223,8 @@ export function useProducts({
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (newProduct) => {
+      prependProductToCaches(queryClient, newProduct);
       queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success("Product created successfully");
     },
@@ -179,17 +245,23 @@ export function useProducts({
         throw new Error("Not authenticated");
       }
 
-      const { error } = await supabase
+      const { data: updatedProduct, error } = await supabase
         .from("products")
         .update({
           ...updates,
           updated_by: user.id,
         })
-        .eq("id", id);
+        .eq("id", id)
+        .select()
+        .single();
 
       if (error) throw error;
+      return updatedProduct;
     },
-    onSuccess: () => {
+    onSuccess: (updatedProduct) => {
+      if (updatedProduct) {
+        updateProductInCaches(queryClient, updatedProduct);
+      }
       queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success("Product updated successfully");
     },
@@ -209,7 +281,8 @@ export function useProducts({
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, productId) => {
+      removeProductFromCaches(queryClient, productId);
       queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success("Product deleted successfully");
     },
@@ -220,17 +293,24 @@ export function useProducts({
   });
 
   return {
-    products: data?.products || [],
-    totalCount: data?.totalCount || 0,
+    products: paginated.data,
+    totalCount: paginated.totalCount,
     loading,
     error: error ? (error as Error).message : null,
-    refetch,
+    refetch: () => {
+      refetch();
+    },
     createProduct: (productData: Partial<Product>) =>
       createMutation.mutateAsync(productData),
     updateProduct: (productId: string, updates: Partial<Product>) =>
       updateMutation.mutateAsync({ id: productId, updates }),
     deleteProduct: (productId: string) =>
       deleteMutation.mutateAsync(productId),
+    page: paginated.page,
+    pageSize: paginated.pageSize,
+    pageCount: paginated.pageCount,
+    setPage: paginated.setPage,
+    setPageSize: paginated.setPageSize,
   };
 }
 
@@ -260,6 +340,13 @@ export async function getProductCategories(brandId?: string): Promise<string[]> 
 
   return categories as string[];
 }
+
+
+
+
+
+
+
 
 
 

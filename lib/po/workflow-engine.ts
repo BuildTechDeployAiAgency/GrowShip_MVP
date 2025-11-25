@@ -1,16 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
-
-export type POStatus = "draft" | "submitted" | "approved" | "rejected" | "ordered" | "received" | "cancelled";
-export type POAction = "submit" | "approve" | "reject" | "cancel" | "order" | "receive";
-
-export interface WorkflowTransition {
-  from: POStatus;
-  to: POStatus;
-  action: POAction;
-  requiresApproval?: boolean;
-  allowedRoles?: string[];
-}
+import { POStatus, POAction, WorkflowTransition, isValidTransition, getNextStatus } from "./workflow-utils";
+import { syncPOApproval, syncPOReceipt, syncPOCancellation } from "@/lib/inventory/po-sync";
 
 const VALID_TRANSITIONS: WorkflowTransition[] = [
   { from: "draft", to: "submitted", action: "submit" },
@@ -24,40 +14,9 @@ const VALID_TRANSITIONS: WorkflowTransition[] = [
   { from: "ordered", to: "cancelled", action: "cancel" },
 ];
 
-/**
- * Validate if a status transition is allowed
- */
-export function isValidTransition(
-  currentStatus: POStatus,
-  targetStatus: POStatus,
-  action: POAction
-): boolean {
-  return VALID_TRANSITIONS.some(
-    (transition) =>
-      transition.from === currentStatus &&
-      transition.to === targetStatus &&
-      transition.action === action
-  );
-}
-
-/**
- * Get available actions for a PO status
- */
-export function getAvailableActions(status: POStatus): POAction[] {
-  return VALID_TRANSITIONS
-    .filter((transition) => transition.from === status)
-    .map((transition) => transition.action);
-}
-
-/**
- * Get next status for an action
- */
-export function getNextStatus(status: POStatus, action: POAction): POStatus | null {
-  const transition = VALID_TRANSITIONS.find(
-    (t) => t.from === status && t.action === action
-  );
-  return transition?.to || null;
-}
+// Re-export types and pure functions for convenience
+export type { POStatus, POAction, WorkflowTransition };
+export { isValidTransition, getNextStatus };
 
 /**
  * Check if user has permission to perform action
@@ -192,6 +151,216 @@ export async function executeTransition(
     comments: comments || null,
   });
 
+  // Handle inventory synchronization based on action
+  if (action === "receive") {
+    // Sync inventory when PO is received
+    const syncResult = await syncPOReceipt(poId, userId);
+    if (!syncResult.success) {
+      console.error("Failed to sync inventory on PO receipt:", syncResult.error);
+      // Don't fail the transition, but log the error
+    }
+  } else if (action === "cancel") {
+    // Sync inventory when PO is cancelled
+    const syncResult = await syncPOCancellation(poId, userId, comments);
+    if (!syncResult.success) {
+      console.error("Failed to sync inventory on PO cancellation:", syncResult.error);
+    }
+  }
+
   return { success: true, updatedPO };
+}
+
+/**
+ * Validate stock requirements for all PO lines
+ */
+export async function validateStockRequirements(
+  poId: string
+): Promise<{ valid: boolean; warnings: string[]; errors: string[] }> {
+  const supabase = createAdminClient();
+
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  // Get all lines for the PO
+  const { data: lines, error: linesError } = await supabase
+    .from("purchase_order_lines")
+    .select("id, sku, requested_qty, available_stock, line_status")
+    .eq("purchase_order_id", poId);
+
+  if (linesError || !lines) {
+    errors.push("Failed to fetch PO lines");
+    return { valid: false, warnings, errors };
+  }
+
+  for (const line of lines) {
+    const requestedQty = line.requested_qty;
+    const availableStock = line.available_stock ?? 0;
+
+    if (line.line_status === "pending") {
+      if (availableStock < requestedQty) {
+        if (availableStock === 0) {
+          errors.push(
+            `Line ${line.sku}: No stock available (requested ${requestedQty})`
+          );
+        } else {
+          warnings.push(
+            `Line ${line.sku}: Partial stock (${availableStock}/${requestedQty})`
+          );
+        }
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    warnings,
+    errors,
+  };
+}
+
+/**
+ * Finalize PO approval after all lines are reviewed
+ */
+export async function finalizeApproval(
+  poId: string,
+  userId: string
+): Promise<{ success: boolean; error?: string; po?: any }> {
+  const supabase = createAdminClient();
+
+  // Get all lines
+  const { data: lines, error: linesError } = await supabase
+    .from("purchase_order_lines")
+    .select("*")
+    .eq("purchase_order_id", poId);
+
+  if (linesError || !lines || lines.length === 0) {
+    return { success: false, error: "No lines found for this PO" };
+  }
+
+  // Check if all lines have been reviewed
+  const hasUnreviewedLines = lines.some(
+    (line) => line.line_status === "pending"
+  );
+
+  if (hasUnreviewedLines) {
+    return {
+      success: false,
+      error: "All line items must be reviewed before finalizing approval",
+    };
+  }
+
+  // Calculate totals
+  let totalRequested = 0;
+  let totalApproved = 0;
+  let totalBackordered = 0;
+
+  for (const line of lines) {
+    totalRequested += line.requested_qty || 0;
+    totalApproved += line.approved_qty || 0;
+    totalBackordered += line.backorder_qty || 0;
+  }
+
+  const fulfillmentPercentage =
+    totalRequested > 0
+      ? Math.round((totalApproved / totalRequested) * 100)
+      : 0;
+
+  // Determine final PO status
+  const allApproved = lines.every((line) => line.line_status === "approved");
+  const allRejected = lines.every(
+    (line) =>
+      line.line_status === "rejected" || line.line_status === "cancelled"
+  );
+
+  let finalStatus: string;
+  if (allApproved) {
+    finalStatus = "approved";
+  } else if (allRejected) {
+    finalStatus = "rejected";
+  } else {
+    finalStatus = "approved"; // Partially approved still goes to approved
+  }
+
+  // Update PO with summary
+  const { data: updatedPO, error: updateError } = await supabase
+    .from("purchase_orders")
+    .update({
+      po_status: finalStatus,
+      total_requested_qty: totalRequested,
+      total_approved_qty: totalApproved,
+      total_backordered_qty: totalBackordered,
+      fulfillment_percentage: fulfillmentPercentage,
+      approved_at: new Date().toISOString(),
+      approved_by: userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", poId)
+    .select()
+    .single();
+
+  if (updateError) {
+    return { success: false, error: "Failed to update PO" };
+  }
+
+  // Create final approval history entry
+  await supabase.from("po_approval_history").insert({
+    po_id: poId,
+    action: "approved",
+    actor_id: userId,
+    comments: `PO finalized: ${fulfillmentPercentage}% fulfillment`,
+    affected_line_ids: lines.map((l) => l.id),
+  });
+
+  // Sync inventory when PO is approved
+  if (finalStatus === "approved") {
+    const syncResult = await syncPOApproval(poId, userId);
+    if (!syncResult.success) {
+      console.error("Failed to sync inventory on PO approval:", syncResult.error);
+      // Don't fail the approval, but log the error
+    }
+  }
+
+  return { success: true, po: updatedPO };
+}
+
+/**
+ * Apply stock override for a line
+ */
+export async function applyStockOverride(
+  poId: string,
+  lineId: string,
+  userId: string,
+  reason: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = createAdminClient();
+
+  // Update line with override info
+  const { error } = await supabase
+    .from("purchase_order_lines")
+    .update({
+      override_applied: true,
+      override_by: userId,
+      override_reason: reason,
+      override_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", lineId)
+    .eq("purchase_order_id", poId);
+
+  if (error) {
+    return { success: false, error: "Failed to apply override" };
+  }
+
+  // Log override in history
+  await supabase.from("po_approval_history").insert({
+    po_id: poId,
+    action: "approved",
+    actor_id: userId,
+    comments: `Stock override applied: ${reason}`,
+    affected_line_ids: [lineId],
+    override_applied: true,
+  });
+
+  return { success: true };
 }
 

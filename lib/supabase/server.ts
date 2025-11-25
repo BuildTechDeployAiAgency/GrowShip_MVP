@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { instrumentedFetch } from "./instrumented-fetch";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -24,6 +25,9 @@ export async function createClient() {
             // user sessions.
           }
         },
+      },
+      global: {
+        fetch: instrumentedFetch as typeof fetch,
       },
     }
   );

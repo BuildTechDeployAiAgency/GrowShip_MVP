@@ -25,7 +25,7 @@ export async function parseOrdersExcel(
   distributorIdConsistent: boolean;
 }> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(fileBuffer);
+  await workbook.xlsx.load(fileBuffer as any);
 
   // Get the first worksheet (assuming orders are in the first sheet)
   const worksheet = workbook.worksheets[0];

@@ -4,7 +4,7 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { ProtectedPage } from "@/components/common/protected-page";
 import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
-import { InventoryDashboard } from "@/components/inventory/inventory-dashboard";
+import { InventoryTabs } from "@/components/inventory/inventory-tabs";
 
 export default function InventoryPage() {
   const { user, profile, loading } = useRequireProfile();
@@ -26,7 +26,7 @@ export default function InventoryPage() {
           pageTitle="Inventory"
           pageSubtitle="Real-time stock visibility and alerts"
         >
-          <InventoryDashboard />
+          <InventoryTabs />
         </MainLayout>
       </ProtectedPage>
     </EnhancedAuthProvider>

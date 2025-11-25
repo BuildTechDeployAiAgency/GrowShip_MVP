@@ -4,7 +4,7 @@ import { Menu, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface HeaderProps {
-  pageTitle: string;
+  pageTitle: string | React.ReactNode;
   pageSubtitle?: string;
   actions?: React.ReactNode;
   onMenuClick: () => void;

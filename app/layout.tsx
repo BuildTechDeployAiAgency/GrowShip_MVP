@@ -5,6 +5,9 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { QueryProvider } from "@/lib/query-provider";
 import { AuthProvider } from "@/contexts/auth-context";
+import { ExtensionErrorHandler } from "@/components/common/extension-error-handler";
+import { Toaster } from "@/components/ui/sonner";
+import { NotificationListener } from "@/components/notifications/notification-listener";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,8 +36,12 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
+        <ExtensionErrorHandler />
         <QueryProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <NotificationListener />
+            {children}
+          </AuthProvider>
         </QueryProvider>
         <ToastContainer
           position="top-right"
@@ -48,6 +55,7 @@ export default function RootLayout({
           pauseOnHover
           theme="light"
         />
+        <Toaster />
       </body>
     </html>
   );

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { useDistributors } from "@/hooks/use-distributors";
 import { useImportOrders } from "@/hooks/use-import-orders";
+import { useImportSales } from "@/hooks/use-import-sales";
+import { useImportProducts } from "@/hooks/use-import-products";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ImportTypeTabs } from "@/components/import/ImportTypeTabs";
 import { InstructionsBanner } from "@/components/import/InstructionsBanner";
@@ -17,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, RefreshCw, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
-export default function ImportPage() {
+function ImportPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile, loading: authLoading } = useRequireProfile();
@@ -26,24 +28,66 @@ export default function ImportPage() {
   const [showDistributorDialog, setShowDistributorDialog] = useState(false);
 
   const {
-    step,
-    loading,
-    error,
+    step: ordersStep,
+    loading: ordersLoading,
+    error: ordersError,
     orders,
-    validationResults,
-    importSummary,
-    brandId,
-    uploadFile,
+    validationResults: ordersValidationResults,
+    importSummary: ordersImportSummary,
+    brandId: ordersBrandId,
+    uploadFile: uploadOrdersFile,
     validateOrders,
-    confirmImport,
-    reset,
-    downloadErrorReport,
+    confirmImport: confirmOrdersImport,
+    reset: resetOrders,
+    downloadErrorReport: downloadOrdersErrorReport,
   } = useImportOrders();
 
-  // Extract distributor ID from orders if available
-  const extractedDistributorId = orders.length > 0 && orders[0].distributor_id 
-    ? orders[0].distributor_id 
-    : null;
+  const {
+    step: salesStep,
+    loading: salesLoading,
+    error: salesError,
+    salesRows,
+    validationResults: salesValidationResults,
+    importSummary: salesImportSummary,
+    brandId: salesBrandId,
+    uploadFile: uploadSalesFile,
+    validateSalesRows,
+    confirmImport: confirmSalesImport,
+    reset: resetSales,
+    downloadErrorReport: downloadSalesErrorReport,
+  } = useImportSales();
+
+  const {
+    step: productsStep,
+    loading: productsLoading,
+    error: productsError,
+    products,
+    validationResults: productsValidationResults,
+    importSummary: productsImportSummary,
+    brandId: productsBrandId,
+    uploadFile: uploadProductsFile,
+    validateProducts,
+    confirmImport: confirmProductsImport,
+    reset: resetProducts,
+    downloadErrorReport: downloadProductsErrorReport,
+  } = useImportProducts();
+
+  // Computed values based on active tab
+  const step = activeTab === "products" ? productsStep : activeTab === "sales" ? salesStep : ordersStep;
+  const loading = activeTab === "products" ? productsLoading : activeTab === "sales" ? salesLoading : ordersLoading;
+  const error = activeTab === "products" ? productsError : activeTab === "sales" ? salesError : ordersError;
+  const validationResults = activeTab === "products" ? productsValidationResults : activeTab === "sales" ? salesValidationResults : ordersValidationResults;
+  const importSummary = activeTab === "products" ? productsImportSummary : activeTab === "sales" ? salesImportSummary : ordersImportSummary;
+  const brandId = activeTab === "products" ? productsBrandId : activeTab === "sales" ? salesBrandId : ordersBrandId;
+  const entityName = activeTab === "products" ? "Products" : activeTab === "sales" ? "Sales" : "Orders";
+
+  // Extract distributor ID from orders or sales rows if available
+  // Products don't use distributor ID
+  const extractedDistributorId = activeTab === "products" 
+    ? null
+    : activeTab === "sales"
+    ? (salesRows.length > 0 && salesRows[0].distributor_id ? salesRows[0].distributor_id : null)
+    : (orders.length > 0 && orders[0].distributor_id ? orders[0].distributor_id : null);
 
   // Define role checks early (before useEffect hooks that use them)
   const isDistributorUser = profile?.role_name?.startsWith("distributor_") || false;
@@ -66,18 +110,23 @@ export default function ImportPage() {
   // Auto-select distributor for distributor users or if extracted from sheet
   useEffect(() => {
     if (profile && isDistributorUser) {
-      // For distributor_admin users, use their distributor_id from profile
+      // For distributor_admin users, ALWAYS use their distributor_id from profile
+      // This ensures they can only import to their own distributor
       if (profile.distributor_id) {
         setSelectedDistributor(profile.distributor_id);
+        console.log("[Import Page] Auto-selected distributor from profile", {
+          distributorId: profile.distributor_id,
+        });
       } else {
-        // Fallback: find their distributor in the list by brand_id
-        const userDistributor = distributors.find(d => d.brand_id === profile.brand_id);
-        if (userDistributor) {
-          setSelectedDistributor(userDistributor.id);
-        }
+        // If distributor_admin doesn't have distributor_id, this is an error condition
+        console.error("[Import Page] Distributor admin user missing distributor_id", {
+          userId: profile.user_id,
+          roleName: profile.role_name,
+        });
+        toast.error("Your account is not properly configured. Please contact support.");
       }
-    } else if (extractedDistributorId && distributors.length > 0) {
-      // Auto-select distributor from sheet if found
+    } else if (extractedDistributorId && distributors.length > 0 && !isDistributorUser) {
+      // Auto-select distributor from sheet if found (only for non-distributor users)
       const foundDistributor = distributors.find(d => d.id === extractedDistributorId);
       if (foundDistributor) {
         setSelectedDistributor(extractedDistributorId);
@@ -85,20 +134,44 @@ export default function ImportPage() {
     }
   }, [profile, distributors, extractedDistributorId, isDistributorUser]);
 
-  // Show confirmation dialog when orders are parsed
+  // Show confirmation dialog when data is parsed
   // Skip dialog for distributor_admin users since distributor is auto-populated
+  // Products import doesn't need distributor selection
   useEffect(() => {
-    if (step === "confirm" && orders.length > 0) {
-      if (!isDistributorUser) {
-        // For brand users, show distributor selection dialog
+    const hasData = activeTab === "products" ? products.length > 0 : activeTab === "sales" ? salesRows.length > 0 : orders.length > 0;
+    const currentStep = activeTab === "products" ? productsStep : activeTab === "sales" ? salesStep : ordersStep;
+    const currentLoading = activeTab === "products" ? productsLoading : activeTab === "sales" ? salesLoading : ordersLoading;
+    const currentValidationResults = activeTab === "products" ? productsValidationResults : activeTab === "sales" ? salesValidationResults : ordersValidationResults;
+
+    if (currentStep === "confirm" && hasData) {
+      // For products, auto-validate since it doesn't need distributor
+      if (activeTab === "products" && !currentLoading && !currentValidationResults) {
+        console.log("[Import Page] Auto-validating products");
+        validateProducts();
+      } else if (!isDistributorUser && activeTab !== "products") {
+        // For brand users, show distributor selection dialog (orders/sales only)
         setShowDistributorDialog(true);
-      } else if (isDistributorUser && selectedDistributor && !loading && !validationResults) {
-        // For distributor_admin, auto-validate with their distributor_id
-        // Only validate if not already loading, we have a selected distributor, and haven't validated yet
-        validateOrders(selectedDistributor);
+      } else if (isDistributorUser && profile?.distributor_id && !currentLoading && !currentValidationResults) {
+        // For distributor_admin, auto-validate with their distributor_id from profile
+        console.log("[Import Page] Auto-validating for distributor_admin", {
+          distributorId: profile.distributor_id,
+          activeTab,
+          step: currentStep,
+          loading: currentLoading,
+          hasValidationResults: !!currentValidationResults,
+        });
+        
+        if (activeTab === "sales") {
+          validateSalesRows(profile.distributor_id);
+        } else {
+          validateOrders(profile.distributor_id);
+        }
+      } else if (isDistributorUser && !profile?.distributor_id) {
+        // If distributor_admin doesn't have distributor_id, show error
+        toast.error("Your account is not associated with a distributor. Please contact support.");
       }
     }
-  }, [step, orders.length, isDistributorUser, selectedDistributor, loading, validationResults]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, salesStep, ordersStep, productsStep, salesRows.length, orders.length, products.length, isDistributorUser, profile?.distributor_id, salesLoading, ordersLoading, productsLoading, salesValidationResults, ordersValidationResults, productsValidationResults]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debug logging for import state
   useEffect(() => {
@@ -117,7 +190,7 @@ export default function ImportPage() {
   const handleDownloadTemplate = async () => {
     try {
       const queryParams = new URLSearchParams({
-        type: "orders",
+        type: activeTab,
         brandId: profile?.brand_id || "",
       });
 
@@ -135,7 +208,7 @@ export default function ImportPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `orders_import_template_${new Date().toISOString().split("T")[0]}.xlsx`;
+      a.download = `${activeTab}_import_template_${new Date().toISOString().split("T")[0]}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -149,23 +222,47 @@ export default function ImportPage() {
   };
 
   const handleFileSelect = async (file: File) => {
-    await uploadFile(file);
+    if (activeTab === "products") {
+      await uploadProductsFile(file);
+    } else if (activeTab === "sales") {
+      await uploadSalesFile(file);
+    } else {
+      await uploadOrdersFile(file);
+    }
   };
 
   const handleConfirmDistributor = async (distributorId: string) => {
     setSelectedDistributor(distributorId);
     setShowDistributorDialog(false);
-    await validateOrders(distributorId);
+    
+    if (activeTab === "sales") {
+      await validateSalesRows(distributorId);
+    } else {
+      await validateOrders(distributorId);
+    }
   };
 
   const handleProceedWithImport = async () => {
-    if (selectedDistributor) {
-      await confirmImport(selectedDistributor);
+    if (activeTab === "products") {
+      // Products don't need distributor
+      await confirmProductsImport();
+    } else if (selectedDistributor) {
+      if (activeTab === "sales") {
+        await confirmSalesImport(selectedDistributor);
+      } else {
+        await confirmOrdersImport(selectedDistributor);
+      }
     }
   };
 
   const handleStartOver = () => {
-    reset();
+    if (activeTab === "products") {
+      resetProducts();
+    } else if (activeTab === "sales") {
+      resetSales();
+    } else {
+      resetOrders();
+    }
     setSelectedDistributor("");
   };
 
@@ -211,12 +308,17 @@ export default function ImportPage() {
         </Button>
 
       {/* Tabs */}
-      <ImportTypeTabs activeTab={activeTab} onTabChange={setActiveTab}>
+      <ImportTypeTabs 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab}
+        showProducts={isSuperAdmin}
+      >
         <div className="space-y-6">
           {/* Instructions */}
           <InstructionsBanner
             onDownloadTemplate={handleDownloadTemplate}
             loading={loading}
+            importType={activeTab as "orders" | "sales" | "products"}
           />
 
           {/* File Uploader - Only show on upload step, not when completed */}
@@ -241,9 +343,10 @@ export default function ImportPage() {
           {validationResults && step === "validated" && (
             <ValidationResultsPanel
               results={validationResults}
-              onDownloadErrors={validationResults.errors.length > 0 ? downloadErrorReport : undefined}
+              onDownloadErrors={validationResults.errors.length > 0 ? (activeTab === "products" ? downloadProductsErrorReport : activeTab === "sales" ? downloadSalesErrorReport : downloadOrdersErrorReport) : undefined}
               onProceed={validationResults.valid ? handleProceedWithImport : undefined}
               loading={loading}
+              entityName={entityName}
             />
           )}
 
@@ -290,10 +393,10 @@ export default function ImportPage() {
                             : "text-amber-700"
                         }`}>
                           {importSummary.failed === 0 
-                            ? `All ${importSummary.successful} orders were imported successfully.`
+                            ? `All ${importSummary.successful} ${entityName.toLowerCase()} were imported successfully.`
                             : importSummary.successful === 0
-                            ? `None of the ${importSummary.total} orders could be imported.`
-                            : `${importSummary.successful} out of ${importSummary.total} orders were imported successfully. ${importSummary.failed} orders failed.`}
+                            ? `None of the ${importSummary.total} ${entityName.toLowerCase()} could be imported.`
+                            : `${importSummary.successful} out of ${importSummary.total} ${entityName.toLowerCase()} were imported successfully. ${importSummary.failed} ${entityName.toLowerCase()} failed.`}
                         </p>
                       </div>
                     </div>
@@ -302,7 +405,7 @@ export default function ImportPage() {
                     <div className="grid grid-cols-3 gap-4">
                       <div className="bg-white/50 p-3 rounded-lg text-center">
                         <p className="text-2xl font-bold text-gray-900">{importSummary.total}</p>
-                        <p className="text-xs text-gray-600 mt-1">Total Orders</p>
+                        <p className="text-xs text-gray-600 mt-1">Total {entityName}</p>
                       </div>
                       <div className="bg-white/50 p-3 rounded-lg text-center">
                         <p className="text-2xl font-bold text-green-600">{importSummary.successful}</p>
@@ -402,15 +505,15 @@ export default function ImportPage() {
                     {/* Actions */}
                     <div className="flex gap-3 pt-2">
                       {importSummary.successful > 0 && (
-                        <Button onClick={() => router.push("/orders")}>
-                          View Imported Orders
+                        <Button onClick={() => router.push(`/${activeTab === "sales" ? "sales" : activeTab === "products" ? "products" : "orders"}`)}>
+                          View Imported {entityName}
                         </Button>
                       )}
                       <Button 
                         variant="outline" 
                         onClick={handleStartOver}
                       >
-                        {importSummary.failed > 0 ? "Try Again" : "Import More Orders"}
+                        {importSummary.failed > 0 ? "Try Again" : `Import More ${entityName}`}
                       </Button>
                     </div>
                   </div>
@@ -465,7 +568,7 @@ export default function ImportPage() {
       {/* Distributor Confirmation Dialog */}
       <DistributorConfirmationDialog
         open={showDistributorDialog}
-        orders={orders}
+        orders={activeTab === "orders" ? orders : []}
         distributors={distributors}
         selectedDistributor={selectedDistributor || extractedDistributorId || ""}
         isDistributorUser={isDistributorUser}
@@ -473,7 +576,11 @@ export default function ImportPage() {
         onConfirm={handleConfirmDistributor}
         onCancel={() => {
           setShowDistributorDialog(false);
-          reset();
+          if (activeTab === "sales") {
+            resetSales();
+          } else {
+            resetOrders();
+          }
         }}
         loading={loading}
       />
@@ -500,16 +607,17 @@ export default function ImportPage() {
           loading && step === "upload"
             ? "Parsing File..."
             : step === "importing"
-            ? "Importing Orders..."
+            ? `Importing ${entityName}...`
             : undefined
         }
         description={
           loading && step === "upload"
-            ? "Please wait while we parse your Excel file and extract order data"
+            ? `Please wait while we parse your Excel file and extract ${entityName.toLowerCase()} data`
             : step === "importing"
-            ? "Please wait while we process your orders"
+            ? `Please wait while we process your ${entityName.toLowerCase()}`
             : undefined
         }
+        entityName={entityName}
         onClose={() => {
           // Don't allow closing during processing
         }}
@@ -519,3 +627,10 @@ export default function ImportPage() {
   );
 }
 
+export default function ImportPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ImportPageContent />
+    </Suspense>
+  );
+}

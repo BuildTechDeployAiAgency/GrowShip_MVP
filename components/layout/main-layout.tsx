@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "./sidebar";
+import { useAuth } from "@/contexts/auth-context";
+import { useRoutePersistence } from "@/hooks/use-route-persistence";
 
 interface MainLayoutProps {
   children: React.ReactNode;
-  pageTitle: string;
+  pageTitle: string | React.ReactNode;
   pageSubtitle?: string;
   actions?: React.ReactNode;
 }
@@ -18,6 +20,9 @@ export function MainLayout({
   actions,
 }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user } = useAuth();
+
+  useRoutePersistence(user?.id, { track: true });
 
   return (
     <div className="h-screen bg-gray-50 flex">

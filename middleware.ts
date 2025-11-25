@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  const LAST_PATH_COOKIE_PREFIX = "growship_lp_";
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
     !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -34,6 +35,25 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (user) {
+    const lastPathCookie = request.cookies.get(
+      `${LAST_PATH_COOKIE_PREFIX}${user.id}`
+    );
+    const savedPath = lastPathCookie
+      ? decodeURIComponent(lastPathCookie.value)
+      : null;
+
+    if (
+      savedPath &&
+      ["/", "/dashboard"].includes(request.nextUrl.pathname) &&
+      savedPath !== request.nextUrl.pathname
+    ) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = savedPath;
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
 
   // Allow access to auth pages (including password setup) without authentication
   const authPages = [

@@ -10,7 +10,7 @@ export async function generateErrorWorkbook(
 ): Promise<Buffer> {
   // Load the original workbook
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(originalFileBuffer);
+  await workbook.xlsx.load(originalFileBuffer as any);
 
   const worksheet = workbook.worksheets[0];
   if (!worksheet) {

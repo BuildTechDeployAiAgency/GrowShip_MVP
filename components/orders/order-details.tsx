@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
-import { Order, OrderStatus, PaymentStatus } from "@/hooks/use-orders";
+import type { Order, OrderStatus, PaymentStatus } from "@/types/orders";
 import { Distributor } from "@/hooks/use-distributors";
 import { format } from "date-fns";
 import { toast } from "react-toastify";

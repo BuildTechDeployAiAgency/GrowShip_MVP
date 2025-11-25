@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { AuthUser, UserProfile } from "@/types/auth";
@@ -23,9 +23,11 @@ import {
   clearAllStoredData,
   setStoredMenuData,
   clearStoredMenuData,
+  clearLastVisitedPath,
 } from "@/lib/localStorage";
 import { fetchUserMenuPermissions } from "@/lib/api/menu-permissions";
 import { menuPermissionKeys } from "@/hooks/use-menu-permissions";
+import { useRoutePersistence } from "@/hooks/use-route-persistence";
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -68,6 +70,7 @@ export function AuthProvider({
   const [mounted, setMounted] = useState(false);
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const pathname = usePathname();
 
   const {
     data: profile,
@@ -80,6 +83,7 @@ export function AuthProvider({
   const clearProfileCache = useClearProfileCache();
   const clearAllCache = useClearAllCache();
   const queryClient = useQueryClient();
+  const { restoreLastPath } = useRoutePersistence(user?.id, { track: false });
 
   useEffect(() => {
     // Mark component as mounted (client-side only)
@@ -159,6 +163,19 @@ export function AuthProvider({
     return () => subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, queryClient]);
+
+  useEffect(() => {
+    if (
+      !mounted ||
+      loading ||
+      !user ||
+      !pathname ||
+      !["/", "/dashboard"].includes(pathname)
+    ) {
+      return;
+    }
+    restoreLastPath(["/", "/dashboard"]);
+  }, [mounted, loading, user, pathname, restoreLastPath]);
 
   const signUp = async (
     email: string,
@@ -380,11 +397,15 @@ export function AuthProvider({
 
   const signOut = async () => {
     try {
+      const currentUserId = user?.id;
       await supabase.auth.signOut();
 
       clearAllCache();
 
       clearAllStoredData();
+      if (currentUserId) {
+        clearLastVisitedPath(currentUserId);
+      }
 
       setUser(null);
 
@@ -394,6 +415,9 @@ export function AuthProvider({
 
       clearAllCache();
       clearAllStoredData();
+      if (user?.id) {
+        clearLastVisitedPath(user.id);
+      }
       setUser(null);
       router.push("/");
     }

@@ -4,7 +4,7 @@ import { syncCalendarEvents } from "@/lib/calendar/event-generator";
 
 /**
  * POST /api/calendar/auto-generate
- * Trigger auto-generation of calendar events from invoices and POs
+ * Trigger auto-generation of calendar events from invoices, POs, shipments, campaigns, and reports
  */
 export async function POST(request: NextRequest) {
   try {
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { brand_id, event_types } = body as {
       brand_id?: string;
-      event_types?: Array<"payment_due" | "po_approval_due" | "shipment_arrival">;
+      event_types?: Array<any>;
     };
 
     const finalBrandId = profile.role_name === "super_admin"
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       data: {
         created: result.created,
         updated: result.updated,
-        deleted: result.deleted,
+        cancelled: result.cancelled,
         total: result.created + result.updated,
       },
     });
@@ -71,4 +71,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

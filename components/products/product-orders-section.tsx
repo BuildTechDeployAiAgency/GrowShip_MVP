@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
-import { Order, OrderStatus } from "@/hooks/use-orders";
+import type { Order, OrderStatus } from "@/types/orders";
 import { format } from "date-fns";
 
 interface ProductOrdersSectionProps {

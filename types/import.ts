@@ -1,6 +1,6 @@
 // Types for Orders Import Feature
 
-export type ImportType = "orders" | "products" | "customers";
+export type ImportType = "orders" | "products" | "customers" | "sales";
 
 export type ImportStatus = "processing" | "completed" | "failed" | "partial";
 
@@ -64,12 +64,71 @@ export interface ParsedOrder {
   distributor_id?: string;
 }
 
+export interface ParsedTarget {
+  row: number;
+  sku: string;
+  target_period: string;
+  period_type: "monthly" | "quarterly" | "yearly";
+  target_quantity?: number;
+  target_revenue?: number;
+}
+
+export interface ParsedSalesRow {
+  row: number;
+  sales_date: string;
+  reporting_month?: string;
+  sku: string;
+  product_name?: string;
+  category?: string;
+  retailer_name: string;
+  territory: string;
+  territory_country?: string;
+  sales_channel?: string;
+  units_sold: number;
+  total_sales: number;
+  gross_revenue_local?: number;
+  marketing_spend?: number;
+  currency?: string;
+  target_revenue?: number;
+  notes?: string;
+  distributor_id?: string;
+}
+
+export interface ParsedProduct {
+  row: number;
+  sku: string;
+  product_name: string;
+  description?: string;
+  product_category?: string;
+  unit_price: number;
+  cost_price?: number;
+  currency?: string;
+  quantity_in_stock?: number;
+  reorder_level?: number;
+  reorder_quantity?: number;
+  barcode?: string;
+  product_image_url?: string;
+  weight?: number;
+  weight_unit?: string;
+  status?: "active" | "inactive" | "discontinued" | "out_of_stock";
+  tags?: string[];
+  supplier_sku?: string;
+  notes?: string;
+  brand_id: string;
+}
+
 export interface ValidationResult {
   valid: boolean;
   errors: ValidationError[];
   warnings?: ValidationError[];
-  validOrders: ParsedOrder[];
-  invalidOrders: ParsedOrder[];
+  validOrders?: ParsedOrder[];
+  invalidOrders?: ParsedOrder[];
+  validTargets?: ParsedTarget[];
+  invalidTargets?: ParsedTarget[];
+  validSalesRows?: ParsedSalesRow[];
+  invalidSalesRows?: ParsedSalesRow[];
+  validProducts?: ParsedProduct[];
+  invalidProducts?: ParsedProduct[];
 }
 
 export interface ImportSummary {
@@ -108,7 +167,9 @@ export interface TemplateConfig {
 export interface FileUploadResponse {
   success: boolean;
   data?: {
-    orders: ParsedOrder[];
+    orders?: ParsedOrder[];
+    salesRows?: ParsedSalesRow[];
+    products?: ParsedProduct[];
     totalCount: number;
     fileHash: string;
     fileName: string;

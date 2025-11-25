@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export interface Notification {
@@ -25,11 +25,13 @@ interface UseNotificationsOptions {
   priority?: string;
   actionRequired?: boolean;
   limit?: number;
+  enableRealtime?: boolean;
 }
 
 export function useNotifications(options: UseNotificationsOptions = {}) {
   const queryClient = useQueryClient();
   const [unreadCount, setUnreadCount] = useState(0);
+  const { enableRealtime = true } = options;
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["notifications", options],
@@ -49,19 +51,89 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     refetchOnWindowFocus: true,
   });
 
-  // Get unread count
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
+  // Fetch unread count
+  const fetchUnreadCount = useCallback(async () => {
+    try {
       const response = await fetch("/api/notifications?is_read=false&limit=1");
       if (response.ok) {
         const data = await response.json();
         setUnreadCount(data.total || 0);
       }
-    };
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 60000); // Check every minute
-    return () => clearInterval(interval);
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+    }
   }, []);
+
+  // Setup Realtime subscription and fallback polling
+  useEffect(() => {
+    let channel: any = null;
+    let pollInterval: NodeJS.Timeout | null = null;
+
+    const setupRealtime = async () => {
+      if (!enableRealtime) return;
+
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) return;
+
+        // Subscribe to new notifications
+        channel = supabase
+          .channel("notifications-changes")
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "notifications",
+              filter: `user_id=eq.${user.id}`,
+            },
+            (payload) => {
+              console.log("New notification received:", payload);
+              // Invalidate queries to refetch
+              queryClient.invalidateQueries({ queryKey: ["notifications"] });
+              fetchUnreadCount();
+            }
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "notifications",
+              filter: `user_id=eq.${user.id}`,
+            },
+            (payload) => {
+              console.log("Notification updated:", payload);
+              // Invalidate queries to refetch
+              queryClient.invalidateQueries({ queryKey: ["notifications"] });
+              fetchUnreadCount();
+            }
+          )
+          .subscribe((status) => {
+            console.log("Notification subscription status:", status);
+          });
+      } catch (error) {
+        console.error("Error setting up Realtime subscription:", error);
+      }
+    };
+
+    setupRealtime();
+    fetchUnreadCount();
+
+    // Fallback polling (less aggressive - every 5 minutes)
+    pollInterval = setInterval(fetchUnreadCount, 300000);
+
+    return () => {
+      if (channel) {
+        channel.unsubscribe();
+      }
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [enableRealtime, queryClient, fetchUnreadCount]);
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {

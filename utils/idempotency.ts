@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
  * Generate SHA-256 hash from file buffer
  */
 export async function generateFileHash(fileBuffer: Buffer): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest("SHA-256", fileBuffer);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", fileBuffer as any);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
   return hashHex;

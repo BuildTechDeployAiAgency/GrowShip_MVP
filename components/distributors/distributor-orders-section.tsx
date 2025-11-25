@@ -22,7 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useOrders, Order, OrderStatus } from "@/hooks/use-orders";
+import { useOrders } from "@/hooks/use-orders";
+import type { Order, OrderStatus } from "@/types/orders";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { format } from "date-fns";
 import Link from "next/link";

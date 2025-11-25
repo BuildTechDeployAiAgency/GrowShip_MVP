@@ -109,7 +109,7 @@ export function useImportOrders(): UseImportOrdersReturn {
         console.log("[Import Hook] Upload successful - setting state", {
           fileHash: apiFileHash,
           brandId: apiBrandId,
-          ordersCount: result.data.orders.length,
+          ordersCount: result.data.orders?.length ?? 0,
           hasFileHash: !!apiFileHash,
           hasBrandId: !!apiBrandId,
         });
@@ -139,14 +139,14 @@ export function useImportOrders(): UseImportOrdersReturn {
         // Set state values
         setFileHash(apiFileHash);
         setBrandId(apiBrandId);
-        setOrders(result.data.orders);
+        setOrders(result.data.orders ?? []);
         setExtractedDistributorId(result.data.extractedDistributorId || null);
         
         // Debug logging after state is set
         console.log("[Import Hook] State set successfully", {
           fileHash: apiFileHash,
           brandId: apiBrandId,
-          ordersCount: result.data.orders.length,
+          ordersCount: result.data.orders?.length ?? 0,
         });
         
         setStep("confirm");
@@ -259,15 +259,62 @@ export function useImportOrders(): UseImportOrdersReturn {
         throw fetchError;
       }
 
+      // Clone response for error handling (response body can only be read once)
+      const responseClone = response.clone();
       let result: ValidationResponse;
+      
       try {
         result = await response.json();
       } catch (jsonError) {
-        throw new Error("Failed to parse validation response. Please try again.");
+        // If JSON parsing fails, try to get text response from clone
+        try {
+          const textResponse = await responseClone.text();
+          console.error("[Import Hook] Failed to parse JSON response", {
+            status: response.status,
+            statusText: response.statusText,
+            textResponse,
+          });
+          throw new Error(`Validation failed: ${response.statusText || "Unknown error"}. ${textResponse || ""}`);
+        } catch (textError) {
+          console.error("[Import Hook] Failed to parse both JSON and text response", {
+            status: response.status,
+            statusText: response.statusText,
+            jsonError,
+            textError,
+          });
+          throw new Error(`Validation failed: ${response.statusText || "Unknown error"} (Status: ${response.status})`);
+        }
       }
 
       if (!response.ok) {
-        throw new Error(result.error || "Validation failed");
+        // Extract error message from response
+        // Handle different response structures
+        let errorMsg = `Validation failed with status ${response.status}`;
+        
+        if (result) {
+          // Try different possible error fields
+          errorMsg = result.error || (result as any).message || (result.error as any)?.message || errorMsg;
+          
+          // If result has a data field with error, try that too
+          if (result.data && typeof result.data === 'object' && 'error' in result.data) {
+            errorMsg = (result.data as any).error || errorMsg;
+          }
+        }
+        
+        console.error("[Import Hook] Validation API returned error", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorMsg,
+          result,
+          resultStringified: JSON.stringify(result),
+        });
+        
+        // Ensure we always have a meaningful error message
+        if (!errorMsg || errorMsg === `Validation failed with status ${response.status}`) {
+          errorMsg = `Validation failed: ${response.statusText || "Unknown error"} (Status: ${response.status})`;
+        }
+        
+        throw new Error(errorMsg);
       }
 
       if (result.data) {
@@ -284,33 +331,52 @@ export function useImportOrders(): UseImportOrdersReturn {
         throw new Error("No validation data returned. Please try again.");
       }
     } catch (err: any) {
-      console.error("Validation error:", {
-        error: err,
-        message: err.message,
-        stack: err.stack,
+      // Better error logging with more details
+      const errorDetails = {
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack,
+        response: err?.response,
+        status: err?.status,
         distributorId,
         ordersCount: orders.length,
-      });
+        fileHash: !!fileHash,
+        brandId: !!brandId,
+      };
+      
+      console.error("[Import Hook] Validation error:", errorDetails);
       
       let errorMessage = "Validation failed. Please check your data and try again.";
       
       // Handle specific error types
-      if (err.name === "AbortError") {
+      if (err?.name === "AbortError") {
         errorMessage = "Validation request timed out. Please try again.";
-      } else if (err.message?.includes("timed out")) {
+      } else if (err?.message?.includes("timed out")) {
         errorMessage = err.message;
-      } else if (err.message?.includes("Failed to parse")) {
+      } else if (err?.message?.includes("Failed to parse")) {
         errorMessage = err.message;
-      } else if (err.message) {
+      } else if (err?.message) {
         errorMessage = err.message;
-      } else if (err instanceof TypeError && err.message.includes("fetch")) {
+      } else if (err instanceof TypeError && err?.message?.includes("fetch")) {
         errorMessage = "Network error during validation. Please check your internet connection and try again.";
+      } else if (!distributorId) {
+        errorMessage = "Distributor ID is required. Please ensure your account is properly configured.";
+      }
+      
+      // Log the actual error object for debugging
+      if (!err?.message) {
+        console.error("[Import Hook] Error object details:", {
+          err,
+          stringified: JSON.stringify(err, Object.getOwnPropertyNames(err)),
+        });
       }
       
       setError(errorMessage);
       toast.error(errorMessage, {
         duration: 6000,
-        description: "Please review your data and try again.",
+        description: distributorId 
+          ? "Please review your data and try again."
+          : "Your account may not be properly configured. Please contact support.",
       });
       setStep("confirm");
     } finally {
@@ -433,7 +499,7 @@ export function useImportOrders(): UseImportOrdersReturn {
         message: err.message,
         stack: err.stack,
         distributorId,
-        ordersCount: validationResults?.validOrders.length || 0,
+        ordersCount: validationResults?.validOrders?.length || 0,
         responseStatus: err.response?.status,
       });
       

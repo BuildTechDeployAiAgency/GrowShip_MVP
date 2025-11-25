@@ -1,6 +1,56 @@
 import { createClient } from "@/lib/supabase/server";
-import { createNotificationsForBrand } from "./alert-generator";
+import { createNotificationsForBrand, createNotification } from "./alert-generator";
 
+/**
+ * Create notification when a new PO is created
+ */
+export async function createPOCreatedAlert(
+  poId: string,
+  poNumber: string,
+  brandId: string,
+  createdBy: string
+): Promise<void> {
+  const supabase = await createClient();
+
+  // Get users who should be notified (brand admins and reviewers)
+  const { data: users, error } = await supabase
+    .from("user_profiles")
+    .select("user_id, role_name")
+    .eq("brand_id", brandId)
+    .eq("status", "approved")
+    .in("role_name", ["brand_admin", "brand_logistics", "brand_reviewer"]);
+
+  if (error || !users || users.length === 0) {
+    console.error("Error fetching users for PO created notification:", error);
+    return;
+  }
+
+  // Notify all relevant users except the creator
+  for (const user of users) {
+    if (user.user_id !== createdBy) {
+      try {
+        await createNotification({
+          user_id: user.user_id,
+          type: "order",
+          title: "New Purchase Order Created",
+          message: `Purchase Order ${poNumber} has been created and requires review`,
+          brand_id: brandId,
+          related_entity_type: "po",
+          related_entity_id: poId,
+          priority: "medium",
+          action_required: true,
+          action_url: `/purchase-orders/${poId}`,
+        });
+      } catch (err) {
+        console.error(`Error creating notification for user ${user.user_id}:`, err);
+      }
+    }
+  }
+}
+
+/**
+ * Create notification when a PO requires approval
+ */
 export async function createPOApprovalAlert(
   poId: string,
   poNumber: string,

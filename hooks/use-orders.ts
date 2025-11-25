@@ -1,67 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-toastify";
-
-export type OrderStatus = "pending" | "processing" | "shipped" | "delivered";
-export type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "partially_paid";
-
-export interface Order {
-  id: string;
-  order_number: string;
-  order_date: string;
-  user_id: string;
-  brand_id: string;
-  distributor_id?: string;
-  customer_id?: string;
-  customer_name: string;
-  customer_email?: string;
-  customer_phone?: string;
-  customer_type?: "retail" | "wholesale" | "distributor" | "manufacturer";
-  items: any[];
-  shipping_address_line1?: string;
-  shipping_address_line2?: string;
-  shipping_city?: string;
-  shipping_state?: string;
-  shipping_zip_code?: string;
-  shipping_country?: string;
-  shipping_method?: string;
-  tracking_number?: string;
-  estimated_delivery_date?: string;
-  actual_delivery_date?: string;
-  subtotal: number;
-  discount_total?: number;
-  tax_total?: number;
-  shipping_cost?: number;
-  total_amount: number;
-  currency?: string;
-  payment_method?: string;
-  payment_status: PaymentStatus;
-  order_status: OrderStatus;
-  notes?: string;
-  tags?: string[];
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
-  updated_by?: string;
-}
-
-interface OrderFilters {
-  status: string;
-  paymentStatus: string;
-  customerType: string;
-  dateRange: string;
-  distributorId?: string;
-}
+import { usePaginatedResource } from "./use-paginated-resource";
+import type { Order, OrderFilters } from "@/types/orders";
+import { updatePaginatedCaches } from "@/lib/react-query/paginated-cache";
+import { postJson } from "@/lib/api/json-client";
 
 interface UseOrdersOptions {
   searchTerm: string;
   filters: OrderFilters;
   brandId?: string;
-  distributorId?: string; // For distributor_admin users, auto-filter by their distributor_id
+  distributorId?: string;
   debounceMs?: number;
+  pageSize?: number;
 }
 
 interface UseOrdersReturn {
@@ -74,92 +28,157 @@ interface UseOrdersReturn {
   deleteOrder: (orderId: string) => Promise<void>;
   totalCount: number;
   isRefetching: boolean;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  setPage: (page: number) => void;
+  setPageSize: (size: number) => void;
 }
 
-async function fetchOrders(
-  debouncedSearchTerm: string,
-  filters: OrderFilters,
-  brandId?: string,
-  distributorId?: string
-): Promise<{ orders: Order[]; totalCount: number }> {
-  const supabase = createClient();
-  let query = supabase.from("orders").select("*", { count: "exact" });
+type OrdersListPayload = {
+  page: number;
+  pageSize: number;
+  filters: OrderFilters;
+  searchTerm?: string;
+  brandId?: string;
+  distributorId?: string;
+};
 
-  // For distributor_admin users, always filter by their distributor_id
-  // This ensures they only see their own distributor's orders
-  const finalDistributorId = distributorId || (filters.distributorId && filters.distributorId !== "all" ? filters.distributorId : undefined);
-  
-  if (finalDistributorId) {
-    query = query.eq("distributor_id", finalDistributorId);
+async function requestOrdersPage(
+  payload: OrdersListPayload
+): Promise<{ data: Order[]; totalCount: number }> {
+  const json = await postJson<OrdersListPayload, { data: Order[]; totalCount: number }>(
+    "/api/orders/list",
+    payload
+  );
+  return {
+    data: json.data ?? [],
+    totalCount: json.totalCount ?? 0,
+  };
+}
+
+function buildFiltersPayload(filters: OrderFilters, distributorId?: string) {
+  if (
+    distributorId &&
+    distributorId !== "all" &&
+    filters.distributorId !== distributorId
+  ) {
+    return {
+      ...filters,
+      distributorId,
+    };
   }
 
-  // Apply brand_id filter only if provided (super admins may not have brandId)
-  if (brandId) {
-    query = query.eq("brand_id", brandId);
+  return filters;
+}
+
+function orderMatchesFilters(
+  order: Order,
+  filters: OrderFilters | null,
+  searchTerm: string
+) {
+  if (searchTerm) {
+    return false;
   }
 
-  if (debouncedSearchTerm.trim()) {
-    query = query.or(
-      `order_number.ilike.%${debouncedSearchTerm}%,customer_name.ilike.%${debouncedSearchTerm}%,customer_email.ilike.%${debouncedSearchTerm}%`
-    );
+  if (!filters) {
+    return true;
   }
 
-  if (filters.status !== "all") {
-    query = query.eq("order_status", filters.status);
+  if (filters.status && filters.status !== "all" && order.order_status !== filters.status) {
+    return false;
   }
 
-  if (filters.paymentStatus !== "all") {
-    query = query.eq("payment_status", filters.paymentStatus);
+  if (
+    filters.paymentStatus &&
+    filters.paymentStatus !== "all" &&
+    order.payment_status !== filters.paymentStatus
+  ) {
+    return false;
   }
 
-  if (filters.customerType !== "all") {
-    query = query.eq("customer_type", filters.customerType);
+  if (
+    filters.customerType &&
+    filters.customerType !== "all" &&
+    order.customer_type !== filters.customerType
+  ) {
+    return false;
   }
 
-  if (filters.dateRange !== "all") {
-    const now = new Date();
-    let startDate: Date;
-    
-    switch (filters.dateRange) {
-      case "today":
-        startDate = new Date(now.setHours(0, 0, 0, 0));
-        break;
-      case "week":
-        startDate = new Date(now.setDate(now.getDate() - 7));
-        break;
-      case "month":
-        startDate = new Date(now.setMonth(now.getMonth() - 1));
-        break;
-      case "year":
-        startDate = new Date(now.setFullYear(now.getFullYear() - 1));
-        break;
-      default:
-        startDate = new Date(0);
+  if (
+    filters.distributorId &&
+    filters.distributorId !== "all" &&
+    order.distributor_id !== filters.distributorId
+  ) {
+    return false;
+  }
+
+  if (filters.dateRange && filters.dateRange !== "all") {
+    return false;
+  }
+
+  return true;
+}
+
+function prependOrderToCaches(queryClient: ReturnType<typeof useQueryClient>, order: Order) {
+  updatePaginatedCaches<Order, OrderFilters>(
+    queryClient,
+    "orders",
+    (cache, meta) => {
+      if (meta.page !== 0 || !orderMatchesFilters(order, meta.filters, meta.searchTerm)) {
+        return null;
+      }
+
+      const deduped = cache.data.filter((existing) => existing.id !== order.id);
+
+      return {
+        data: [order, ...deduped].slice(0, meta.pageSize),
+        totalCount: (cache.totalCount ?? 0) + 1,
+      };
     }
-    
-    query = query.gte("order_date", startDate.toISOString());
-  }
+  );
+}
 
-  query = query.order("order_date", { ascending: false });
+function updateOrderInCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  order: Order
+) {
+  updatePaginatedCaches<Order, OrderFilters>(
+    queryClient,
+    "orders",
+    (cache) => {
+      if (!cache.data.some((existing) => existing.id === order.id)) {
+        return null;
+      }
 
-  const { data, error: fetchError, count } = await query;
+      return {
+        data: cache.data.map((existing) =>
+          existing.id === order.id ? { ...existing, ...order } : existing
+        ),
+        totalCount: cache.totalCount,
+      };
+    }
+  );
+}
 
-  if (fetchError) {
-    console.error("[fetchOrders] Error fetching orders:", {
-      error: fetchError,
-      message: fetchError.message,
-      code: fetchError.code,
-      details: fetchError.details,
-      filters,
-      brandId,
-    });
-    throw fetchError;
+function removeOrderFromCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  orderId: string
+) {
+  updatePaginatedCaches<Order, OrderFilters>(
+    queryClient,
+    "orders",
+    (cache) => {
+      if (!cache.data.some((existing) => existing.id === orderId)) {
+        return null;
   }
 
   return {
-    orders: data || [],
-    totalCount: count || 0,
+        data: cache.data.filter((existing) => existing.id !== orderId),
+        totalCount: Math.max(0, (cache.totalCount ?? 0) - 1),
   };
+    }
+  );
 }
 
 export function useOrders({
@@ -168,6 +187,7 @@ export function useOrders({
   brandId,
   distributorId,
   debounceMs = 300,
+  pageSize = 25,
 }: UseOrdersOptions): UseOrdersReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
   const queryClient = useQueryClient();
@@ -180,11 +200,35 @@ export function useOrders({
     return () => clearTimeout(timer);
   }, [searchTerm, debounceMs]);
 
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ["orders", debouncedSearchTerm, filters, brandId, distributorId],
-    queryFn: () => fetchOrders(debouncedSearchTerm, filters, brandId, distributorId),
-    staleTime: 0,
+  const resolvedDistributorId =
+    distributorId ||
+    (filters.distributorId && filters.distributorId !== "all"
+      ? filters.distributorId
+      : undefined);
+
+  const paginated = usePaginatedResource({
+    queryKey: "orders",
+    filters: buildFiltersPayload(filters, resolvedDistributorId),
+    searchTerm: debouncedSearchTerm,
+    initialPageSize: pageSize,
+    identityKey: [brandId ?? "brand:none", resolvedDistributorId ?? "distributor:all"],
+    fetcher: ({ page, pageSize: size, filters: currentFilters, searchTerm }) => {
+      return requestOrdersPage({
+        page,
+        pageSize: size,
+        filters: currentFilters,
+        searchTerm,
+        brandId,
+        distributorId: resolvedDistributorId,
+      });
+    },
   });
+
+  useEffect(() => {
+    paginated.setPage(0);
+  }, [brandId, resolvedDistributorId, paginated.setPage]);
+
+  const { isLoading, error, refetch, isRefetching } = paginated.query;
 
   const createOrderMutation = useMutation({
     mutationFn: async (order: Partial<Order>): Promise<Order> => {
@@ -232,7 +276,8 @@ export function useOrders({
 
       return newOrder;
     },
-    onSuccess: () => {
+    onSuccess: (newOrder) => {
+      prependOrderToCaches(queryClient, newOrder);
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       toast.success("Order created successfully!");
     },
@@ -249,24 +294,31 @@ export function useOrders({
     }: {
       orderId: string;
       updates: Partial<Order>;
-    }): Promise<void> => {
+    }): Promise<Order> => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
-      const { error } = await supabase
+      const { data: updatedOrder, error } = await supabase
         .from("orders")
         .update({
           ...updates,
           updated_by: user?.id,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", orderId);
+        .eq("id", orderId)
+        .select()
+        .single();
 
       if (error) {
         throw error;
       }
+
+      return updatedOrder;
     },
-    onSuccess: () => {
+    onSuccess: (updatedOrder) => {
+      if (updatedOrder) {
+        updateOrderInCaches(queryClient, updatedOrder);
+      }
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       toast.success("Order updated successfully!");
     },
@@ -289,7 +341,8 @@ export function useOrders({
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, orderId) => {
+      removeOrderFromCaches(queryClient, orderId);
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       toast.success("Order deleted successfully!");
     },
@@ -300,7 +353,7 @@ export function useOrders({
   });
 
   return {
-    orders: data?.orders || [],
+    orders: paginated.data,
     loading: isLoading,
     error: error ? (error as Error).message : null,
     refetch: () => {
@@ -315,8 +368,13 @@ export function useOrders({
     deleteOrder: async (orderId: string) => {
       await deleteOrderMutation.mutateAsync(orderId);
     },
-    totalCount: data?.totalCount || 0,
+    totalCount: paginated.totalCount,
     isRefetching,
+    page: paginated.page,
+    pageSize: paginated.pageSize,
+    pageCount: paginated.pageCount,
+    setPage: paginated.setPage,
+    setPageSize: paginated.setPageSize,
   };
 }
 

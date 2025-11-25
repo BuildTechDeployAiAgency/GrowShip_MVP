@@ -78,6 +78,8 @@ const safeLocalStorage = {
 const MENU_STORAGE_KEY = "growship_menu_data";
 const PROFILE_STORAGE_KEY = "growship_user_profile";
 const USER_STORAGE_KEY = "growship_user_data";
+const LAST_PATH_STORAGE_PREFIX = "growship_last_path_";
+const LAST_PATH_COOKIE_PREFIX = "growship_lp_";
 
 export function getStoredMenuData(userId: string): MenuItem[] | null {
   try {
@@ -206,4 +208,39 @@ export function clearAllStoredData(): void {
   safeLocalStorage.removeItem(MENU_STORAGE_KEY);
   safeLocalStorage.removeItem(PROFILE_STORAGE_KEY);
   safeLocalStorage.removeItem(USER_STORAGE_KEY);
+}
+
+function buildLastPathKey(userId: string) {
+  return `${LAST_PATH_STORAGE_PREFIX}${userId}`;
+}
+
+function buildLastPathCookieName(userId: string) {
+  return `${LAST_PATH_COOKIE_PREFIX}${userId}`;
+}
+
+function setLastPathCookie(userId: string, path: string) {
+  if (typeof document === "undefined") return;
+  const encodedPath = encodeURIComponent(path);
+  document.cookie = `${buildLastPathCookieName(
+    userId
+  )}=${encodedPath}; path=/; max-age=${60 * 60 * 24 * 30}`;
+}
+
+function clearLastPathCookie(userId: string) {
+  if (typeof document === "undefined") return;
+  document.cookie = `${buildLastPathCookieName(userId)}=; path=/; max-age=0`;
+}
+
+export function setLastVisitedPath(userId: string, path: string): void {
+  safeLocalStorage.setItem(buildLastPathKey(userId), path);
+  setLastPathCookie(userId, path);
+}
+
+export function getLastVisitedPath(userId: string): string | null {
+  return safeLocalStorage.getItem(buildLastPathKey(userId));
+}
+
+export function clearLastVisitedPath(userId: string): void {
+  safeLocalStorage.removeItem(buildLastPathKey(userId));
+  clearLastPathCookie(userId);
 }

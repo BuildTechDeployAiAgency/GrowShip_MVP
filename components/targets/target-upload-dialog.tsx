@@ -12,8 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FileUploader } from "@/components/import/FileUploader";
 import { useTargetImport } from "@/hooks/use-target-import";
-import { ParsedTarget } from "@/lib/excel/target-parser";
-import { ValidationResult } from "@/types/import";
+import { ParsedTarget, ValidationResult } from "@/types/import";
 import { CheckCircle2, XCircle, Download, Loader2, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -138,7 +137,7 @@ export function TargetUploadDialog({
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm font-medium text-gray-600 mb-1">Total</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {validationResults.validTargets.length + validationResults.invalidTargets.length}
+                  {(validationResults.validTargets?.length || 0) + (validationResults.invalidTargets?.length || 0)}
                 </p>
               </div>
               <div className="bg-green-50 p-4 rounded-lg">
@@ -147,7 +146,7 @@ export function TargetUploadDialog({
                   <p className="text-sm font-medium text-green-600">Valid</p>
                 </div>
                 <p className="text-2xl font-bold text-green-600">
-                  {validationResults.validTargets.length}
+                  {validationResults.validTargets?.length || 0}
                 </p>
               </div>
               <div className="bg-red-50 p-4 rounded-lg">
@@ -156,7 +155,7 @@ export function TargetUploadDialog({
                   <p className="text-sm font-medium text-red-600">Invalid</p>
                 </div>
                 <p className="text-2xl font-bold text-red-600">
-                  {validationResults.invalidTargets.length}
+                  {validationResults.invalidTargets?.length || 0}
                 </p>
               </div>
             </div>
@@ -373,7 +372,7 @@ export function TargetUploadDialog({
               </Button>
               <Button
                 onClick={confirmImport}
-                disabled={loading || (validationResults?.validTargets.length || 0) === 0}
+                disabled={loading || (validationResults?.validTargets?.length || 0) === 0}
               >
                 {loading ? (
                   <>
@@ -381,7 +380,7 @@ export function TargetUploadDialog({
                     Importing...
                   </>
                 ) : (
-                  `Import ${validationResults?.validTargets.length || 0} Target(s)`
+                  `Import ${validationResults?.validTargets?.length || 0} Target(s)`
                 )}
               </Button>
             </>

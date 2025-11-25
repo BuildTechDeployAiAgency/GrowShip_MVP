@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { ParsedTarget } from "@/lib/excel/target-parser";
-import { ValidationResult } from "@/types/import";
+import { ParsedTarget, ValidationResult } from "@/types/import";
 
 type ImportStep =
   | "upload"

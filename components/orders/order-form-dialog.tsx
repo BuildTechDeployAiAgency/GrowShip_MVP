@@ -20,9 +20,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useOrders, Order, OrderStatus, PaymentStatus } from "@/hooks/use-orders";
+import { useOrders } from "@/hooks/use-orders";
+import type { Order, OrderStatus, PaymentStatus } from "@/types/orders";
 import { useDistributors, Distributor } from "@/hooks/use-distributors";
-import { useProducts, Product } from "@/hooks/use-products";
+import { useProducts } from "@/hooks/use-products";
+import type { Product } from "@/types/products";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { toast } from "react-toastify";
 import { Plus, X, ShoppingCart, Package } from "lucide-react";
@@ -112,7 +114,7 @@ export function OrderFormDialog({
     searchTerm: "",
     filters: { status: "all" },
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
-    distributorId: isDistributorAdmin ? profile.distributor_id : undefined,
+    distributorId: isDistributorAdmin ? profile?.distributor_id : undefined,
     isSuperAdmin,
   });
 
@@ -121,6 +123,7 @@ export function OrderFormDialog({
     filters: { status: "all", category: "all" },
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
     isSuperAdmin,
+    pageSize: 200,
   });
 
   // Memoize today's date to prevent hydration issues
@@ -176,6 +179,12 @@ export function OrderFormDialog({
   useEffect(() => {
     if (open && order) {
       // Editing existing order
+      // Ensure all items have unique IDs
+      const itemsWithIds = (order.items || []).map((item, index) => ({
+        ...item,
+        id: item.id || `item-${Date.now()}-${index}`,
+      }));
+      
       setFormData({
         distributor_id: order.distributor_id || "",
         brand_id: order.brand_id,
@@ -187,7 +196,7 @@ export function OrderFormDialog({
         customer_email: order.customer_email,
         customer_phone: order.customer_phone,
         customer_type: "distributor",
-        items: order.items || [],
+        items: itemsWithIds,
         shipping_address_line1: order.shipping_address_line1,
         shipping_address_line2: order.shipping_address_line2,
         shipping_city: order.shipping_city,

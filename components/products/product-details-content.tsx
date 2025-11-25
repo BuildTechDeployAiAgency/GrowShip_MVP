@@ -1,6 +1,6 @@
 "use client";
 
-import { Product } from "@/hooks/use-products";
+import type { Product } from "@/types/products";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -284,6 +284,13 @@ export function ProductDetailsContent({ product }: ProductDetailsContentProps) {
     </div>
   );
 }
+
+
+
+
+
+
+
 
 
 

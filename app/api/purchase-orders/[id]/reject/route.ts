@@ -5,8 +5,9 @@ import { createPOStatusChangeAlert } from "@/lib/notifications/po-alerts";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: any
 ) {
+  const { params } = context as { params: { id: string } };
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
