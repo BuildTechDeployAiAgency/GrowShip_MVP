@@ -76,7 +76,7 @@ export function DistributorDetailsDialog({
             <Building2 className="h-6 w-6 text-teal-600" />
             {distributor.name}
           </DialogTitle>
-          <DialogDescription>Distributor Details</DialogDescription>
+          <DialogDescription>Customer Details</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

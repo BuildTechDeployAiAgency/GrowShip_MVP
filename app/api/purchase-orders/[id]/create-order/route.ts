@@ -8,9 +8,9 @@ import { validateNewOrderWithPO } from "@/lib/orders/workflow-engine";
  */
 export async function POST(
   request: NextRequest,
-  context: any
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { params } = context as { params: { id: string } };
+  const { id } = await context.params;
   try {
     const supabase = await createClient();
     const {
@@ -36,7 +36,7 @@ export async function POST(
       );
     }
 
-    const purchaseOrderId = params.id;
+    const purchaseOrderId = id;
 
     // Get purchase order details
     const { data: po, error: poError } = await supabase

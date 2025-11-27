@@ -162,7 +162,7 @@ export function POFormDialog({
 
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState("supplier");
+  const [activeTab, setActiveTab] = useState("details");
 
   // Update brand_id when profile changes
   useEffect(() => {
@@ -239,7 +239,7 @@ export function POFormDialog({
         notes: "",
       });
       setSelectedProductId("");
-      setActiveTab("supplier");
+      setActiveTab("details");
     }
   }, [open, po, todayDate, profile?.brand_id]);
 
@@ -424,70 +424,123 @@ export function POFormDialog({
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="supplier">Purchaser Info</TabsTrigger>
-              <TabsTrigger value="items">Items</TabsTrigger>
               <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="items">Items</TabsTrigger>
+              <TabsTrigger value="supplier">Purchaser Info</TabsTrigger>
             </TabsList>
 
             <ScrollArea className="flex-1 px-1">
-              {/* Purchaser Information Tab */}
-              <TabsContent value="supplier" className="space-y-4 mt-4">
+              {/* Details Tab */}
+              <TabsContent value="details" className="space-y-4 mt-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2 col-span-2">
-                    <Label htmlFor="distributor_id">
-                      Distributor <span className="text-red-500">*</span>
-                    </Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="po_status">PO Status</Label>
                     <Select
-                      value={formData.distributor_id || undefined}
-                      onValueChange={handleDistributorSelect}
+                      value={formData.po_status}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({ ...prev, po_status: value as POStatus }))
+                      }
                     >
-                      <SelectTrigger id="distributor_id">
-                        <SelectValue placeholder="Select distributor" />
+                      <SelectTrigger id="po_status">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {distributors.map((distributor) => (
-                          <SelectItem key={distributor.id} value={distributor.id}>
-                            {distributor.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="submitted">Submitted</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="ordered">Ordered</SelectItem>
+                        <SelectItem value="received">Received</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-gray-500">
-                      Purchaser information will be automatically populated from the selected distributor
-                    </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="po_date">PO Date</Label>
+                    <Label htmlFor="payment_status">Payment Status</Label>
+                    <Select
+                      value={formData.payment_status}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          payment_status: value as PaymentStatus,
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="payment_status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="partially_paid">Partially Paid</SelectItem>
+                        <SelectItem value="failed">Failed</SelectItem>
+                        <SelectItem value="refunded">Refunded</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="expected_delivery_date">Expected Delivery Date</Label>
                     <Input
-                      id="po_date"
+                      id="expected_delivery_date"
                       type="date"
-                      value={formData.po_date}
+                      value={formData.expected_delivery_date || ""}
                       onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, po_date: e.target.value }))
+                        setFormData((prev) => ({
+                          ...prev,
+                          expected_delivery_date: e.target.value || undefined,
+                        }))
                       }
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="currency">Currency</Label>
-                    <Select
-                      value={formData.currency}
-                      onValueChange={(value) =>
-                        setFormData((prev) => ({ ...prev, currency: value }))
+                    <Label htmlFor="tax_total">Tax Total</Label>
+                    <Input
+                      id="tax_total"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.tax_total}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          tax_total: parseFloat(e.target.value) || 0,
+                        }))
                       }
-                    >
-                      <SelectTrigger id="currency">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="AED">AED</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="GBP">GBP</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="shipping_cost">Shipping Cost</Label>
+                    <Input
+                      id="shipping_cost"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.shipping_cost}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          shipping_cost: parseFloat(e.target.value) || 0,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    value={formData.notes || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, notes: e.target.value }))
+                    }
+                    placeholder="Additional notes..."
+                    rows={4}
+                  />
                 </div>
               </TabsContent>
 
@@ -659,117 +712,64 @@ export function POFormDialog({
                 </div>
               </TabsContent>
 
-              {/* Details Tab */}
-              <TabsContent value="details" className="space-y-4 mt-4">
+              {/* Purchaser Information Tab */}
+              <TabsContent value="supplier" className="space-y-4 mt-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="po_status">PO Status</Label>
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="distributor_id">
+                      Distributor <span className="text-red-500">*</span>
+                    </Label>
                     <Select
-                      value={formData.po_status}
-                      onValueChange={(value) =>
-                        setFormData((prev) => ({ ...prev, po_status: value as POStatus }))
-                      }
+                      value={formData.distributor_id || undefined}
+                      onValueChange={handleDistributorSelect}
                     >
-                      <SelectTrigger id="po_status">
-                        <SelectValue />
+                      <SelectTrigger id="distributor_id">
+                        <SelectValue placeholder="Select distributor" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="submitted">Submitted</SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="rejected">Rejected</SelectItem>
-                        <SelectItem value="ordered">Ordered</SelectItem>
-                        <SelectItem value="received">Received</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        {distributors.map((distributor) => (
+                          <SelectItem key={distributor.id} value={distributor.id}>
+                            {distributor.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-gray-500">
+                      Purchaser information will be automatically populated from the selected distributor
+                    </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="payment_status">Payment Status</Label>
-                    <Select
-                      value={formData.payment_status}
-                      onValueChange={(value) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          payment_status: value as PaymentStatus,
-                        }))
-                      }
-                    >
-                      <SelectTrigger id="payment_status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="partially_paid">Partially Paid</SelectItem>
-                        <SelectItem value="failed">Failed</SelectItem>
-                        <SelectItem value="refunded">Refunded</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="expected_delivery_date">Expected Delivery Date</Label>
+                    <Label htmlFor="po_date">PO Date</Label>
                     <Input
-                      id="expected_delivery_date"
+                      id="po_date"
                       type="date"
-                      value={formData.expected_delivery_date || ""}
+                      value={formData.po_date}
                       onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          expected_delivery_date: e.target.value || undefined,
-                        }))
+                        setFormData((prev) => ({ ...prev, po_date: e.target.value }))
                       }
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="tax_total">Tax Total</Label>
-                    <Input
-                      id="tax_total"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.tax_total}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          tax_total: parseFloat(e.target.value) || 0,
-                        }))
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select
+                      value={formData.currency}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({ ...prev, currency: value }))
                       }
-                    />
+                    >
+                      <SelectTrigger id="currency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="AED">AED</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="shipping_cost">Shipping Cost</Label>
-                    <Input
-                      id="shipping_cost"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.shipping_cost}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          shipping_cost: parseFloat(e.target.value) || 0,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, notes: e.target.value }))
-                    }
-                    placeholder="Additional notes..."
-                    rows={4}
-                  />
                 </div>
               </TabsContent>
             </ScrollArea>

@@ -9,21 +9,17 @@ import { useRequireProfile } from "@/hooks/use-auth";
 import { Distributor } from "@/hooks/use-distributors";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, BarChart3, Package, FileCheck, Users } from "lucide-react";
 import { DistributorFormDialog } from "@/components/distributors/distributor-form-dialog";
 import { useDistributors } from "@/hooks/use-distributors";
 import { toast } from "react-toastify";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { DistributorHeader } from "@/components/distributors/distributor-header";
-import {
-  PerformanceTabPlaceholder,
-  ProductsTabPlaceholder,
-  SLATabPlaceholder,
-  ContactsTabPlaceholder,
-} from "@/components/distributors/distributor-tab-placeholders";
 import { DistributorOrdersSection } from "@/components/distributors/distributor-orders-section";
-import { BarChart3, Package, FileCheck, Users } from "lucide-react";
+import { DistributorMetricsCard } from "@/components/distributors/distributor-metrics-card";
+import { DistributorSLATab } from "@/components/distributors/distributor-sla-tab";
+import { DistributorProductsTab } from "@/components/distributors/distributor-products-tab";
+import { DistributorContactsTab } from "@/components/distributors/distributor-contacts-tab";
 
 export default function DistributorDetailPage() {
   const params = useParams();
@@ -35,7 +31,7 @@ export default function DistributorDetailPage() {
   const [loadingDistributor, setLoadingDistributor] = useState(true);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<string>(
-    searchParams?.get("tab") || "performance"
+    searchParams?.get("tab") || "products"
   );
 
   const { deleteDistributor } = useDistributors({
@@ -71,18 +67,18 @@ export default function DistributorDetailPage() {
 
       if (error) {
         if (error.code === "PGRST116") {
-          toast.error("Distributor not found");
+          toast.error("Customer not found");
           router.push("/distributors");
         } else {
-          toast.error(`Error loading distributor: ${error.message}`);
+          toast.error(`Error loading customer: ${error.message}`);
         }
         return;
       }
 
       setDistributor(data);
     } catch (error: any) {
-      console.error("Error loading distributor:", error);
-      toast.error("Failed to load distributor");
+      console.error("Error loading customer:", error);
+      toast.error("Failed to load customer");
     } finally {
       setLoadingDistributor(false);
     }
@@ -93,17 +89,17 @@ export default function DistributorDetailPage() {
 
     try {
       await deleteDistributor(distributor.id);
-      toast.success("Distributor deleted successfully");
+      toast.success("Customer deleted successfully");
       router.push("/distributors");
     } catch (error: any) {
-      console.error("Error deleting distributor:", error);
-      toast.error("Failed to delete distributor");
+      console.error("Error deleting customer:", error);
+      toast.error("Failed to delete customer");
     }
   };
 
   if (loading || loadingDistributor) {
     return (
-      <MainLayout pageTitle="Distributor Details" pageSubtitle="Loading...">
+      <MainLayout pageTitle="Customer Details" pageSubtitle="Loading...">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
         </div>
@@ -113,12 +109,12 @@ export default function DistributorDetailPage() {
 
   if (!distributor) {
     return (
-      <MainLayout pageTitle="Distributor Not Found" pageSubtitle="">
+      <MainLayout pageTitle="Customer Not Found" pageSubtitle="">
         <div className="flex flex-col items-center justify-center h-64">
-          <p className="text-gray-600 mb-4">Distributor not found</p>
+          <p className="text-gray-600 mb-4">Customer not found</p>
           <Button onClick={() => router.push("/distributors")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Distributors
+            Back to Customers
           </Button>
         </div>
       </MainLayout>
@@ -147,7 +143,7 @@ export default function DistributorDetailPage() {
               <Button
                 variant="destructive"
                 onClick={() => {
-                  if (confirm("Are you sure you want to delete this distributor?")) {
+                  if (confirm("Are you sure you want to delete this customer?")) {
                     handleDelete();
                   }
                 }}
@@ -159,81 +155,52 @@ export default function DistributorDetailPage() {
           }
         >
           <div className="space-y-6">
-            {/* Distributor Header with KPIs */}
+            {/* Header */}
             <DistributorHeader distributor={distributor} />
+
+            {/* Dashboard Metrics Section */}
+            <DistributorMetricsCard 
+              distributorId={distributor.id} 
+              marginPercent={distributor.margin_percent}
+            />
 
             {/* Tabbed Navigation */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1">
-                <TabsTrigger
-                  value="performance"
-                  className="relative data-[state=active]:bg-white data-[state=active]:text-teal-600"
-                >
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Performance
-                  <Badge
-                    variant="outline"
-                    className="ml-2 h-4 px-1.5 text-xs border-gray-300 text-gray-500"
-                  >
-                    Soon
-                  </Badge>
-                </TabsTrigger>
+              <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1">
                 <TabsTrigger
                   value="products"
-                  className="relative data-[state=active]:bg-white data-[state=active]:text-teal-600"
+                  className="data-[state=active]:bg-white data-[state=active]:text-teal-600"
                 >
                   <Package className="mr-2 h-4 w-4" />
                   Products
-                  <Badge
-                    variant="outline"
-                    className="ml-2 h-4 px-1.5 text-xs border-gray-300 text-gray-500"
-                  >
-                    Soon
-                  </Badge>
                 </TabsTrigger>
                 <TabsTrigger
                   value="sla"
-                  className="relative data-[state=active]:bg-white data-[state=active]:text-teal-600"
+                  className="data-[state=active]:bg-white data-[state=active]:text-teal-600"
                 >
                   <FileCheck className="mr-2 h-4 w-4" />
-                  SLA
-                  <Badge
-                    variant="outline"
-                    className="ml-2 h-4 px-1.5 text-xs border-gray-300 text-gray-500"
-                  >
-                    Soon
-                  </Badge>
+                  SLA & Terms
                 </TabsTrigger>
                 <TabsTrigger
                   value="contacts"
-                  className="relative data-[state=active]:bg-white data-[state=active]:text-teal-600"
+                  className="data-[state=active]:bg-white data-[state=active]:text-teal-600"
                 >
                   <Users className="mr-2 h-4 w-4" />
                   Contacts
-                  <Badge
-                    variant="outline"
-                    className="ml-2 h-4 px-1.5 text-xs border-gray-300 text-gray-500"
-                  >
-                    Soon
-                  </Badge>
                 </TabsTrigger>
               </TabsList>
 
               <div className="mt-6">
-                <TabsContent value="performance" className="mt-0">
-                  <PerformanceTabPlaceholder />
-                </TabsContent>
-
                 <TabsContent value="products" className="mt-0">
-                  <ProductsTabPlaceholder />
+                  <DistributorProductsTab distributorId={distributor.id} />
                 </TabsContent>
 
                 <TabsContent value="sla" className="mt-0">
-                  <SLATabPlaceholder />
+                  <DistributorSLATab distributor={distributor} />
                 </TabsContent>
 
                 <TabsContent value="contacts" className="mt-0">
-                  <ContactsTabPlaceholder />
+                  <DistributorContactsTab distributor={distributor} />
                 </TabsContent>
               </div>
             </Tabs>

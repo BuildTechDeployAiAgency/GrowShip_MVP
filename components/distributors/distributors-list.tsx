@@ -70,7 +70,7 @@ export function DistributorsList() {
   });
 
   const handleDelete = async (distributorId: string) => {
-    if (confirm("Are you sure you want to delete this distributor?")) {
+    if (confirm("Are you sure you want to delete this customer?")) {
       await deleteDistributor(distributorId);
     }
   };
@@ -101,7 +101,7 @@ export function DistributorsList() {
     return (
       <Card>
         <CardContent className="p-6">
-          <p className="text-red-600">Error loading distributors: {error}</p>
+          <p className="text-red-600">Error loading customers: {error}</p>
         </CardContent>
       </Card>
     );
@@ -114,7 +114,7 @@ export function DistributorsList() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
-              placeholder="Search distributors..."
+              placeholder="Search customers..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 w-full sm:w-64"
@@ -140,7 +140,7 @@ export function DistributorsList() {
           </Select>
           <Button onClick={() => setShowCreateDialog(true)}>
             <Building2 className="mr-2 h-4 w-4" />
-            Add Distributor
+            Add Customer
           </Button>
         </div>
       </div>
@@ -178,7 +178,7 @@ export function DistributorsList() {
                 {distributors.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                      No distributors found. Add your first distributor to get started.
+                      No customers found. Add your first customer to get started.
                     </td>
                   </tr>
                 ) : (
@@ -258,7 +258,7 @@ export function DistributorsList() {
 
       {totalCount > 0 && (
         <div className="text-sm text-gray-600">
-          Showing {distributors.length} of {totalCount} distributors
+          Showing {distributors.length} of {totalCount} customers
         </div>
       )}
 
@@ -292,4 +292,3 @@ export function DistributorsList() {
     </div>
   );
 }
-

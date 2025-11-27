@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { format, subDays, isAfter } from "date-fns";
 import Link from "next/link";
+import { PONotificationActions } from "./po-notification-actions";
 
 export function NotificationList() {
   const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
@@ -24,12 +25,17 @@ export function NotificationList() {
   const [entityFilter, setEntityFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
 
-  const { notifications, isLoading, markAsRead, markAllAsRead, unreadCount } = useNotifications({
+  const { notifications, isLoading, markAsRead, markAllAsRead, unreadCount, refetch } = useNotifications({
     isRead: filter === "all" ? undefined : filter === "read",
     type: typeFilter !== "all" ? typeFilter : undefined,
     priority: priorityFilter !== "all" ? priorityFilter : undefined,
     limit: 100,
   });
+
+  const handlePOStatusChange = () => {
+    // Refetch notifications when PO status changes
+    refetch();
+  };
 
   // Client-side filtering for entity type and date
   const filteredNotifications = useMemo(() => {
@@ -199,6 +205,11 @@ export function NotificationList() {
           <div className="space-y-2">
             {filteredNotifications.map((notification: Notification) => {
               const Icon = typeIcons[notification.type] || Bell;
+              const isPOApprovalNotification =
+                notification.related_entity_type === "po" &&
+                notification.related_entity_id &&
+                notification.title.toLowerCase().includes("approval required");
+
               return (
                 <div
                   key={notification.id}
@@ -257,16 +268,23 @@ export function NotificationList() {
                         </div>
                       </div>
                     </div>
-                    {!notification.is_read && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => markAsRead(notification.id)}
-                        className="ml-2"
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2 ml-2">
+                      {isPOApprovalNotification && notification.related_entity_id && (
+                        <PONotificationActions
+                          poId={notification.related_entity_id}
+                          onStatusChange={handlePOStatusChange}
+                        />
+                      )}
+                      {!notification.is_read && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => markAsRead(notification.id)}
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

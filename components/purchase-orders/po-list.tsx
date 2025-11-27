@@ -59,6 +59,7 @@ export function PurchaseOrdersList() {
     totalCount,
     deletePurchaseOrder,
     updatePurchaseOrder,
+    duplicatePurchaseOrder,
     refetch,
     page,
     pageCount,
@@ -109,6 +110,17 @@ export function PurchaseOrdersList() {
   const handleEdit = (poId: string) => {
     // Edit functionality handled in detail page
     router.push(`/purchase-orders/${poId}`);
+  };
+
+  const handleDuplicate = async (poId: string) => {
+    try {
+      const duplicatedPO = await duplicatePurchaseOrder(poId);
+      // Optionally navigate to the new PO
+      router.push(`/purchase-orders/${duplicatedPO.id}`);
+    } catch (error) {
+      // Error is already handled by the mutation's onError
+      console.error("Failed to duplicate purchase order:", error);
+    }
   };
 
   if (loading) {
@@ -299,6 +311,7 @@ export function PurchaseOrdersList() {
                               onDelete={handleDelete}
                               onViewDetails={handleViewDetails}
                               onEdit={handleEdit}
+                              onDuplicate={handleDuplicate}
                             />
                           </td>
                         </tr>

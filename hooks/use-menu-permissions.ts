@@ -27,15 +27,18 @@ export function useMenuPermissions(roleId: string | null) {
 /**
  * Hook to get user's menu permissions with localStorage caching
  * This ensures menu is shown immediately on page refresh/load
+ * 
+ * @param userId - User ID to fetch menu permissions for. Query is disabled if null/undefined.
  */
-export function useUserMenuPermissions(userId: string | null) {
+export function useUserMenuPermissions(userId: string | null | undefined) {
   // Get cached menu data from localStorage for instant display
   const cachedMenuData = userId ? getStoredMenuData(userId) : null;
 
   return useQuery({
     queryKey: menuPermissionKeys.byUser(userId || ""),
     queryFn: () => fetchUserMenuPermissions(userId!),
-    enabled: !!userId,
+    // Only fetch if userId is present and valid
+    enabled: !!userId && userId.length > 0,
     // Use cached data as initial data to show menu immediately
     initialData: cachedMenuData
       ? { menuItems: cachedMenuData, error: null }

@@ -29,6 +29,7 @@ interface UsePurchaseOrdersReturn {
     updates: Partial<PurchaseOrder>
   ) => Promise<void>;
   deletePurchaseOrder: (poId: string) => Promise<void>;
+  duplicatePurchaseOrder: (poId: string) => Promise<PurchaseOrder>;
   totalCount: number;
   page: number;
   pageSize: number;
@@ -345,6 +346,34 @@ export function usePurchaseOrders({
     },
   });
 
+  const duplicatePOMutation = useMutation({
+    mutationFn: async (poId: string): Promise<PurchaseOrder> => {
+      const response = await fetch(`/api/purchase-orders/${poId}/duplicate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to duplicate purchase order");
+      }
+
+      const result = await response.json();
+      return result.purchaseOrder;
+    },
+    onSuccess: (duplicatedPO) => {
+      prependPurchaseOrder(queryClient, duplicatedPO);
+      queryClient.invalidateQueries({ queryKey: ["purchaseOrders"] });
+      toast.success("Purchase order duplicated successfully!");
+    },
+    onError: (error: any) => {
+      console.error("Error duplicating purchase order:", error);
+      toast.error(error?.message || "Failed to duplicate purchase order. Please try again.");
+    },
+  });
+
   return {
     purchaseOrders: paginated.data,
     loading: isLoading,
@@ -360,6 +389,9 @@ export function usePurchaseOrders({
     },
     deletePurchaseOrder: async (poId: string) => {
       await deletePOMutation.mutateAsync(poId);
+    },
+    duplicatePurchaseOrder: async (poId: string) => {
+      return await duplicatePOMutation.mutateAsync(poId);
     },
     totalCount: paginated.totalCount,
     page: paginated.page,

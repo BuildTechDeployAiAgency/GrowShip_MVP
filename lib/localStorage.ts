@@ -2,45 +2,13 @@
 
 import { MenuItem } from "@/types/menu";
 import { UserProfile } from "@/types/auth";
-import {
-  LayoutDashboard,
-  Upload,
-  ShoppingCart,
-  Truck,
-  FileText,
-  Receipt,
-  BarChart3,
-  Users,
-  DollarSign,
-  Megaphone,
-  Bell,
-  Calendar,
-  Settings,
-  Users2,
-} from "lucide-react";
+import { attachMenuIcons } from "@/lib/menu-icons";
 
-const iconMap: Record<string, any> = {
-  LayoutDashboard: LayoutDashboard,
-  Upload: Upload,
-  ShoppingCart: ShoppingCart,
-  Truck: Truck,
-  FileText: FileText,
-  Receipt: Receipt,
-  BarChart3: BarChart3,
-  Users: Users,
-  DollarSign: DollarSign,
-  Megaphone: Megaphone,
-  Bell: Bell,
-  Calendar: Calendar,
-  Users2: Users2,
-  Settings: Settings,
-};
-
-function reconstructMenuIcons(menuItems: MenuItem[]): MenuItem[] {
-  return menuItems.map((item) => ({
+// Remove icon functions before persisting to storage
+function stripMenuIcons(menuItems: MenuItem[]): MenuItem[] {
+  return menuItems.map(({ icon: _icon, children, ...item }) => ({
     ...item,
-    icon: iconMap[item.menu_icon] || LayoutDashboard,
-    children: item.children ? reconstructMenuIcons(item.children) : undefined,
+    children: children ? stripMenuIcons(children) : undefined,
   }));
 }
 
@@ -91,7 +59,7 @@ export function getStoredMenuData(userId: string): MenuItem[] | null {
       const maxAge = 24 * 60 * 60 * 1000; // 24 hours
 
       if (data.userId === userId && now - storedTime < maxAge) {
-        return reconstructMenuIcons(data.menuItems);
+        return attachMenuIcons(data.menuItems);
       } else {
         safeLocalStorage.removeItem(MENU_STORAGE_KEY);
       }
@@ -106,9 +74,10 @@ export function getStoredMenuData(userId: string): MenuItem[] | null {
 
 export function setStoredMenuData(userId: string, menuItems: MenuItem[]): void {
   try {
+    const sanitizedMenuItems = stripMenuIcons(menuItems);
     const dataWithTimestamp = {
       userId,
-      menuItems,
+      menuItems: sanitizedMenuItems,
       _storedAt: Date.now(),
     };
     safeLocalStorage.setItem(MENU_STORAGE_KEY, JSON.stringify(dataWithTimestamp));

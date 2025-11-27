@@ -14,9 +14,14 @@ import { useAuth } from "@/contexts/auth-context";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { useDateFilters } from "@/contexts/date-filter-context";
 import { useDashboardMetrics } from "@/hooks/use-dashboard-metrics";
+import type { DashboardMetrics } from "@/types/dashboard";
 import { useMemo } from "react";
 
-export function SalesMetricsCards() {
+export interface SalesMetricsCardsProps {
+  initialData?: DashboardMetrics | null;
+}
+
+export function SalesMetricsCards({ initialData }: SalesMetricsCardsProps = {}) {
   const { user } = useAuth();
   const { profile } = useEnhancedAuth();
   const { filters } = useDateFilters();
@@ -47,6 +52,7 @@ export function SalesMetricsCards() {
 
   const { data, isLoading, error } = useDashboardMetrics({
     filters: dashboardFilters,
+    initialData,
   });
 
   const metrics = useMemo(() => {

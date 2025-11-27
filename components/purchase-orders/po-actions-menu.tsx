@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Eye, Edit, Trash2, CheckCircle, XCircle, Package, Truck, FileText, X } from "lucide-react";
+import { MoreHorizontal, Eye, Edit, Trash2, CheckCircle, XCircle, Package, Truck, FileText, X, Copy } from "lucide-react";
 import type { PurchaseOrder, POStatus } from "@/types/purchase-orders";
 import { POApprovalDialog } from "./po-approval-dialog";
 import { POHistoryTimeline } from "./po-history-timeline";
@@ -30,6 +30,7 @@ interface POActionsMenuProps {
   onDelete?: (id: string) => void;
   onViewDetails?: (id: string) => void;
   onEdit?: (id: string) => void;
+  onDuplicate?: (id: string) => void;
 }
 
 export function POActionsMenu({
@@ -38,6 +39,7 @@ export function POActionsMenu({
   onDelete,
   onViewDetails,
   onEdit,
+  onDuplicate,
 }: POActionsMenuProps) {
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject">("approve");
@@ -184,6 +186,13 @@ export function POActionsMenu({
             <FileText className="mr-2 h-4 w-4" />
             View History
           </DropdownMenuItem>
+
+          {onDuplicate && (
+            <DropdownMenuItem onClick={() => onDuplicate(po.id)}>
+              <Copy className="mr-2 h-4 w-4" />
+              Duplicate
+            </DropdownMenuItem>
+          )}
 
           {onDelete && po.po_status === "draft" && (
             <DropdownMenuItem

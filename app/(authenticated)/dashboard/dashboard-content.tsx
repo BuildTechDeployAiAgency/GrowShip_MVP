@@ -12,10 +12,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
+import type { DashboardMetrics } from "@/types/dashboard";
 
 type DashboardView = "overview" | "sales";
 
-export default function DashboardContent() {
+export interface DashboardContentProps {
+  initialMetrics?: DashboardMetrics | null;
+}
+
+export default function DashboardContent({ initialMetrics }: DashboardContentProps = {}) {
   const [currentView, setCurrentView] = useState<DashboardView>("overview");
 
   const viewLabels: Record<DashboardView, string> = {
@@ -68,7 +73,11 @@ export default function DashboardContent() {
       pageSubtitle="Welcome to your business portal"
       actions={headerActions}
     >
-      {currentView === "overview" ? <OverviewView /> : <SalesMetricsView />}
+      {currentView === "overview" ? (
+        <OverviewView initialMetrics={initialMetrics} />
+      ) : (
+        <SalesMetricsView />
+      )}
     </MainLayout>
   );
 }

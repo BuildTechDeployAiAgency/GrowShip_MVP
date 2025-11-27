@@ -30,7 +30,7 @@ export async function checkPaymentDueAlerts(): Promise<void> {
       .from("user_profiles")
       .select("user_id")
       .eq("brand_id", invoice.brand_id)
-      .eq("status", "approved");
+      .eq("user_status", "approved");
 
     if (!users || users.length === 0) continue;
 

@@ -110,9 +110,8 @@ export async function GET(request: NextRequest) {
     if (stockStatus === "out_of_stock") {
       query = query.eq("quantity_in_stock", 0);
     } else if (stockStatus === "critical") {
-      query = query
-        .gt("quantity_in_stock", 0)
-        .lte("quantity_in_stock", supabase.rpc ? 0 : 0); // Will filter client-side
+      query = query.gt("quantity_in_stock", 0);
+      // Will filter client-side for threshold comparison
     } else if (stockStatus === "low_stock") {
       // Will filter client-side for threshold comparison
     } else if (stockStatus === "in_stock") {
@@ -147,7 +146,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Process products and add computed fields
-    const processedProducts = (products || []).map((product) => {
+    const processedProducts = (products || []).map((product: any) => {
       const quantityInStock = product.quantity_in_stock || 0;
       const unitPrice = product.unit_price || 0;
       const criticalThreshold = product.critical_stock_threshold || 0;

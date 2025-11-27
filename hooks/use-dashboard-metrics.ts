@@ -1,40 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
+import type { DashboardMetrics, DashboardMetricsFilters } from "@/types/dashboard";
 
-export interface DashboardMetrics {
-  total_revenue: number;
-  total_revenue_display: string;
-  revenue_growth_percentage: number;
-  revenue_growth_display: string;
-
-  profit_margin: number;
-  profit_margin_display: string;
-  profit_margin_growth_percentage: number;
-  profit_margin_growth_display: string;
-
-  target_achievement: number;
-  target_achievement_display: string;
-  target_period: string;
-
-  pending_orders_count: number;
-  pending_orders_count_display: string;
-  pending_orders_value: number;
-  pending_orders_value_display: string;
-}
-
-export interface DashboardMetricsFilters {
-  tableSuffix?: string;
-  userId?: string;
-  brandId?: string;
-  userRole?: string;
-  year?: number;
-  month?: number;
-}
+// Re-export types for convenience
+export type { DashboardMetrics, DashboardMetricsFilters } from "@/types/dashboard";
 
 export interface UseDashboardMetricsOptions {
   filters?: DashboardMetricsFilters;
   enabled?: boolean;
+  initialData?: DashboardMetrics | null;
 }
 
 export interface UseDashboardMetricsReturn {
@@ -134,6 +109,7 @@ async function fetchDashboardMetrics(
 export function useDashboardMetrics({
   filters = {},
   enabled = true,
+  initialData,
 }: UseDashboardMetricsOptions = {}): UseDashboardMetricsReturn {
   const { user, profile } = useEnhancedAuth();
 
@@ -151,6 +127,8 @@ export function useDashboardMetrics({
         profile?.brand_id
       ),
     enabled: enabled && !!user && !!profile,
+    // Use server-fetched data as initial data to skip loading state
+    initialData: initialData ?? undefined,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: true, // Ensure data refreshes when component mounts

@@ -5,9 +5,9 @@ import { executeTransition } from "@/lib/po/workflow-engine";
 
 export async function POST(
   request: NextRequest,
-  context: any
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { params } = context as { params: { id: string } };
+  const { id } = await context.params;
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -26,7 +26,7 @@ export async function POST(
     const { data: po, error: poError } = await supabase
       .from("purchase_orders")
       .select("po_number, user_id, brand_id")
-      .eq("id", params.id)
+      .eq("id", id)
       .single();
 
     if (poError || !po) {
@@ -38,7 +38,7 @@ export async function POST(
 
     // Execute workflow transition using the workflow engine
     const result = await executeTransition(
-      params.id,
+      id,
       user.id,
       "approve",
       comments
@@ -53,7 +53,7 @@ export async function POST(
 
     // Create notification
     await createPOStatusChangeAlert(
-      params.id,
+      id,
       po.po_number,
       "approved",
       po.user_id,

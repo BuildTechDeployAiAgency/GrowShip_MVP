@@ -5,8 +5,15 @@ import { useRouter } from "next/navigation";
 import { Search, MoreHorizontal, Eye, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,6 +62,8 @@ export function DistributorOrdersSection({
     status: "all",
     dateRange: "all",
   });
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showSummaryDialog, setShowSummaryDialog] = useState(false);
 
   const isSuperAdmin = canPerformAction("view_all_users");
 
@@ -78,10 +87,11 @@ export function DistributorOrdersSection({
     filters: {
       ...filters,
       paymentStatus: "all",
-      customerType: "all", // Remove customerType filter to show all orders for this distributor
+      customerType: "all",
       distributorId: distributorId,
     },
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    pageSize: 50, // Show last 50 orders
   });
 
   // Debug logging
@@ -96,8 +106,17 @@ export function DistributorOrdersSection({
     });
   }, [orders, loading, error, distributorId, filters, isSuperAdmin, profile?.brand_id]);
 
-  // Orders are already filtered by distributor_id via the useOrders hook
-  const filteredOrders = orders;
+  const handleRowClick = (order: Order) => {
+    setSelectedOrder(order);
+    setShowSummaryDialog(true);
+  };
+
+  const handleViewOrderDetails = () => {
+    if (selectedOrder) {
+      setShowSummaryDialog(false);
+      router.push(`/orders/${selectedOrder.id}`);
+    }
+  };
 
   if (loading) {
     return (
@@ -121,12 +140,10 @@ export function DistributorOrdersSection({
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Orders</h2>
-          {filteredOrders.length > 0 && (
-            <p className="text-sm text-gray-600 mt-1">
-              {filteredOrders.length} {filteredOrders.length === 1 ? "order" : "orders"} found
-            </p>
-          )}
+          <h2 className="text-lg font-semibold text-gray-900">Orders History</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Showing last {Math.min(50, orders.length)} orders
+          </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <div className="relative">
@@ -155,23 +172,6 @@ export function DistributorOrdersSection({
               <SelectItem value="shipped">Shipped</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.dateRange}
-            onValueChange={(value) =>
-              setFilters({ ...filters, dateRange: value })
-            }
-          >
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue placeholder="Date Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Time</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="week">Last Week</SelectItem>
-              <SelectItem value="month">Last Month</SelectItem>
-              <SelectItem value="year">Last Year</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -204,32 +204,28 @@ export function DistributorOrdersSection({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredOrders.length === 0 ? (
+                {orders.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                       <div className="flex flex-col items-center">
                         <p className="text-sm font-medium mb-2">No orders found</p>
                         <p className="text-xs text-gray-400">
-                          This distributor hasn't placed any orders yet.
+                          This customer hasn't placed any orders yet.
                         </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  filteredOrders.map((order) => (
+                  orders.map((order) => (
                     <tr
                       key={order.id}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/orders/${order.id}`)}
+                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      onClick={() => handleRowClick(order)}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Link
-                          href={`/orders/${order.id}`}
-                          className="text-sm font-medium text-teal-600 hover:text-teal-800 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <span className="text-sm font-medium text-teal-600">
                           {order.order_number}
-                        </Link>
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {format(new Date(order.order_date), "MMM dd, yyyy")}
@@ -246,35 +242,16 @@ export function DistributorOrdersSection({
                         </Badge>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/orders/${order.id}`);
-                              }}
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // TODO: Implement download invoice
-                              }}
-                            >
-                              <Download className="mr-2 h-4 w-4" />
-                              Download Invoice
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRowClick(order);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 text-gray-500" />
+                        </Button>
                       </td>
                     </tr>
                   ))
@@ -285,11 +262,70 @@ export function DistributorOrdersSection({
         </CardContent>
       </Card>
 
-      {filteredOrders.length > 0 && (
-        <div className="text-sm text-gray-600">
-          Showing {filteredOrders.length} of {filteredOrders.length} orders
-        </div>
-      )}
+      {/* Order Summary Dialog */}
+      <Dialog open={showSummaryDialog} onOpenChange={setShowSummaryDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Order Summary</DialogTitle>
+          </DialogHeader>
+          {selectedOrder && (
+            <div className="grid gap-4 py-4">
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-gray-500">Order #</span>
+                <span className="font-bold">{selectedOrder.order_number}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-gray-500">Date</span>
+                <span>{format(new Date(selectedOrder.order_date), "PPP")}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-gray-500">Status</span>
+                <Badge className={statusColors[selectedOrder.order_status]}>
+                  {selectedOrder.order_status}
+                </Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-gray-500">Total Amount</span>
+                <span className="font-bold text-lg">
+                  {selectedOrder.currency || "USD"} {selectedOrder.total_amount?.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-gray-500">Items Count</span>
+                <span>{Array.isArray(selectedOrder.items) ? selectedOrder.items.length : 0}</span>
+              </div>
+              
+              {/* Simple items preview if available */}
+              {Array.isArray(selectedOrder.items) && selectedOrder.items.length > 0 && (
+                <div className="mt-2 border-t pt-2">
+                  <span className="text-sm font-medium text-gray-500 block mb-2">Items Preview</span>
+                  <ul className="text-sm text-gray-600 space-y-1 max-h-32 overflow-y-auto">
+                    {selectedOrder.items.slice(0, 3).map((item: any, idx: number) => (
+                      <li key={idx} className="flex justify-between">
+                        <span className="truncate max-w-[200px]">{item.product_name || item.name || "Item"}</span>
+                        <span>x{item.quantity}</span>
+                      </li>
+                    ))}
+                    {selectedOrder.items.length > 3 && (
+                      <li className="text-xs text-gray-400 italic">
+                        +{selectedOrder.items.length - 3} more items...
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSummaryDialog(false)}>
+              Close
+            </Button>
+            <Button onClick={handleViewOrderDetails}>
+              View Full Details
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

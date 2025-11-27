@@ -18,7 +18,7 @@ export default function DistributorsPage() {
 
   if (!mounted || loading) {
     return (
-      <MainLayout pageTitle="Distributors" pageSubtitle="Loading...">
+      <MainLayout pageTitle="Customers" pageSubtitle="Loading...">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
         </div>
@@ -30,8 +30,8 @@ export default function DistributorsPage() {
     <EnhancedAuthProvider>
       <ProtectedPage allowedStatuses={["approved"]}>
         <MainLayout
-          pageTitle="Distributors"
-          pageSubtitle="Manage distributor relationships"
+          pageTitle="Customers"
+          pageSubtitle="Manage customer relationships"
         >
           <DistributorsList />
         </MainLayout>
@@ -39,4 +39,3 @@ export default function DistributorsPage() {
     </EnhancedAuthProvider>
   );
 }
-

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 export interface AlertData {
   user_id: string;
@@ -15,7 +15,8 @@ export interface AlertData {
 }
 
 export async function createNotification(alert: AlertData): Promise<void> {
-  const supabase = await createClient();
+  // Use admin client to bypass RLS when creating notifications for other users
+  const supabase = createAdminClient();
   
   // Check user's notification preferences
   const shouldCreate = await checkNotificationPreference(
@@ -54,14 +55,15 @@ export async function createNotificationsForBrand(
   alert: Omit<AlertData, "user_id">,
   brandId: string
 ): Promise<void> {
-  const supabase = await createClient();
+  // Use admin client to bypass RLS when creating notifications for multiple users
+  const supabase = createAdminClient();
   
   // Get all users for the brand
   const { data: users, error: usersError } = await supabase
     .from("user_profiles")
     .select("user_id")
     .eq("brand_id", brandId)
-    .eq("status", "approved");
+    .eq("user_status", "approved");
 
   if (usersError) {
     console.error("Error fetching brand users:", usersError);

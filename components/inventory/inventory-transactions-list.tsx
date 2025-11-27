@@ -50,11 +50,11 @@ export function InventoryTransactionsList() {
 
   // Local filter state
   const [filters, setFilters] = useState({
-    product_id: "" as string,
+    product_id: "all",
     sku: "",
-    transaction_type: "" as TransactionType | "",
-    source_type: "" as SourceType | "",
-    status: "" as TransactionStatus | "",
+    transaction_type: "all" as TransactionType | "all",
+    source_type: "all" as SourceType | "all",
+    status: "all" as TransactionStatus | "all",
     page: 1,
     limit: 50,
   });
@@ -64,7 +64,7 @@ export function InventoryTransactionsList() {
     if (contextFilters.selectedProductId) {
       setFilters(prev => ({
         ...prev,
-        product_id: contextFilters.selectedProductId || "",
+        product_id: contextFilters.selectedProductId || "all",
         sku: "", // Clear SKU search when product is selected from context
         page: 1,
       }));
@@ -74,11 +74,11 @@ export function InventoryTransactionsList() {
   // Build query filters including context product filter
   const queryFilters = {
     ...filters,
-    product_id: filters.product_id || undefined,
+    product_id: filters.product_id === "all" ? undefined : filters.product_id,
     sku: filters.sku || undefined,
-    transaction_type: filters.transaction_type || undefined,
-    source_type: filters.source_type || undefined,
-    status: filters.status || undefined,
+    transaction_type: filters.transaction_type === "all" ? undefined : (filters.transaction_type as TransactionType),
+    source_type: filters.source_type === "all" ? undefined : (filters.source_type as SourceType),
+    status: filters.status === "all" ? undefined : (filters.status as TransactionStatus),
   };
 
   const { transactions, pagination, isLoading, error } = useInventoryTransactions(queryFilters);
@@ -95,7 +95,7 @@ export function InventoryTransactionsList() {
   // Clear product filter
   const handleClearProduct = () => {
     clearProductSelection();
-    setFilters({ ...filters, product_id: "", page: 1 });
+    setFilters({ ...filters, product_id: "all", page: 1 });
   };
 
   const getTransactionTypeColor = (type: TransactionType) => {
@@ -175,8 +175,8 @@ export function InventoryTransactionsList() {
   };
 
   // Get selected product info for display
-  const selectedProduct = filters.product_id 
-    ? dropdownProducts.find(p => p.id === filters.product_id)
+  const selectedProduct = filters.product_id && filters.product_id !== "all"
+    ? dropdownProducts.find((p: any) => p.id === filters.product_id)
     : null;
 
   if (error) {
@@ -207,15 +207,15 @@ export function InventoryTransactionsList() {
                 onValueChange={handleProductChange}
                 disabled={productsLoading}
               >
-                <SelectTrigger className={filters.product_id ? "pr-8" : ""}>
+                <SelectTrigger className={filters.product_id && filters.product_id !== "all" ? "pr-8" : ""}>
                   <div className="flex items-center gap-2 truncate">
                     <Package className="h-4 w-4 text-gray-500 flex-shrink-0" />
                     <SelectValue placeholder="All Products" />
                   </div>
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px]">
-                  <SelectItem value="">All Products</SelectItem>
-                  {dropdownProducts.map((product) => (
+                  <SelectItem value="all">All Products</SelectItem>
+                  {dropdownProducts.map((product: any) => (
                     <SelectItem key={product.id} value={product.id}>
                       <span className="font-mono text-xs mr-2">{product.sku}</span>
                       <span className="truncate">{product.product_name}</span>
@@ -223,7 +223,7 @@ export function InventoryTransactionsList() {
                   ))}
                 </SelectContent>
               </Select>
-              {filters.product_id && (
+              {filters.product_id && filters.product_id !== "all" && (
                 <button
                   onClick={handleClearProduct}
                   className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
@@ -241,19 +241,19 @@ export function InventoryTransactionsList() {
                 value={filters.sku}
                 onChange={(e) => setFilters({ ...filters, sku: e.target.value, page: 1 })}
                 className="pl-10"
-                disabled={!!filters.product_id}
+                disabled={!!filters.product_id && filters.product_id !== "all"}
               />
             </div>
 
             <Select
               value={filters.transaction_type}
-              onValueChange={(value) => setFilters({ ...filters, transaction_type: value as TransactionType, page: 1 })}
+              onValueChange={(value) => setFilters({ ...filters, transaction_type: value as TransactionType | "all", page: 1 })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Transaction Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="PO_RECEIVED">PO Received</SelectItem>
                 <SelectItem value="PO_APPROVED">PO Approved</SelectItem>
                 <SelectItem value="PO_CANCELLED">PO Cancelled</SelectItem>
@@ -267,13 +267,13 @@ export function InventoryTransactionsList() {
 
             <Select
               value={filters.source_type}
-              onValueChange={(value) => setFilters({ ...filters, source_type: value as SourceType, page: 1 })}
+              onValueChange={(value) => setFilters({ ...filters, source_type: value as SourceType | "all", page: 1 })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Source Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Sources</SelectItem>
+                <SelectItem value="all">All Sources</SelectItem>
                 <SelectItem value="purchase_order">Purchase Order</SelectItem>
                 <SelectItem value="order">Order</SelectItem>
                 <SelectItem value="manual">Manual</SelectItem>
@@ -283,13 +283,13 @@ export function InventoryTransactionsList() {
 
             <Select
               value={filters.status}
-              onValueChange={(value) => setFilters({ ...filters, status: value as TransactionStatus, page: 1 })}
+              onValueChange={(value) => setFilters({ ...filters, status: value as TransactionStatus | "all", page: 1 })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -456,7 +456,7 @@ export function InventoryTransactionsList() {
               <Package className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">No transactions found</h3>
               <p className="mt-1 text-sm text-gray-500">
-                {filters.product_id || filters.sku || filters.transaction_type || filters.source_type || filters.status
+                {(filters.product_id && filters.product_id !== "all") || filters.sku || (filters.transaction_type && filters.transaction_type !== "all") || (filters.source_type && filters.source_type !== "all") || (filters.status && filters.status !== "all")
                   ? "Try adjusting your filters."
                   : "Inventory transactions will appear here when stock changes occur."}
               </p>

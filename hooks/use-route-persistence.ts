@@ -34,17 +34,19 @@ export function useRoutePersistence(
   }, [userId, pathname, track, shouldIgnore]);
 
   const restoreLastPath = useCallback(
-    (fallbackPaths: string[] = ["/", "/dashboard"]) => {
+    (fallbackPaths: string[] = ["/"]) => {
+      // Only restore from root path and only once per session
       if (!userId || hasRestoredRef.current || !pathname) {
         return;
       }
 
+      // Only trigger restore logic when on the landing page (/)
       if (!fallbackPaths.includes(pathname)) {
         return;
       }
 
       const storedPath = getLastVisitedPath(userId);
-      if (storedPath && storedPath !== pathname) {
+      if (storedPath && storedPath !== pathname && storedPath !== "/dashboard") {
         hasRestoredRef.current = true;
         router.replace(storedPath);
       }

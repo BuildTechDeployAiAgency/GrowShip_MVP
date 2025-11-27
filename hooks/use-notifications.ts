@@ -51,7 +51,14 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     refetchOnWindowFocus: true,
   });
 
-  // Fetch unread count
+  // Update unreadCount from query data when fetching unread notifications
+  useEffect(() => {
+    if (options.isRead === false && data?.total !== undefined) {
+      setUnreadCount(data.total);
+    }
+  }, [data?.total, options.isRead]);
+
+  // Fetch unread count (for cases where we're not querying unread notifications)
   const fetchUnreadCount = useCallback(async () => {
     try {
       const response = await fetch("/api/notifications?is_read=false&limit=1");
@@ -93,7 +100,10 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
               console.log("New notification received:", payload);
               // Invalidate queries to refetch
               queryClient.invalidateQueries({ queryKey: ["notifications"] });
-              fetchUnreadCount();
+              // Only fetch unread count if we're not already querying unread notifications
+              if (options.isRead !== false) {
+                fetchUnreadCount();
+              }
             }
           )
           .on(
@@ -108,7 +118,10 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
               console.log("Notification updated:", payload);
               // Invalidate queries to refetch
               queryClient.invalidateQueries({ queryKey: ["notifications"] });
-              fetchUnreadCount();
+              // Only fetch unread count if we're not already querying unread notifications
+              if (options.isRead !== false) {
+                fetchUnreadCount();
+              }
             }
           )
           .subscribe((status) => {
@@ -120,10 +133,13 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     };
 
     setupRealtime();
-    fetchUnreadCount();
-
-    // Fallback polling (less aggressive - every 5 minutes)
-    pollInterval = setInterval(fetchUnreadCount, 300000);
+    
+    // Only fetch unread count separately if we're not already querying unread notifications
+    if (options.isRead !== false) {
+      fetchUnreadCount();
+      // Fallback polling (less aggressive - every 5 minutes)
+      pollInterval = setInterval(fetchUnreadCount, 300000);
+    }
 
     return () => {
       if (channel) {
@@ -133,7 +149,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
         clearInterval(pollInterval);
       }
     };
-  }, [enableRealtime, queryClient, fetchUnreadCount]);
+  }, [enableRealtime, queryClient, fetchUnreadCount, options.isRead]);
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {

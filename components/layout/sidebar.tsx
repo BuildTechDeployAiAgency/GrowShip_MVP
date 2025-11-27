@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { useUserMenuPermissions } from "@/hooks/use-menu-permissions";
 import { getStoredUserData, getStoredProfile } from "@/lib/localStorage";
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   X,
   User,
@@ -38,10 +38,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MenuItem } from "@/types/menu";
 import { toast } from "react-toastify";
+import { attachMenuIcons } from "@/lib/menu-icons";
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  initialMenuData?: MenuItem[] | null;
 }
 
 function MenuItemComponent({
@@ -142,6 +144,14 @@ function MenuItemWithChildren({
   );
   const [isOpen, setIsOpen] = useState<boolean>(Boolean(isActive || hasActiveChild));
   const hasChildren = Boolean(item.children && item.children.length > 0);
+
+  // Sync submenu state with pathname changes
+  useEffect(() => {
+    const shouldBeOpen = Boolean(isActive || hasActiveChild);
+    if (shouldBeOpen !== isOpen) {
+      setIsOpen(shouldBeOpen);
+    }
+  }, [pathname, isActive, hasActiveChild]);
 
   const handleClick = (e: React.MouseEvent) => {
     if (isPendingUser && !isDashboard) {
@@ -282,7 +292,7 @@ function MenuItemWithChildren({
   );
 }
 
-export function Sidebar({ isOpen, onClose }: SidebarProps) {
+export function Sidebar({ isOpen, onClose, initialMenuData }: SidebarProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
 
@@ -298,7 +308,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     isFetching,
   } = useUserMenuPermissions(user?.id || null);
 
-  const menuItems = menuData?.menuItems || [];
+  // Use server-provided menu data if available, otherwise use client query result
+  const rawMenuItems = menuData?.menuItems || initialMenuData || [];
+  const menuItems = useMemo(
+    () => attachMenuIcons(rawMenuItems),
+    [rawMenuItems]
+  );
   const menuError = menuData?.error || error?.message;
 
   const isPendingUser = profile?.user_status === "pending";

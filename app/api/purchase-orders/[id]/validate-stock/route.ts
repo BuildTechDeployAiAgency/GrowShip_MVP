@@ -4,11 +4,11 @@ import { getStockForMultipleSKUs, validateLineStock } from "@/lib/inventory/stoc
 
 export async function POST(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { params } = context;
-    const poId = params.id;
+    const { id } = await context.params;
+    const poId = id;
 
     const supabase = await createClient();
     const {

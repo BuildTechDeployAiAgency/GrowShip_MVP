@@ -237,13 +237,53 @@ export async function createBatchStockAlerts(
         await createRunningOutSoonAlert(alert.product_id, alert.days_until_out);
       } else if (alert.alert_type === "overstock") {
         await createOverstockAlert(alert.product_id);
-      } else {
+      } else if (alert.alert_type === "low" || alert.alert_type === "critical") {
         await createLowStockAlert(alert.product_id, alert.alert_type);
       }
     } catch (error) {
       console.error(`Failed to create alert for product ${alert.product_id}:`, error);
     }
   }
+}
+
+/**
+ * Check inventory alerts for all products in a brand
+ * This function evaluates thresholds and creates alerts as needed
+ */
+export async function checkInventoryAlerts(brandId: string): Promise<void> {
+  const { checkAllProductThresholds, evaluateStockThresholds } = await import("@/lib/inventory/alert-evaluator");
+  const supabase = await createClient();
+
+  // Get all products that need threshold evaluation
+  const evaluations = await checkAllProductThresholds(brandId);
+
+  // For each product with an alert level, check if we need to create/update alerts
+  for (const evaluation of evaluations) {
+    try {
+      // Get previous alert level from notifications to track state changes
+      const { data: recentAlert } = await supabase
+        .from("notifications")
+        .select("metadata")
+        .eq("related_entity_type", "inventory")
+        .eq("related_entity_id", evaluation.product_id)
+        .eq("is_read", false)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      const previousAlertLevel = recentAlert?.metadata?.alert_level as InventoryAlertLevel | undefined;
+
+      // Evaluate thresholds and create alerts if needed
+      await evaluateStockThresholds(
+        evaluation.product_id,
+        previousAlertLevel as any // Convert to AlertLevel type
+      );
+    } catch (error) {
+      console.error(`Error checking alerts for product ${evaluation.product_id}:`, error);
+    }
+  }
+
+  console.log(`Checked inventory alerts for brand ${brandId}: ${evaluations.length} products evaluated`);
 }
 
 /**

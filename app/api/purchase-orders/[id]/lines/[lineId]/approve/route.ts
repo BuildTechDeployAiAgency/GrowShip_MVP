@@ -4,12 +4,11 @@ import { validateApprovalPermission, validateOverridePermission } from "@/lib/po
 
 export async function POST(
   request: NextRequest,
-  context: { params: { id: string; lineId: string } }
+  context: { params: Promise<{ id: string; lineId: string }> }
 ) {
   try {
-    const { params } = context;
-    const poId = params.id;
-    const lineId = params.lineId;
+    const { id, lineId } = await context.params;
+    const poId = id;
 
     const supabase = await createClient();
     const {

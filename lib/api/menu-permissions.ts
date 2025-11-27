@@ -1,39 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { MenuItem, PermissionLevel } from "@/types/menu";
 import { setStoredMenuData } from "@/lib/localStorage";
-import {
-  LayoutDashboard,
-  Upload,
-  ShoppingCart,
-  Truck,
-  FileText,
-  Receipt,
-  BarChart3,
-  Users,
-  DollarSign,
-  Megaphone,
-  Bell,
-  Calendar,
-  Settings,
-  Users2,
-} from "lucide-react";
-
-const iconMap: Record<string, any> = {
-  LayoutDashboard: LayoutDashboard,
-  Upload: Upload,
-  ShoppingCart: ShoppingCart,
-  Truck: Truck,
-  FileText: FileText,
-  Receipt: Receipt,
-  BarChart3: BarChart3,
-  Users: Users,
-  DollarSign: DollarSign,
-  Megaphone: Megaphone,
-  Bell: Bell,
-  Calendar: Calendar,
-  Users2: Users2,
-  Settings: Settings,
-};
 
 // Query keys for TanStack Query
 export const menuPermissionKeys = {
@@ -103,7 +70,6 @@ export async function fetchMenuPermissions(roleId: string): Promise<{
       requires_permission: menu.requires_permission,
       created_at: menu.created_at,
       updated_at: menu.updated_at,
-      icon: iconMap[menu.menu_icon] || LayoutDashboard,
       permissions: menu.role_menu_permissions[0],
     }));
 

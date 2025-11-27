@@ -1,7 +1,7 @@
 "use client";
 
-import { Menu, Bell } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Menu } from "lucide-react";
+import { NotificationBell } from "@/components/layout/notification-bell";
 
 interface HeaderProps {
   pageTitle: string | React.ReactNode;
@@ -47,10 +47,9 @@ export function Header({
               </div>
             )}
 
-            <Button variant="outline" size="sm" className="hidden md:flex">
-              <Bell className="w-4 h-4 sm:mr-2" />
-              <span className="hidden lg:inline">Notifications</span>
-            </Button>
+            <div className="hidden md:flex">
+              <NotificationBell />
+            </div>
           </div>
         </div>
       </div>

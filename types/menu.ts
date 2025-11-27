@@ -38,7 +38,8 @@ export interface RoleMenuPermission {
 
 // Extended menu item with permissions and icon component
 export interface MenuItem extends SidebarMenu {
-  icon: LucideIcon;
+  // Icon is optional because server responses strip functions before crossing to the client
+  icon?: LucideIcon;
   permissions?: RoleMenuPermission;
   children?: MenuItem[];
 }

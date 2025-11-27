@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
           title: "Bulk Stock Adjustment",
           message: `${successCount} product(s) adjusted via ${adjustment_type}. Reference: ${refNumber}`,
           related_entity_type: "inventory",
-          related_entity_id: null,
+          related_entity_id: undefined,
           priority: "low",
           action_required: false,
           action_url: `/inventory/transactions?reference_number=${refNumber}`,

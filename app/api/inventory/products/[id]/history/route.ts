@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
@@ -16,7 +16,8 @@ export async function GET(
       );
     }
 
-    const productId = params.id;
+    const { id } = await params;
+    const productId = id;
 
     // Get user profile
     const { data: profile } = await supabase

@@ -1,12 +1,12 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { SearchFilter } from "@/components/dashboard/search-filter";
 import { PendingUserWarning } from "@/components/common/pending-user-warning";
 import { useDateFilters } from "@/contexts/date-filter-context";
 import { GlobalDateFilter } from "@/components/sales/global-date-filter";
 import { Skeleton } from "@/components/ui/skeleton";
 import dynamic from "next/dynamic";
+import type { DashboardMetrics } from "@/types/dashboard";
 
 // Lazy load heavy chart components for better performance
 const SalesMetricsCards = dynamic(
@@ -83,7 +83,11 @@ function ChartSkeleton() {
   );
 }
 
-export function OverviewView() {
+export interface OverviewViewProps {
+  initialMetrics?: DashboardMetrics | null;
+}
+
+export function OverviewView({ initialMetrics }: OverviewViewProps = {}) {
   const { setFilters } = useDateFilters();
 
   const handleDateChange = (filters: { year: number; month?: number }) => {
@@ -95,7 +99,7 @@ export function OverviewView() {
       <PendingUserWarning />
 
       {/* Key Metrics Cards */}
-      <SalesMetricsCards />
+      <SalesMetricsCards initialData={initialMetrics} />
 
       {/* Search Filter for Distributors */}
       <SearchFilter

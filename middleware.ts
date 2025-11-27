@@ -44,9 +44,10 @@ export async function middleware(request: NextRequest) {
       ? decodeURIComponent(lastPathCookie.value)
       : null;
 
+    // Only redirect from root path, not from explicit dashboard navigation
     if (
       savedPath &&
-      ["/", "/dashboard"].includes(request.nextUrl.pathname) &&
+      request.nextUrl.pathname === "/" &&
       savedPath !== request.nextUrl.pathname
     ) {
       const redirectUrl = request.nextUrl.clone();

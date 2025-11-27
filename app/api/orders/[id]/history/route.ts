@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-export async function GET(request: NextRequest, context: any) {
-  const { params } = context as { params: { id: string } };
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, context: any) {
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .select("brand_id")
-      .eq("id", params.id)
+      .eq("id", id)
       .single();
 
     if (orderError || !order) {
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest, context: any) {
           email
         )
       `)
-      .eq("order_id", params.id)
+      .eq("order_id", id)
       .order("created_at", { ascending: false });
 
     if (historyError) {

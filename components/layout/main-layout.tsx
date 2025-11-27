@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Header } from "@/components/layout/header";
-import { Sidebar } from "./sidebar";
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { useRoutePersistence } from "@/hooks/use-route-persistence";
+import { useHeader } from "@/contexts/header-context";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -13,34 +13,29 @@ interface MainLayoutProps {
   actions?: React.ReactNode;
 }
 
+/**
+ * MainLayout now acts as a "Page Controller" that sets header data
+ * and handles route persistence. The actual layout shell (Sidebar/Header)
+ * is rendered by the app/(authenticated)/layout.tsx to persist across routes.
+ */
 export function MainLayout({
   children,
   pageTitle,
   pageSubtitle,
   actions,
 }: MainLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user } = useAuth();
+  const pathname = usePathname();
+  const { setHeaderData } = useHeader();
 
-  useRoutePersistence(user?.id, { track: true });
+  // Update header when props change
+  useEffect(() => {
+    setHeaderData({ pageTitle, pageSubtitle, actions });
+  }, [pageTitle, pageSubtitle, actions, setHeaderData]);
 
-  return (
-    <div className="h-screen bg-gray-50 flex">
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header
-          pageTitle={pageTitle}
-          pageSubtitle={pageSubtitle}
-          actions={actions}
-          onMenuClick={() => setSidebarOpen(true)}
-        />
+  // Don't track /dashboard to avoid overriding it as the saved path
+  const shouldTrack = pathname !== "/dashboard";
+  useRoutePersistence(user?.id, { track: shouldTrack });
 
-        <main className="flex-1 overflow-y-auto py-4 sm:py-6">
-          <div className="mx-auto max-w-8xl px-3 sm:px-6 lg:px-8">
-            {children}
-          </div>
-        </main>
-      </div>
-    </div>
-  );
+  return <>{children}</>;
 }

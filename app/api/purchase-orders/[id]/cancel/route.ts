@@ -5,9 +5,9 @@ import { createPOStatusChangeAlert } from "@/lib/notifications/po-alerts";
 
 export async function POST(
   request: NextRequest,
-  context: any
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { params } = context as { params: { id: string } };
+  const { id } = await context.params;
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -33,11 +33,11 @@ export async function POST(
     const { data: po } = await supabase
       .from("purchase_orders")
       .select("po_number, user_id, brand_id")
-      .eq("id", params.id)
+      .eq("id", id)
       .single();
 
     // Execute workflow transition
-    const result = await executeTransition(params.id, user.id, "cancel", reason);
+    const result = await executeTransition(id, user.id, "cancel", reason);
 
     if (!result.success) {
       return NextResponse.json(
@@ -49,7 +49,7 @@ export async function POST(
     // Create notification
     if (po) {
       await createPOStatusChangeAlert(
-        params.id,
+        id,
         po.po_number,
         "cancelled",
         po.user_id,

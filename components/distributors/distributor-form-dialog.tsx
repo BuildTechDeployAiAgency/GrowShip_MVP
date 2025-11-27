@@ -185,7 +185,7 @@ export function DistributorFormDialog({
 
   const validateForm = (): boolean => {
     if (!formData.name.trim()) {
-      setError("Distributor name is required");
+      setError("Customer name is required");
       return false;
     }
 
@@ -276,8 +276,8 @@ export function DistributorFormDialog({
         }
       }
     } catch (err: any) {
-      console.error("Error saving distributor:", err);
-      setError(err?.message || "Failed to save distributor. Please try again.");
+      console.error("Error saving customer:", err);
+      setError(err?.message || "Failed to save customer. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -319,12 +319,12 @@ export function DistributorFormDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Building2 className="h-6 w-6 text-teal-600" />
-            {distributor ? "Edit Distributor" : "Create New Distributor"}
+            {distributor ? "Edit Customer" : "Create New Customer"}
           </DialogTitle>
           <DialogDescription>
             {distributor
-              ? "Update distributor information below"
-              : "Add a new distributor to manage relationships"}
+              ? "Update customer information below"
+              : "Add a new customer to manage relationships"}
           </DialogDescription>
         </DialogHeader>
 
@@ -347,7 +347,7 @@ export function DistributorFormDialog({
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <Label htmlFor="name">
-                    Distributor Name <span className="text-red-500">*</span>
+                    Customer Name <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="name"
@@ -705,7 +705,7 @@ export function DistributorFormDialog({
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea
                   id="notes"
-                  placeholder="Additional information about this distributor..."
+                  placeholder="Additional information about this customer..."
                   rows={4}
                   value={formData.notes}
                   onChange={(e) =>
@@ -725,7 +725,7 @@ export function DistributorFormDialog({
               disabled={loading || (!isSuperAdmin && !profile?.brand_id)}
               title={!isSuperAdmin && !profile?.brand_id ? "Waiting for your profile to load. If this persists, please refresh the page." : ""}
             >
-              {loading ? "Saving..." : distributor ? "Update Distributor" : "Create Distributor"}
+              {loading ? "Saving..." : distributor ? "Update Customer" : "Create Customer"}
             </Button>
             {!isSuperAdmin && !profile?.brand_id && !loading && (
               <p className="text-xs text-amber-600 ml-2">

@@ -79,7 +79,7 @@ export function InventoryProductsList() {
 
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
