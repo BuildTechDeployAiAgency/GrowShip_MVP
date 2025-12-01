@@ -86,18 +86,20 @@ function MenuItemComponent({
       `}
     >
       <div className="flex items-center w-full">
-        <item.icon
-          className={`
-            mr-3 h-5 w-5 flex-shrink-0
-            ${
-              isActive
-                ? "text-white"
-                : isPendingUser && !isDashboard
-                ? "text-gray-300"
-                : "text-gray-400 group-hover:text-gray-600"
-            }
-          `}
-        />
+        {item.icon && (
+          <item.icon
+            className={`
+              mr-3 h-5 w-5 flex-shrink-0
+              ${
+                isActive
+                  ? "text-white"
+                  : isPendingUser && !isDashboard
+                  ? "text-gray-300"
+                  : "text-gray-400 group-hover:text-gray-600"
+              }
+            `}
+          />
+        )}
         <span className="flex-1">{item.menu_label}</span>
         <div className="flex items-center gap-2">
           {isComingSoon && (
@@ -182,18 +184,20 @@ function MenuItemWithChildren({
             `}
             aria-expanded={isOpen}
           >
-            <item.icon
-              className={`
-                mr-3 h-5 w-5 flex-shrink-0
-                ${
-                  isActive || hasActiveChild
-                    ? "text-white"
-                    : isPendingUser && !isDashboard
-                    ? "text-gray-300"
-                    : "text-gray-400 group-hover:text-gray-600"
-                }
-              `}
-            />
+            {item.icon && (
+              <item.icon
+                className={`
+                  mr-3 h-5 w-5 flex-shrink-0
+                  ${
+                    isActive || hasActiveChild
+                      ? "text-white"
+                      : isPendingUser && !isDashboard
+                      ? "text-gray-300"
+                      : "text-gray-400 group-hover:text-gray-600"
+                  }
+                `}
+              />
+            )}
             <span className="flex-1">{item.menu_label}</span>
             <div className="flex items-center gap-2">
               {isComingSoon && (
@@ -233,18 +237,20 @@ function MenuItemWithChildren({
             `}
           >
             <div className="flex items-center w-full">
-              <item.icon
-                className={`
-                  mr-3 h-5 w-5 flex-shrink-0
-                  ${
-                    isActive
-                      ? "text-white"
-                      : isPendingUser && !isDashboard
-                      ? "text-gray-300"
-                      : "text-gray-400 group-hover:text-gray-600"
-                  }
-                `}
-              />
+              {item.icon && (
+                <item.icon
+                  className={`
+                    mr-3 h-5 w-5 flex-shrink-0
+                    ${
+                      isActive
+                        ? "text-white"
+                        : isPendingUser && !isDashboard
+                        ? "text-gray-300"
+                        : "text-gray-400 group-hover:text-gray-600"
+                    }
+                  `}
+                />
+              )}
               <span className="flex-1">{item.menu_label}</span>
               <div className="flex items-center gap-2">
                 {isComingSoon && (
