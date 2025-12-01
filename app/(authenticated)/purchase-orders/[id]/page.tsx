@@ -5,7 +5,6 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { PODetails } from "@/components/purchase-orders/po-details";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 
 export default function PODetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { user, profile, loading } = useRequireProfile();
@@ -22,16 +21,14 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle="Purchase Order Details"
-          pageSubtitle="View and manage purchase order information"
-        >
-          <PODetails poId={id} />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
+        pageTitle="Purchase Order Details"
+        pageSubtitle="View and manage purchase order information"
+      >
+        <PODetails poId={id} />
+      </MainLayout>
+    </ProtectedPage>
   );
 }
 

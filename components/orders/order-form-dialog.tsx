@@ -22,6 +22,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useOrders } from "@/hooks/use-orders";
 import type { Order, OrderStatus, PaymentStatus } from "@/types/orders";
+import { getNextStatuses, getStatusLabel } from "@/lib/orders/status-workflow";
 import { useDistributors, Distributor } from "@/hooks/use-distributors";
 import { useProducts } from "@/hooks/use-products";
 import type { Product } from "@/types/products";
@@ -130,6 +131,19 @@ export function OrderFormDialog({
   const todayDate = useMemo(() => {
     return new Date().toISOString().split("T")[0];
   }, []);
+
+  // Calculate allowed statuses based on current order status
+  const allowedStatuses = useMemo(() => {
+    if (!order) {
+      // New order: only allow "pending"
+      return ["pending"];
+    }
+    const currentStatus = order.order_status as OrderStatus;
+    const nextStatuses = getNextStatuses(currentStatus);
+    // Include current status (to allow updating other fields without changing status)
+    // and all valid next statuses
+    return [currentStatus, ...nextStatuses];
+  }, [order]);
 
   const [formData, setFormData] = useState<OrderFormData>({
     distributor_id: "",
@@ -585,12 +599,18 @@ export function OrderFormDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="processing">Processing</SelectItem>
-                    <SelectItem value="shipped">Shipped</SelectItem>
-                    <SelectItem value="delivered">Delivered</SelectItem>
+                    {allowedStatuses.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {getStatusLabel(status as OrderStatus)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {order && allowedStatuses.length > 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    Orders progress: pending → processing → shipped → delivered (or cancelled)
+                  </p>
+                )}
               </div>
 
               {/* Notes */}

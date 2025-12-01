@@ -2,8 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { syncOrderAllocation, syncOrderFulfillment, syncOrderCancellation } from "@/lib/inventory/order-sync";
 
-export type OrderStatus = "draft" | "submitted" | "fulfilled" | "cancelled";
-export type OrderAction = "submit" | "fulfill" | "cancel";
+export type OrderStatus = "draft" | "submitted" | "fulfilled" | "delivered" | "cancelled";
+export type OrderAction = "submit" | "fulfill" | "deliver" | "cancel";
 
 export interface OrderWorkflowTransition {
   from: OrderStatus;
@@ -16,6 +16,7 @@ export interface OrderWorkflowTransition {
 const VALID_TRANSITIONS: OrderWorkflowTransition[] = [
   { from: "draft", to: "submitted", action: "submit" },
   { from: "submitted", to: "fulfilled", action: "fulfill" },
+  { from: "fulfilled", to: "delivered", action: "deliver" },
   { from: "draft", to: "cancelled", action: "cancel" },
   { from: "submitted", to: "cancelled", action: "cancel" },
 ];
@@ -267,11 +268,15 @@ export async function executeOrderTransition(
       // Consider adding a flag to the order to indicate sync failure
     }
   } else if (action === "fulfill") {
-    // Consume allocated stock when order is fulfilled
+    // Consume allocated stock when order is fulfilled (stock deduction happens here)
     const syncResult = await syncOrderFulfillment(orderId, userId);
     if (!syncResult.success) {
       console.error("Failed to sync inventory on order fulfillment:", syncResult.error);
     }
+  } else if (action === "deliver") {
+    // Deliver action is status-only - stock was already deducted at fulfillment
+    // This marks the order as received by customer (no inventory impact)
+    console.log(`Order ${orderId} marked as delivered`);
   } else if (action === "cancel") {
     // Release allocated stock when order is cancelled
     const syncResult = await syncOrderCancellation(orderId, userId, notes);

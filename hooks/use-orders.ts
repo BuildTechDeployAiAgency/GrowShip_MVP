@@ -295,25 +295,20 @@ export function useOrders({
       orderId: string;
       updates: Partial<Order>;
     }): Promise<Order> => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const response = await fetch(`/api/orders/${orderId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updates),
+      });
 
-      const { data: updatedOrder, error } = await supabase
-        .from("orders")
-        .update({
-          ...updates,
-          updated_by: user?.id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", orderId)
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to update order");
       }
 
-      return updatedOrder;
+      return await response.json();
     },
     onSuccess: (updatedOrder) => {
       if (updatedOrder) {

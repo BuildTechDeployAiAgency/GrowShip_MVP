@@ -4,7 +4,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { useRequireProfile } from "@/hooks/use-auth";
 import type { Product } from "@/types/products";
 import { createClient } from "@/lib/supabase/client";
@@ -90,32 +89,28 @@ export default function ProductDetailPage() {
 
   if (loading || loadingProduct) {
     return (
-      <EnhancedAuthProvider>
-        <ProtectedPage allowedStatuses={["approved"]}>
-          <MainLayout pageTitle="Product Details" pageSubtitle="Loading...">
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
-            </div>
-          </MainLayout>
-        </ProtectedPage>
-      </EnhancedAuthProvider>
+      <ProtectedPage allowedStatuses={["approved"]}>
+        <MainLayout pageTitle="Product Details" pageSubtitle="Loading...">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
+          </div>
+        </MainLayout>
+      </ProtectedPage>
     );
   }
 
   if (!product) {
     return (
-      <EnhancedAuthProvider>
-        <ProtectedPage allowedStatuses={["approved"]}>
-          <MainLayout pageTitle="Product Not Found" pageSubtitle="Product not found">
-            <div className="text-center py-12">
-              <p className="text-gray-500">Product not found</p>
-              <Button onClick={() => router.push("/products")} className="mt-4">
-                Back to Products
-              </Button>
-            </div>
-          </MainLayout>
-        </ProtectedPage>
-      </EnhancedAuthProvider>
+      <ProtectedPage allowedStatuses={["approved"]}>
+        <MainLayout pageTitle="Product Not Found" pageSubtitle="Product not found">
+          <div className="text-center py-12">
+            <p className="text-gray-500">Product not found</p>
+            <Button onClick={() => router.push("/products")} className="mt-4">
+              Back to Products
+            </Button>
+          </div>
+        </MainLayout>
+      </ProtectedPage>
     );
   }
 
@@ -127,11 +122,10 @@ export default function ProductDetailPage() {
   };
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle={product.product_name}
-          pageSubtitle={`SKU: ${product.sku}`}
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
+        pageTitle={product.product_name}
+        pageSubtitle={`SKU: ${product.sku}`}
           actions={
             <div className="flex gap-2">
               <Button
@@ -306,9 +300,8 @@ export default function ProductDetailPage() {
             }}
             product={product}
           />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+      </MainLayout>
+    </ProtectedPage>
   );
 }
 

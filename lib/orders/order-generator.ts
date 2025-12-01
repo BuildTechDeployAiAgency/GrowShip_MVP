@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { deductStock, shouldTriggerLowStockAlert } from "@/lib/inventory/stock-checker";
+import { syncOrderAllocation } from "@/lib/inventory/order-sync";
 import { PurchaseOrderLine } from "@/types/purchase-orders";
 
 interface OrderGenerationResult {
@@ -142,7 +142,7 @@ export async function createOrderFromLines(
       });
     }
 
-    // Create order header
+    // Create order header with "submitted" status so allocation sync runs
     const orderData = {
       order_number: `ORD-${Date.now()}`,
       order_date: new Date().toISOString(),
@@ -155,7 +155,7 @@ export async function createOrderFromLines(
       subtotal,
       total_amount: subtotal, // Simplified, could add tax/shipping
       currency: po.currency || "USD",
-      order_status: "pending",
+      order_status: "submitted", // Changed from "pending" to trigger allocation
       payment_status: "pending",
       created_by: userId,
       updated_by: userId,
@@ -172,11 +172,8 @@ export async function createOrderFromLines(
       return { success: false, error: "Failed to create order" };
     }
 
-    // Create order lines and deduct inventory
-    const lowStockAlerts: Array<{ product_id: string; sku: string; stock: number }> = [];
-
+    // Create order lines first (no immediate stock deduction)
     for (const line of lines) {
-      // Create order line
       const orderLineData = {
         order_id: order.id,
         source_po_line_id: line.id,
@@ -189,45 +186,24 @@ export async function createOrderFromLines(
       };
 
       await supabase.from("order_lines").insert(orderLineData);
+    }
 
-      // Deduct inventory if product exists
-      if (line.product_id) {
-        const deductResult = await deductStock(
-          line.product_id,
-          line.approved_qty
-        );
-
-        if (!deductResult.success) {
-          console.error(
-            `Failed to deduct stock for product ${line.product_id}:`,
-            deductResult.error
-          );
-        } else if (deductResult.newStock !== undefined) {
-          // Check if low stock alert should be triggered
-          const { data: product } = await supabase
-            .from("products")
-            .select("reorder_level")
-            .eq("id", line.product_id)
-            .single();
-
-          if (
-            product &&
-            shouldTriggerLowStockAlert(deductResult.newStock, product.reorder_level)
-          ) {
-            lowStockAlerts.push({
-              product_id: line.product_id,
-              sku: line.sku,
-              stock: deductResult.newStock,
-            });
-          }
-        }
-      }
+    // Allocate stock using the standard order sync (creates inventory transactions)
+    // This reserves stock (increases allocated_stock) without deducting on-hand yet
+    const allocationResult = await syncOrderAllocation(order.id, userId, true);
+    
+    if (!allocationResult.success) {
+      console.error(
+        `Failed to allocate stock for order ${order.id}:`,
+        allocationResult.error
+      );
+      // Note: Order is still created, but allocation failed - logged for investigation
     }
 
     return {
       success: true,
       orderId: order.id,
-      lowStockAlerts: lowStockAlerts.length > 0 ? lowStockAlerts : undefined,
+      // Low stock alerts are now handled by syncOrderAllocation internally
     };
   } catch (error) {
     console.error("Error creating order from lines:", error);

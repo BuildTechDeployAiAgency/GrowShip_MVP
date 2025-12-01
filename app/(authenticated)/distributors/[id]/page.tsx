@@ -4,7 +4,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { Distributor } from "@/hooks/use-distributors";
 import { createClient } from "@/lib/supabase/client";
@@ -122,9 +121,8 @@ export default function DistributorDetailPage() {
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
           pageTitle=""
           pageSubtitle=""
           actions={
@@ -225,8 +223,7 @@ export default function DistributorDetailPage() {
             }}
             distributor={distributor}
           />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+      </MainLayout>
+    </ProtectedPage>
   );
 }
