@@ -39,6 +39,7 @@ export interface ParsedOrderItem {
   discount?: number;
   tax_rate?: number;
   total?: number;
+    notes?: string;
 }
 
 export interface ParsedOrder {
