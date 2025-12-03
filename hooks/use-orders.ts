@@ -274,6 +274,35 @@ export function useOrders({
         throw new Error(createError.message || "Failed to create order");
       }
 
+      // Create order_lines from the items array to support shipments/fulfilment
+      if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+        const orderLinesPayload = order.items.map((item: any) => ({
+          order_id: newOrder.id,
+          product_id: item.product_id || null,
+          sku: item.sku || "",
+          product_name: item.product_name || item.name || "",
+          quantity: item.quantity || 0,
+          unit_price: item.unit_price || item.price || 0,
+          discount: item.discount || 0,
+          tax: item.tax || item.tax_rate || 0,
+          currency: order.currency || "USD",
+          notes: item.notes || null,
+          shipped_quantity: 0,
+        }));
+
+        const { error: linesError } = await supabase
+          .from("order_lines")
+          .insert(orderLinesPayload);
+
+        if (linesError) {
+          console.error("Error creating order lines:", linesError);
+          // Don't fail the entire operation, order was created successfully
+          // The order_lines can be backfilled later if needed
+        } else {
+          console.log(`Created ${orderLinesPayload.length} order lines for order ${newOrder.id}`);
+        }
+      }
+
       return newOrder;
     },
     onSuccess: (newOrder) => {
