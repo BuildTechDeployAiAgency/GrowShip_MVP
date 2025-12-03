@@ -32,6 +32,7 @@ export interface ValidationError {
 
 export interface ParsedOrderItem {
   sku: string;
+    product_id?: string;
   product_name?: string;
   quantity: number;
   unit_price: number;
