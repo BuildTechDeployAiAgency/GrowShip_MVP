@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { useManufacturers, Manufacturer, ManufacturerStatus } from "@/hooks/use-manufacturers";
 import { ManufacturerFormDialog } from "@/components/manufacturers/manufacturer-form-dialog";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
+import { formatCurrency } from "@/lib/formatters";
 
 const statusColors: Record<ManufacturerStatus, string> = {
   active: "bg-green-100 text-green-800",
@@ -71,13 +72,6 @@ function ManufacturerDetailContent() {
       await deleteManufacturer(manufacturer.id);
       router.push("/manufacturers");
     }
-  };
-
-  const formatCurrency = (amount: number, currency: string = "USD") => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency,
-    }).format(amount);
   };
 
   if (loading) {

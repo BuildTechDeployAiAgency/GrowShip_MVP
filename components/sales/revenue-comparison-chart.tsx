@@ -20,6 +20,7 @@ import {
   ResponsiveContainer,
   ComposedChart,
 } from "recharts";
+import { formatCurrency } from "@/lib/formatters";
 
 export function RevenueComparisonChart() {
   const { user } = useAuth();
@@ -71,10 +72,8 @@ export function RevenueComparisonChart() {
           <div className="text-right flex-shrink-0 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl px-4 py-3 border border-purple-100">
             <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
               {data && data.length > 0
-                ? `$${Math.max(
-                    ...data.map((d) => d.current || 0)
-                  ).toLocaleString()}`
-                : "$0"}
+                ? formatCurrency(Math.max(...data.map((d) => d.current || 0)))
+                : formatCurrency(0)}
             </p>
             <p className="text-xs font-medium text-gray-600">Peak Revenue</p>
           </div>
@@ -179,7 +178,7 @@ export function RevenueComparisonChart() {
                               {filters.year - 1}:
                             </span>
                             <span className="font-medium text-gray-900">
-                              ${prevVal.toLocaleString()}
+                              {formatCurrency(prevVal)}
                             </span>
                           </div>
                           <div className="flex items-center justify-between gap-4">
@@ -187,7 +186,7 @@ export function RevenueComparisonChart() {
                               {filters.year}:
                             </span>
                             <span className="font-medium text-gray-900">
-                              ${currVal.toLocaleString()}
+                              {formatCurrency(currVal)}
                             </span>
                           </div>
                           <div className="h-px bg-gray-100" />
@@ -200,7 +199,7 @@ export function RevenueComparisonChart() {
                                   : "text-red-600 font-medium"
                               }
                             >
-                              {deltaSign}${Math.abs(delta).toLocaleString()} (
+                              {deltaSign}{formatCurrency(Math.abs(delta))} (
                               {pctSign}
                               {Math.abs(pctChange).toFixed(1)}%)
                             </span>

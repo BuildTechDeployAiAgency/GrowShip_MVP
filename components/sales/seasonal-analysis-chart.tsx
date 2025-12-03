@@ -19,6 +19,7 @@ import {
   Legend,
 } from "recharts";
 import { Calendar, TrendingUp, TrendingDown } from "lucide-react";
+import { formatCurrency, formatNumber } from "@/lib/formatters";
 
 export function SeasonalAnalysisChart() {
   const { user } = useAuth();
@@ -324,14 +325,13 @@ export function SeasonalAnalysisChart() {
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Revenue:</span>
                         <span className="font-semibold">
-                          {quarter.revenue_display ||
-                            `$${(quarter.revenue / 1000).toFixed(0)}k`}
+                          {formatCurrency(quarter.revenue)}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Orders:</span>
                         <span className="font-semibold">
-                          {quarter.orders.toLocaleString()}
+                          {formatNumber(quarter.orders)}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">

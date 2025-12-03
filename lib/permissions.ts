@@ -66,7 +66,7 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     can_manage_brands: false,
     can_view_financials: true,
     can_manage_products: false,
-    can_manage_orders: true,
+    can_manage_orders: false,
   },
   distributor_finance: {
     level: 3,
@@ -77,7 +77,7 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     can_manage_brands: false,
     can_view_financials: true,
     can_manage_products: false,
-    can_manage_orders: true,
+    can_manage_orders: false,
   },
   distributor_manager: {
     level: 3,
@@ -88,7 +88,7 @@ export const ROLE_PERMISSIONS: Record<UserRoleName, PermissionLevel> = {
     can_manage_brands: false,
     can_view_financials: false,
     can_manage_products: false,
-    can_manage_orders: true,
+    can_manage_orders: false,
   },
   distributor_user: {
     level: 4,
@@ -318,5 +318,4 @@ export function getRoleDisplayName(roleName: UserRoleName): string {
 export function getRoleDescription(roleName: UserRoleName): string {
   return ROLE_PERMISSIONS[roleName]?.description || "";
 }
-
 

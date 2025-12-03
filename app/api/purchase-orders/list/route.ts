@@ -2,37 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { PurchaseOrderFilters } from "@/types/purchase-orders";
 
-const PURCHASE_ORDER_COLUMNS = [
-  "id",
-  "po_number",
-  "po_date",
-  "user_id",
-  "brand_id",
-  "distributor_id",
-  "supplier_id",
-  "supplier_name",
-  "supplier_email",
-  "supplier_phone",
-  "subtotal",
-  "tax_total",
-  "shipping_cost",
-  "total_amount",
-  "currency",
-  "po_status",
-  "payment_status",
-  "expected_delivery_date",
-  "actual_delivery_date",
-  "submitted_at",
-  "approved_at",
-  "approved_by",
-  "rejection_reason",
-  "notes",
-  "tags",
-  "created_at",
-  "updated_at",
-  "created_by",
-  "updated_by",
-].join(", ");
+// Select all PO columns plus the distributor name via a join
+const PURCHASE_ORDER_COLUMNS_WITH_DISTRIBUTOR = `
+  id,
+  po_number,
+  po_date,
+  user_id,
+  brand_id,
+  distributor_id,
+  supplier_id,
+  supplier_name,
+  supplier_email,
+  supplier_phone,
+  subtotal,
+  tax_total,
+  shipping_cost,
+  total_amount,
+  currency,
+  po_status,
+  payment_status,
+  expected_delivery_date,
+  actual_delivery_date,
+  submitted_at,
+  approved_at,
+  approved_by,
+  rejection_reason,
+  notes,
+  tags,
+  created_at,
+  updated_at,
+  created_by,
+  updated_by,
+  distributors(name)
+`;
 
 interface PurchaseOrdersListRequest {
   page?: number;
@@ -105,9 +107,10 @@ export async function POST(request: NextRequest) {
 
   // Use exact count - with proper indexes, this should be fast
   // The new indexes in migration 039 optimize count queries
+  // Join with distributors table to get the actual distributor name
   let query = supabase
     .from("purchase_orders")
-    .select(PURCHASE_ORDER_COLUMNS, { count: "exact" });
+    .select(PURCHASE_ORDER_COLUMNS_WITH_DISTRIBUTOR, { count: "exact" });
 
   // Apply filters in order of selectivity (most selective first)
   // This helps the query planner choose the best index
@@ -166,9 +169,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Post-process data to use the actual distributor name instead of "Your Distributor Account"
+  const processedData = (data ?? []).map((po: any) => {
+    // If there's a joined distributor with a name, use it as supplier_name
+    const distributorName = po.distributors?.name;
+    if (distributorName) {
+      return {
+        ...po,
+        supplier_name: distributorName,
+        distributors: undefined, // Remove the nested object from response
+      };
+    }
+    // Remove the distributors nested object even if no name
+    const { distributors, ...rest } = po;
+    return rest;
+  });
+
   return NextResponse.json({
     ok: true,
-    data: data ?? [],
+    data: processedData,
     totalCount: count ?? 0,
     page,
     pageSize,

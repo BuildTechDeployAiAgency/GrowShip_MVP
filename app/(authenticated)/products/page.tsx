@@ -1,43 +1,22 @@
-"use client";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { ProductsPageClient } from "./products-page-client";
 
-import { useState, useEffect } from "react";
-import { MainLayout } from "@/components/layout/main-layout";
-import { useRequireProfile } from "@/hooks/use-auth";
-import { ProductsList } from "@/components/products/products-list";
-import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
+// Server component - handles auth check on server
+export default async function ProductsPage() {
+  const supabase = await createClient();
+  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-export default function ProductsPage() {
-  const { user, profile, loading } = useRequireProfile();
-  const [mounted, setMounted] = useState(false);
-
-  // Prevent hydration mismatch by only rendering after client mount
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted || loading) {
-    return (
-      <MainLayout pageTitle="Products" pageSubtitle="Loading...">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
-        </div>
-      </MainLayout>
-    );
+  // Redirect to home if not authenticated
+  if (!user) {
+    redirect("/");
   }
 
-  return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle="Products"
-          pageSubtitle="Manage your product catalog and inventory"
-        >
-          <ProductsList />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
-  );
+  // Server-verified auth, render client component
+  return <ProductsPageClient />;
 }
 
 

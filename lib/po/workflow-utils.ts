@@ -11,14 +11,14 @@ export interface WorkflowTransition {
 
 const VALID_TRANSITIONS: WorkflowTransition[] = [
   { from: "draft", to: "submitted", action: "submit" },
-  { from: "submitted", to: "approved", action: "approve", requiresApproval: true },
-  { from: "submitted", to: "rejected", action: "reject", requiresApproval: true },
+  { from: "submitted", to: "approved", action: "approve", requiresApproval: true, allowedRoles: ["super_admin", "brand_admin"] },
+  { from: "submitted", to: "rejected", action: "reject", requiresApproval: true, allowedRoles: ["super_admin", "brand_admin"] },
   { from: "approved", to: "ordered", action: "order" },
   { from: "ordered", to: "received", action: "receive" },
-  { from: "draft", to: "cancelled", action: "cancel" },
-  { from: "submitted", to: "cancelled", action: "cancel" },
-  { from: "approved", to: "cancelled", action: "cancel" },
-  { from: "ordered", to: "cancelled", action: "cancel" },
+  { from: "draft", to: "cancelled", action: "cancel", allowedRoles: ["super_admin", "brand_admin"] },
+  { from: "submitted", to: "cancelled", action: "cancel", allowedRoles: ["super_admin", "brand_admin"] },
+  { from: "approved", to: "cancelled", action: "cancel", allowedRoles: ["super_admin", "brand_admin"] },
+  { from: "ordered", to: "cancelled", action: "cancel", allowedRoles: ["super_admin", "brand_admin"] },
 ];
 
 /**

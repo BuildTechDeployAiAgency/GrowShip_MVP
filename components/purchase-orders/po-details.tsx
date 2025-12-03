@@ -13,12 +13,21 @@ import {
   Edit,
   Printer,
   Download,
-  Plus
+  Plus,
+  CheckCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
 import type { PurchaseOrder, POStatus, PaymentStatus } from "@/types/purchase-orders";
 import { Distributor } from "@/hooks/use-distributors";
@@ -26,6 +35,9 @@ import { format } from "date-fns";
 import { toast } from "react-toastify";
 import { POFormDialog } from "./po-form-dialog";
 import { POHistoryTimeline } from "./po-history-timeline";
+import { POApprovalDialog } from "./po-approval-dialog";
+import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
+import { formatCurrency } from "@/lib/formatters";
 
 const statusColors: Record<POStatus, string> = {
   draft: "bg-gray-100 text-gray-800",
@@ -60,13 +72,22 @@ interface RelatedOrder {
 
 export function PODetails({ poId }: PODetailsProps) {
   const router = useRouter();
+  const { profile } = useEnhancedAuth();
   const [po, setPO] = useState<PurchaseOrder | null>(null);
   const [distributor, setDistributor] = useState<Distributor | null>(null);
   const [relatedOrders, setRelatedOrders] = useState<RelatedOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+  const [showCreateOrderPrompt, setShowCreateOrderPrompt] = useState(false);
   const [creatingOrder, setCreatingOrder] = useState(false);
+
+  // Only Super Admin and Brand Admin can approve POs
+  const canApprovePO = profile?.role_name === "super_admin" || profile?.role_name === "brand_admin";
+  
+  // Only Super Admin and Brand Admin can create orders from POs
+  const canCreateOrder = profile?.role_name === "super_admin" || profile?.role_name === "brand_admin";
 
   const fetchPODetails = async () => {
     try {
@@ -198,6 +219,29 @@ export function PODetails({ poId }: PODetailsProps) {
     );
   }
 
+  const calculateTotals = () => {
+    if (!po) return { subtotal: 0, total: 0, tax: 0, shipping: 0 };
+    
+    let subtotal = po.subtotal || 0;
+    // If subtotal is 0 but we have items with value, calculate it
+    if (subtotal === 0 && po.items && po.items.length > 0) {
+      subtotal = po.items.reduce((sum: number, item: any) => {
+        const quantity = item.quantity || 0;
+        const price = item.unit_price || item.price || 0;
+        return sum + (quantity * price);
+      }, 0);
+    }
+    
+    const tax = po.tax_total || 0;
+    const shipping = po.shipping_cost || 0;
+    // If total is 0 but we have calculated subtotal, use that
+    const total = (po.total_amount && po.total_amount > 0) ? po.total_amount : (subtotal + tax + shipping);
+    
+    return { subtotal, tax, shipping, total };
+  };
+
+  const totals = calculateTotals();
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -232,7 +276,17 @@ export function PODetails({ poId }: PODetailsProps) {
             <Edit className="h-4 w-4 mr-2" />
             Edit PO
           </Button>
-          {(po.po_status === "approved" || po.po_status === "ordered") && (
+          {canApprovePO && po.po_status === "submitted" && (
+            <Button 
+              size="sm" 
+              onClick={() => setShowApprovalDialog(true)}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Approve Purchase Order
+            </Button>
+          )}
+          {canCreateOrder && (po.po_status === "approved" || po.po_status === "ordered") && (
             <Button 
               size="sm" 
               onClick={handleCreateOrder}
@@ -276,7 +330,7 @@ export function PODetails({ poId }: PODetailsProps) {
             <div>
               <p className="text-sm text-gray-500">Total Amount</p>
               <p className="font-medium text-teal-600">
-                {po.currency || "USD"} {po.total_amount?.toFixed(2) || "0.00"}
+                {formatCurrency(totals.total, po.currency)}
               </p>
             </div>
           </div>
@@ -321,10 +375,10 @@ export function PODetails({ poId }: PODetailsProps) {
                         <td className="px-4 py-3 text-sm">{item.product_name || item.name}</td>
                         <td className="px-4 py-3 text-sm text-right">{item.quantity}</td>
                         <td className="px-4 py-3 text-sm text-right">
-                          {po.currency || "USD"} {item.unit_price?.toFixed(2) || item.price?.toFixed(2) || "0.00"}
+                          {formatCurrency(item.unit_price || item.price, po.currency)}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-medium">
-                          {po.currency || "USD"} {item.total?.toFixed(2) || (item.quantity * (item.unit_price || item.price || 0)).toFixed(2)}
+                          {formatCurrency(item.total || (item.quantity * (item.unit_price || item.price || 0)), po.currency)}
                         </td>
                       </tr>
                     ))
@@ -344,24 +398,24 @@ export function PODetails({ poId }: PODetailsProps) {
             <div className="space-y-2 max-w-sm ml-auto">
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal:</span>
-                <span className="font-medium">{po.currency || "USD"} {po.subtotal?.toFixed(2) || "0.00"}</span>
+                <span className="font-medium">{formatCurrency(totals.subtotal, po.currency)}</span>
               </div>
-              {(po.tax_total ?? 0) > 0 && (
+              {(totals.tax > 0) && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">Tax:</span>
-                  <span className="font-medium">{po.currency || "USD"} {(po.tax_total ?? 0).toFixed(2)}</span>
+                  <span className="font-medium">{formatCurrency(totals.tax, po.currency)}</span>
                 </div>
               )}
-              {(po.shipping_cost ?? 0) > 0 && (
+              {(totals.shipping > 0) && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping:</span>
-                  <span className="font-medium">{po.currency || "USD"} {(po.shipping_cost ?? 0).toFixed(2)}</span>
+                  <span className="font-medium">{formatCurrency(totals.shipping, po.currency)}</span>
                 </div>
               )}
               <Separator />
               <div className="flex justify-between text-lg font-bold">
                 <span className="text-teal-600">Total:</span>
-                <span className="text-teal-600">{po.currency || "USD"} {po.total_amount?.toFixed(2) || "0.00"}</span>
+                <span className="text-teal-600">{formatCurrency(totals.total, po.currency)}</span>
               </div>
             </div>
           </CardContent>
@@ -378,18 +432,19 @@ export function PODetails({ poId }: PODetailsProps) {
           <CardContent className="space-y-3">
             <div>
               <p className="text-sm text-gray-500">Name</p>
-              <p className="font-medium">{po.supplier_name || "N/A"}</p>
+              {/* Prioritize distributor name over supplier_name to avoid showing "Your Distributor Account" */}
+              <p className="font-medium">{distributor?.name || po.supplier_name || "N/A"}</p>
             </div>
-            {po.supplier_email && (
+            {(distributor?.contact_email || po.supplier_email) && (
               <div>
                 <p className="text-sm text-gray-500">Email</p>
-                <p className="font-medium">{po.supplier_email}</p>
+                <p className="font-medium">{distributor?.contact_email || po.supplier_email}</p>
               </div>
             )}
-            {po.supplier_phone && (
+            {(distributor?.contact_phone || po.supplier_phone) && (
               <div>
                 <p className="text-sm text-gray-500">Phone</p>
-                <p className="font-medium">{po.supplier_phone}</p>
+                <p className="font-medium">{distributor?.contact_phone || po.supplier_phone}</p>
               </div>
             )}
           </CardContent>
@@ -451,7 +506,7 @@ export function PODetails({ poId }: PODetailsProps) {
                   </div>
                   <div className="text-right">
                     <p className="font-medium">
-                      {order.currency || "USD"} {order.total_amount.toFixed(2)}
+                      {formatCurrency(order.total_amount, order.currency)}
                     </p>
                     <Badge className="mt-1">{order.order_status}</Badge>
                   </div>
@@ -500,6 +555,42 @@ export function PODetails({ poId }: PODetailsProps) {
           fetchPODetails();
         }}
       />
+
+      {/* Approval Dialog */}
+      <POApprovalDialog
+        open={showApprovalDialog}
+        onClose={() => setShowApprovalDialog(false)}
+        po={po}
+        action="approve"
+        onSuccess={() => {
+          setShowApprovalDialog(false);
+          fetchPODetails();
+          setShowCreateOrderPrompt(true);
+        }}
+      />
+
+      {/* Create Order Confirmation Dialog */}
+      <Dialog open={showCreateOrderPrompt} onOpenChange={setShowCreateOrderPrompt}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Related Order?</DialogTitle>
+            <DialogDescription>
+              The purchase order has been approved. Would you like to create a new sales order from this purchase order now?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateOrderPrompt(false)}>
+              Maybe Later
+            </Button>
+            <Button onClick={() => {
+              setShowCreateOrderPrompt(false);
+              handleCreateOrder();
+            }}>
+              Create Order
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

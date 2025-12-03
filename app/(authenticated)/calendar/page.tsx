@@ -4,7 +4,6 @@ import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { WeekView } from "@/components/calendar/week-view";
 import { EventList } from "@/components/calendar/event-list";
@@ -130,12 +129,11 @@ export default function CalendarPage() {
   };
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle="Calendar"
-          pageSubtitle="View and manage events and deadlines"
-          actions={
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
+        pageTitle="Calendar"
+        pageSubtitle="View and manage events and deadlines"
+        actions={
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -265,8 +263,7 @@ export default function CalendarPage() {
             onOpenChange={setIsDetailDialogOpen}
             onUpdateEvent={handleUpdateEvent}
           />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+      </MainLayout>
+    </ProtectedPage>
   );
 }

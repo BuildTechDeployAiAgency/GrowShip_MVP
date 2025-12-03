@@ -14,6 +14,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { DemandForecast } from "@/hooks/use-forecasting";
+import { formatCurrency } from "@/lib/formatters";
 
 interface ForecastChartProps {
   forecasts: Array<DemandForecast & {
@@ -119,7 +120,7 @@ export function ForecastChart({
                   return [`${value.toFixed(1)}%`, "Variance"];
                 }
                 if (metric === "revenue") {
-                  return [`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, name === "forecasted" ? "Forecasted" : "Actual"];
+                  return [formatCurrency(value), name === "forecasted" ? "Forecasted" : "Actual"];
                 }
                 return [value.toLocaleString(), name === "forecasted" ? "Forecasted" : "Actual"];
               }}

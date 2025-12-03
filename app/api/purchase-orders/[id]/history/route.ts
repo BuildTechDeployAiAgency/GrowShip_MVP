@@ -17,7 +17,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     // Get PO to verify access
     const { data: po, error: poError } = await supabase
       .from("purchase_orders")
-      .select("brand_id")
+      .select("brand_id, distributor_id")
       .eq("id", id)
       .single();
 
@@ -28,15 +28,19 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       );
     }
 
-    // Get user profile to check brand access
+    // Get user profile to check brand/distributor access
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role_name, brand_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 
     const isSuperAdmin = profile?.role_name === "super_admin";
-    if (!isSuperAdmin && profile?.brand_id !== po.brand_id) {
+    const isBrandMatch = profile?.brand_id === po.brand_id;
+    const isDistributorMatch = profile?.distributor_id && profile.distributor_id === po.distributor_id;
+    
+    // Allow access if super admin, brand matches, or distributor matches (for distributor users)
+    if (!isSuperAdmin && !isBrandMatch && !isDistributorMatch) {
       return NextResponse.json(
         { error: "You do not have access to this purchase order" },
         { status: 403 }
@@ -46,15 +50,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     // Get approval history
     const { data: history, error: historyError } = await supabase
       .from("po_approval_history")
-      .select(`
-        *,
-        actor:user_profiles!po_approval_history_actor_id_fkey (
-          user_id,
-          contact_name,
-          company_name,
-          email
-        )
-      `)
+      .select("*")
       .eq("po_id", id)
       .order("created_at", { ascending: true });
 
@@ -66,7 +62,28 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       );
     }
 
-    return NextResponse.json({ history: history || [] });
+    // Manually fetch actor profiles to avoid FK issues
+    const actorIds = Array.from(new Set(history.map((h: any) => h.actor_id)));
+    
+    let historyWithActors = history;
+    
+    if (actorIds.length > 0) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from("user_profiles")
+        .select("user_id, contact_name, company_name, email")
+        .in("user_id", actorIds);
+        
+      if (!profilesError && profiles) {
+        const profileMap = new Map(profiles.map(p => [p.user_id, p]));
+        
+        historyWithActors = history.map((h: any) => ({
+          ...h,
+          actor: profileMap.get(h.actor_id) || null
+        }));
+      }
+    }
+
+    return NextResponse.json({ history: historyWithActors || [] });
   } catch (error: any) {
     console.error("Unexpected error:", error);
     return NextResponse.json(

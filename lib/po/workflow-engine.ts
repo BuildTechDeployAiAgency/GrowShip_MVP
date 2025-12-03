@@ -65,16 +65,17 @@ export async function checkPermission(
     return { allowed: false, reason: "Invalid transition" };
   }
 
+  // Check role-based permissions if allowedRoles is defined
+  if (transition.allowedRoles && transition.allowedRoles.length > 0) {
+    if (!isSuperAdmin && !transition.allowedRoles.includes(profile.role_name)) {
+      return { allowed: false, reason: "You do not have permission to perform this action on purchase orders" };
+    }
+  }
+
   if (transition.requiresApproval) {
     // Check if user is not the creator (can't approve own PO)
     if (po.user_id === userId) {
       return { allowed: false, reason: "You cannot approve your own purchase order" };
-    }
-
-    // Check role permissions (could be enhanced with role-based checks)
-    const allowedRoles = transition.allowedRoles || ["brand_admin", "super_admin"];
-    if (!isSuperAdmin && !allowedRoles.includes(profile.role_name)) {
-      return { allowed: false, reason: "You do not have permission to approve purchase orders" };
     }
   }
 
@@ -152,7 +153,14 @@ export async function executeTransition(
   });
 
   // Handle inventory synchronization based on action
-  if (action === "receive") {
+  if (action === "approve") {
+    // Sync inventory when PO is approved
+    const syncResult = await syncPOApproval(poId, userId);
+    if (!syncResult.success) {
+      console.error("Failed to sync inventory on PO approval:", syncResult.error);
+      // Don't fail the transition, but log the error
+    }
+  } else if (action === "receive") {
     // Sync inventory when PO is received
     const syncResult = await syncPOReceipt(poId, userId);
     if (!syncResult.success) {

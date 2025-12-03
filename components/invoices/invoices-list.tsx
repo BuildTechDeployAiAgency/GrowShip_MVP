@@ -33,6 +33,7 @@ import { useInvoices, Invoice, PaymentStatus } from "@/hooks/use-invoices";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { format } from "date-fns";
 import { InvoiceFormDialog } from "./invoice-form-dialog";
+import { formatCurrency } from "@/lib/formatters";
 
 const paymentColors: Record<PaymentStatus, string> = {
   pending: "bg-gray-100 text-gray-800",
@@ -233,7 +234,7 @@ export function InvoicesList({ onCreateClick }: InvoicesListProps) {
                           : "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {invoice.currency || "USD"} {invoice.total_amount?.toFixed(2) || "0.00"}
+                        {formatCurrency(invoice.total_amount, invoice.currency)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge className={paymentColors[invoice.payment_status]}>

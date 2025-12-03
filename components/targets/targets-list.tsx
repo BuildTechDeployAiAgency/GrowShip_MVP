@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { TargetFormDialog } from "./target-form-dialog";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/formatters";
 
 export function TargetsList() {
   const { profile } = useEnhancedAuth();
@@ -125,10 +126,7 @@ export function TargetsList() {
                     <TableCell>{target.target_quantity?.toLocaleString() || "-"}</TableCell>
                     <TableCell>
                       {target.target_revenue
-                        ? `$${target.target_revenue.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}`
+                        ? formatCurrency(target.target_revenue)
                         : "-"}
                     </TableCell>
                     <TableCell>

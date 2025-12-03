@@ -27,13 +27,15 @@ import type {
   PaymentStatus,
   PurchaseOrderLine,
 } from "@/types/purchase-orders";
-import { useDistributors } from "@/hooks/use-distributors";
+import { useDistributors, type Distributor } from "@/hooks/use-distributors";
 import { useProducts } from "@/hooks/use-products";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
+import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-toastify";
 import { Plus, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProductLookup } from "@/components/products/product-lookup";
 
 interface POFormDialogProps {
   open: boolean;
@@ -95,6 +97,7 @@ export function POFormDialog({
 }: POFormDialogProps) {
   const { profile, canPerformAction } = useEnhancedAuth();
   const isSuperAdmin = canPerformAction("view_all_users");
+  const isDistributorAdmin = profile?.role_name?.startsWith("distributor_");
   
   const { createPurchaseOrder, updatePurchaseOrder } = usePurchaseOrders({
     searchTerm: "",
@@ -104,14 +107,14 @@ export function POFormDialog({
       dateRange: "all",
     },
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
-    distributorId: profile?.role_name?.startsWith("distributor_") ? profile.distributor_id : undefined,
+    distributorId: isDistributorAdmin ? profile?.distributor_id : undefined,
   });
 
-  const { distributors } = useDistributors({
+  const { distributors, loading: distributorsLoading } = useDistributors({
     searchTerm: "",
     filters: { status: "all" },
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
-    distributorId: profile?.role_name?.startsWith("distributor_") ? profile.distributor_id : undefined,
+    distributorId: isDistributorAdmin ? profile?.distributor_id : undefined,
     isSuperAdmin,
   });
 
@@ -163,6 +166,77 @@ export function POFormDialog({
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
+  
+  // State to store the current distributor details for Distributor Admin users
+  const [currentDistributor, setCurrentDistributor] = useState<Distributor | null>(null);
+
+  // For Distributor Admin users, fetch the distributor directly
+  // This bypasses any caching issues with the useDistributors hook
+  useEffect(() => {
+    if (!isDistributorAdmin || !open || !profile?.distributor_id) {
+      return;
+    }
+
+
+    const fetchDistributor = async () => {
+      try {
+        const supabase = createClient();
+        let query = supabase
+          .from("distributors")
+          .select("*")
+          .eq("id", profile.distributor_id!);
+
+        if (profile.brand_id) {
+          query = query.eq("brand_id", profile.brand_id);
+        }
+
+        const { data, error } = await query.limit(1).maybeSingle();
+
+        if (error) {
+          // Try fallback to hook data
+          if (distributors.length > 0) {
+            const distributor = distributors.find(d => d.id === profile.distributor_id) || distributors[0];
+            setCurrentDistributor(distributor);
+          }
+          return;
+        }
+
+        if (data) {
+          setCurrentDistributor(data as Distributor);
+        } else {
+          // Try fallback to hook data
+          if (distributors.length > 0) {
+            const distributor = distributors[0];
+            setCurrentDistributor(distributor);
+          } else {
+            // Create a minimal distributor object with the ID
+            // This allows the form to work even if RLS blocks the query
+            // Use the user's company name or contact name as a fallback
+            const fallbackName = profile.company_name || profile.contact_name || "Distributor";
+            setCurrentDistributor({
+              id: profile.distributor_id!,
+              name: fallbackName,
+              brand_id: profile.brand_id || "",
+              contact_email: profile.email || "",
+              contact_phone: "",
+              contact_name: profile.contact_name || "",
+              code: "",
+              status: "active",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            } as Distributor);
+          }
+        }
+      } catch (err) {
+        // Silent catch - fallback will be used
+      }
+    };
+
+    // Only fetch if we don't have currentDistributor yet
+    if (!currentDistributor) {
+      fetchDistributor();
+    }
+  }, [isDistributorAdmin, profile?.distributor_id, profile?.brand_id, open, distributors, currentDistributor]);
 
   // Update brand_id when profile changes
   useEffect(() => {
@@ -208,13 +282,24 @@ export function POFormDialog({
       });
     } else if (open && !po) {
       // Creating new PO - reset to defaults
+      const initialDistributorId = isDistributorAdmin && profile?.distributor_id 
+        ? profile.distributor_id 
+        : undefined;
+
+      const initialBrandId = isDistributorAdmin && profile?.brand_id
+        ? profile.brand_id
+        : (profile?.brand_id || "");
+
+      // For distributor admin, use currentDistributor data if available
+      const distributorData = isDistributorAdmin && currentDistributor ? currentDistributor : null;
+
       setFormData({
-        supplier_name: "",
-        supplier_email: "",
-        supplier_phone: "",
+        supplier_name: distributorData?.name || "",
+        supplier_email: distributorData?.contact_email || "",
+        supplier_phone: distributorData?.contact_phone || "",
         po_date: todayDate,
-        distributor_id: undefined,
-        brand_id: profile?.brand_id || "",
+        distributor_id: initialDistributorId,
+        brand_id: distributorData?.brand_id || initialBrandId,
         po_status: "draft",
         payment_status: "pending",
         items: [],
@@ -241,7 +326,7 @@ export function POFormDialog({
       setSelectedProductId("");
       setActiveTab("details");
     }
-  }, [open, po, todayDate, profile?.brand_id]);
+  }, [open, po, todayDate, profile?.brand_id, isDistributorAdmin, profile?.distributor_id, currentDistributor]);
 
   // Calculate totals when items change
   useEffect(() => {
@@ -254,6 +339,60 @@ export function POFormDialog({
       total_amount: total,
     }));
   }, [formData.items, formData.tax_total, formData.shipping_cost]);
+
+  // Auto-populate fields when distributor is selected or loaded
+  // This effect specifically handles the case when currentDistributor is loaded for Distributor Admin
+  useEffect(() => {
+    // For Distributor Admin, always populate from currentDistributor when it becomes available
+    if (isDistributorAdmin && currentDistributor && open && !po) {
+      // Always set the supplier info from currentDistributor for distributor admin users
+      setFormData((prev) => ({
+        ...prev,
+        distributor_id: currentDistributor.id,
+        supplier_name: currentDistributor.name,
+        supplier_email: currentDistributor.contact_email,
+        supplier_phone: currentDistributor.contact_phone,
+        brand_id: currentDistributor.brand_id || prev.brand_id,
+      }));
+      return;
+    }
+
+    // For Distributor Admin without currentDistributor, try to use distributors from hook
+    if (isDistributorAdmin && !currentDistributor && distributors.length > 0 && open && !po) {
+      const firstDistributor = distributors[0];
+      console.log("[POFormDialog] Auto-populating from distributors hook (fallback):", firstDistributor.name);
+      setCurrentDistributor(firstDistributor);
+      setFormData((prev) => ({
+        ...prev,
+        distributor_id: firstDistributor.id,
+        supplier_name: firstDistributor.name,
+        supplier_email: firstDistributor.contact_email,
+        supplier_phone: firstDistributor.contact_phone,
+        brand_id: firstDistributor.brand_id || prev.brand_id,
+      }));
+      return;
+    }
+
+    // For non-distributor users, use the distributors list
+    if (formData.distributor_id && distributors.length > 0 && !isDistributorAdmin) {
+      // Only auto-populate if fields are empty (to avoid overwriting user edits)
+      if (!formData.supplier_name) {
+        const selectedDistributor = distributors.find(
+          (d) => d.id === formData.distributor_id
+        );
+        
+        if (selectedDistributor) {
+          setFormData((prev) => ({
+            ...prev,
+            supplier_name: selectedDistributor.name,
+            supplier_email: selectedDistributor.contact_email,
+            supplier_phone: selectedDistributor.contact_phone,
+            brand_id: selectedDistributor.brand_id || prev.brand_id, // Ensure brand_id is set
+          }));
+        }
+      }
+    }
+  }, [formData.distributor_id, distributors, isDistributorAdmin, currentDistributor, open, po]);
 
   // Handle distributor selection - auto-populate purchaser fields
   const handleDistributorSelect = (distributorId: string) => {
@@ -279,6 +418,26 @@ export function POFormDialog({
 
   // Handle product selection
   const handleProductSelect = (productId: string) => {
+    setSelectedProductId(productId);
+    
+    if (!productId || productId === "manual") {
+      // Clear fields if no product selected or manual entry
+      if (productId === "manual") {
+        setCurrentItem({
+          id: "",
+          sku: "",
+          product_name: "",
+          product_id: undefined,
+          quantity: 1,
+          unit_price: 0,
+          total: 0,
+          currency: formData.currency,
+          notes: "",
+        });
+      }
+      return;
+    }
+    
     const product = products.find((p) => p.id === productId);
     if (product) {
       setCurrentItem({
@@ -289,7 +448,6 @@ export function POFormDialog({
         unit_price: product.unit_price || 0,
         currency: product.currency || "USD",
       });
-      setSelectedProductId(productId);
     }
   };
 
@@ -339,11 +497,20 @@ export function POFormDialog({
     }));
   };
 
-  // Handle form submission
+    // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.distributor_id) {
+    // For Distributor Admin, ensure we have the correct IDs from profile if missing
+    const effectiveDistributorId = isDistributorAdmin && profile?.distributor_id 
+      ? profile.distributor_id 
+      : formData.distributor_id;
+
+    const effectiveBrandId = isDistributorAdmin && profile?.brand_id
+      ? profile.brand_id
+      : formData.brand_id;
+
+    if (!effectiveDistributorId) {
       toast.error("Please select a distributor");
       setActiveTab("supplier");
       return;
@@ -369,8 +536,8 @@ export function POFormDialog({
         supplier_email: formData.supplier_email || undefined,
         supplier_phone: formData.supplier_phone || undefined,
         po_date: formData.po_date,
-        distributor_id: formData.distributor_id || undefined,
-        brand_id: formData.brand_id,
+        distributor_id: effectiveDistributorId,
+        brand_id: effectiveBrandId,
         po_status: formData.po_status,
         payment_status: formData.payment_status,
         items: formData.items.map((item) => ({
@@ -503,12 +670,14 @@ export function POFormDialog({
                       min="0"
                       step="0.01"
                       value={formData.tax_total}
+                      readOnly={isDistributorAdmin}
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
                           tax_total: parseFloat(e.target.value) || 0,
                         }))
                       }
+                      className={isDistributorAdmin ? "bg-muted cursor-not-allowed" : ""}
                     />
                   </div>
 
@@ -520,12 +689,14 @@ export function POFormDialog({
                       min="0"
                       step="0.01"
                       value={formData.shipping_cost}
+                      readOnly={isDistributorAdmin}
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
                           shipping_cost: parseFloat(e.target.value) || 0,
                         }))
                       }
+                      className={isDistributorAdmin ? "bg-muted cursor-not-allowed" : ""}
                     />
                   </div>
                 </div>
@@ -550,23 +721,17 @@ export function POFormDialog({
                   <div className="border rounded-lg p-4 space-y-4">
                     <h3 className="font-semibold">Add Item</h3>
                     
-                    {products.length > 0 && (
-                      <div className="space-y-2">
-                        <Label htmlFor="product_select">Select Product (Optional)</Label>
-                        <Select value={selectedProductId || undefined} onValueChange={handleProductSelect}>
-                          <SelectTrigger id="product_select">
-                            <SelectValue placeholder="Select a product (optional)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.sku} - {product.product_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="product_select">Select Product</Label>
+                      <ProductLookup
+                        products={products}
+                        selectedProductId={selectedProductId}
+                        onSelect={handleProductSelect}
+                        loading={productsLoading}
+                        allowManualEntry={!isDistributorAdmin}
+                        placeholder="Search products by name or SKU..."
+                      />
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -576,13 +741,13 @@ export function POFormDialog({
                         <Input
                           id="item_sku"
                           value={currentItem.sku}
-                          readOnly={!!selectedProductId}
+                          readOnly={isDistributorAdmin || !!selectedProductId}
                           onChange={(e) =>
                             setCurrentItem((prev) => ({ ...prev, sku: e.target.value }))
                           }
                           placeholder="SKU-001"
                           required
-                          className={selectedProductId ? "bg-gray-50" : ""}
+                          className={(isDistributorAdmin || selectedProductId) ? "bg-muted cursor-not-allowed" : ""}
                         />
                       </div>
 
@@ -593,13 +758,13 @@ export function POFormDialog({
                         <Input
                           id="item_name"
                           value={currentItem.product_name}
-                          readOnly={!!selectedProductId}
+                          readOnly={isDistributorAdmin || !!selectedProductId}
                           onChange={(e) =>
                             setCurrentItem((prev) => ({ ...prev, product_name: e.target.value }))
                           }
                           placeholder="Product name"
                           required
-                          className={selectedProductId ? "bg-gray-50" : ""}
+                          className={(isDistributorAdmin || selectedProductId) ? "bg-muted cursor-not-allowed" : ""}
                         />
                       </div>
 
@@ -610,7 +775,7 @@ export function POFormDialog({
                           type="number"
                           min="0.01"
                           step="0.01"
-                          value={currentItem.quantity}
+                          value={currentItem.quantity === 0 ? "" : currentItem.quantity}
                           onChange={(e) =>
                             setCurrentItem((prev) => ({
                               ...prev,
@@ -629,13 +794,14 @@ export function POFormDialog({
                           min="0"
                           step="0.01"
                           value={currentItem.unit_price}
+                          readOnly={isDistributorAdmin}
                           onChange={(e) =>
                             setCurrentItem((prev) => ({
                               ...prev,
                               unit_price: parseFloat(e.target.value) || 0,
                             }))
                           }
-                          className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className={isDistributorAdmin ? "bg-muted cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" : "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"}
                         />
                       </div>
                     </div>
@@ -654,7 +820,7 @@ export function POFormDialog({
                     {formData.items.length === 0 ? (
                       <p className="text-sm text-gray-500">No items added yet</p>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
                         {formData.items.map((item) => (
                           <div
                             key={item.id}
@@ -719,24 +885,48 @@ export function POFormDialog({
                     <Label htmlFor="distributor_id">
                       Distributor <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      value={formData.distributor_id || undefined}
-                      onValueChange={handleDistributorSelect}
-                    >
-                      <SelectTrigger id="distributor_id">
-                        <SelectValue placeholder="Select distributor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {distributors.map((distributor) => (
-                          <SelectItem key={distributor.id} value={distributor.id}>
-                            {distributor.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-gray-500">
-                      Purchaser information will be automatically populated from the selected distributor
-                    </p>
+                    {isDistributorAdmin ? (
+                      // For Distributor Admin users, show a read-only field with their distributor
+                      <>
+                        <Input
+                          id="distributor_id"
+                          value={
+                            distributorsLoading && !currentDistributor
+                              ? "Loading..."
+                              : currentDistributor?.name ||
+                                distributors.find((d) => d.id === formData.distributor_id)?.name ||
+                                "Your Distributor"
+                          }
+                          disabled
+                          className="bg-muted cursor-not-allowed"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Purchaser information is automatically associated with your distributor account
+                        </p>
+                      </>
+                    ) : (
+                      // For Brand Admin / Super Admin users, show the dropdown selector
+                      <>
+                        <Select
+                          value={formData.distributor_id || undefined}
+                          onValueChange={handleDistributorSelect}
+                        >
+                          <SelectTrigger id="distributor_id">
+                            <SelectValue placeholder="Select distributor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {distributors.map((distributor) => (
+                              <SelectItem key={distributor.id} value={distributor.id}>
+                                {distributor.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-gray-500">
+                          Purchaser information will be automatically populated from the selected distributor
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -788,4 +978,3 @@ export function POFormDialog({
     </Dialog>
   );
 }
-

@@ -1,0 +1,124 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Development Commands
+
+```bash
+# Development
+npm run dev          # Start development server (port 3000)
+npm run build        # Build for production  
+npm run start        # Start production server
+
+# Server management (reference from .cursor/rules)
+# Stop server: Ctrl + C
+# Clean cache: rm -rf .next
+# Clean npm cache: npm cache clean --force
+# Full restart: npm install && npm run build && npm run dev
+```
+
+## Project Architecture
+
+### Tech Stack
+- **Framework**: Next.js 15 with App Router and React 19
+- **Language**: TypeScript with strict mode
+- **Styling**: Tailwind CSS 4 with Radix UI components
+- **Backend**: Supabase (PostgreSQL + Auth + Storage + RLS)
+- **State Management**: TanStack React Query v5 + React Context
+- **Forms**: React Hook Form + Zod validation
+- **Charts**: Recharts for analytics dashboards
+
+### Core Architecture Patterns
+
+**Multi-Tenant SaaS**: Platform serves three user types (Brand, Distributor, Manufacturer) with organization-based data isolation using Supabase Row Level Security.
+
+**Role-Based Access Control**: Hierarchical permissions system with roles like `brand_admin`, `distributor_manager`, etc. Permission levels 1-4 control access to features and menu items.
+
+**Dynamic Menu System**: Menu items are fetched from Supabase based on user role and cached locally. Menu permissions control visibility and actions (view/edit/delete/approve).
+
+**Protected Routes**: Middleware at `/middleware.ts` handles authentication, profile completion checks, and user status validation (pending/approved/suspended).
+
+### Key Directory Structure
+
+```
+/app/(authenticated)/     # Protected routes with shared layout
+/components/             # Organized by domain (auth, dashboard, users, etc.)
+/hooks/                 # Custom React hooks for data fetching
+/lib/                   # Utilities, permissions, Supabase clients
+/types/                 # TypeScript definitions
+/contexts/              # React contexts for state management
+```
+
+## Important Architectural Concepts
+
+### User Status Flow
+- `pending` users: Dashboard access only, awaiting approval
+- `approved` users: Full access based on role permissions  
+- `suspended` users: Redirected to auth/suspended page
+
+### Authentication & Profile Setup
+- User signs up → profile created (incomplete) → redirected to `/profile/setup`
+- Profile completion required before accessing main application
+- Middleware enforces authentication and profile completion
+
+### Data Fetching Patterns
+- All server state managed via TanStack React Query
+- Supabase clients: `lib/supabase/client.ts` (browser) and `lib/supabase/server.ts` (SSR)
+- Query keys namespaced by domain, 5-minute stale time for menu permissions
+- Local storage caching for user data and menu permissions
+
+### Backend Integration
+FastAPI service in `/Backend/` handles file uploads, Excel/CSV processing, and AI-assisted column mapping. Endpoints at `/api/v1/excel/*` integrate with the Next.js frontend.
+
+## Development Guidelines
+
+### File Naming Conventions
+- Components: `kebab-case.tsx` (e.g., `user-form-dialog.tsx`)
+- Hooks: `use-*.ts` (e.g., `use-users.ts`)
+- Types: `kebab-case.ts` (e.g., `auth.ts`)
+- Pages: Next.js convention (`page.tsx`, `layout.tsx`)
+
+### Component Patterns
+- Use `"use client"` directive for client-side interactivity
+- Wrap data fetching in custom hooks
+- Use `cn()` from `lib/utils.ts` for conditional classes
+- Form validation with React Hook Form + Zod schemas
+
+### Environment Configuration
+Required environment variables in `.env.local`:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` 
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_APP_URL`
+
+## Workflow and Documentation
+
+### Changelog Management
+- Create `.md` files in `ChangeLogs/` folder for each development session
+- Save implementation documentation in `Project-Research-Files/` folder
+- Maintain detailed commit messages for tracking changes
+
+### Performance Considerations
+- Authenticated routes grouped under `(authenticated)` for shared layouts
+- Loading components for each route to improve perceived performance
+- React Query caching strategies for optimal data fetching
+- Image optimization with AVIF/WebP formats
+
+### Testing & Validation
+Manual testing checklist includes authentication flows, role-based access, profile setup, and menu visibility based on permissions. Always verify RLS policies and user status handling.
+
+## Key Integration Points
+
+### Supabase Integration
+- Row Level Security enforces data isolation
+- Database schema includes organizations, user_profiles, roles, and menu permissions
+- Real-time subscriptions for live data updates
+
+### Import System
+Excel/CSV import system with AI-assisted column mapping via OpenAI integration. Supports products, sales data, and order imports with validation and confirmation workflows.
+
+### Security Considerations
+- Known security vulnerability in xlsx package (documented in SECURITY-NOTES.md)
+- Environment-based configuration prevents credential exposure
+- RLS policies enforce data access controls
+- Session management handled by Supabase Auth

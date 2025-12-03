@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ProductWithInventory, StockStatusType } from "@/types/products";
+import { formatCurrency } from "@/lib/formatters";
 
 // Stock status badge colors
 const stockStatusColors: Record<string, string> = {
@@ -54,16 +55,6 @@ const stockStatusLabels: Record<string, string> = {
   in_stock: "In Stock",
   healthy: "Healthy",
 };
-
-// Format currency
-function formatCurrency(amount: number, currency: string = "USD"): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
 
 export function InventoryProductsList() {
   const { profile } = useEnhancedAuth();

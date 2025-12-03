@@ -28,8 +28,9 @@ import { useProducts } from "@/hooks/use-products";
 import type { Product } from "@/types/products";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { toast } from "react-toastify";
-import { Plus, X, ShoppingCart, Package } from "lucide-react";
+import { AlertTriangle, Plus, X, ShoppingCart } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ProductLookup } from "@/components/products/product-lookup";
 
 interface OrderFormDialogProps {
   open: boolean;
@@ -111,7 +112,7 @@ export function OrderFormDialog({
   });
 
   const isDistributorAdmin = profile?.role_name?.startsWith("distributor_");
-  const { distributors } = useDistributors({
+  const { distributors, loading: distributorsLoading } = useDistributors({
     searchTerm: "",
     filters: { status: "all" },
     brandId: isSuperAdmin ? undefined : profile?.brand_id,
@@ -227,14 +228,19 @@ export function OrderFormDialog({
       });
     } else if (open && !profileLoading) {
       // Creating new order - brand will be auto-populated from distributor
-      // For distributor_admin users, auto-populate their distributor_id
+      // For distributor_admin users, auto-populate their distributor_id AND brand_id from their profile
       const initialDistributorId = isDistributorAdmin && profile?.distributor_id 
         ? profile.distributor_id 
         : "";
       
+      // For distributor_admin users, use their brand_id directly from profile
+      const initialBrandId = isDistributorAdmin && profile?.brand_id
+        ? profile.brand_id
+        : "";
+      
       setFormData({
         distributor_id: initialDistributorId,
-        brand_id: "", // Will be auto-populated from selected distributor
+        brand_id: initialBrandId, // For distributor_admin, use their brand_id; otherwise auto-populated from selected distributor
         order_date: todayDate,
         order_status: "pending",
         customer_name: "",
@@ -249,7 +255,7 @@ export function OrderFormDialog({
         payment_status: "pending",
       });
     }
-  }, [open, order, profileLoading, todayDate, isDistributorAdmin, profile?.distributor_id]);
+  }, [open, order, profileLoading, todayDate, isDistributorAdmin, profile?.distributor_id, profile?.brand_id]);
 
   // Auto-populate fields when distributor is selected
   useEffect(() => {
@@ -371,10 +377,23 @@ export function OrderFormDialog({
   };
 
   const handleProductSelect = (productId: string) => {
-    setSelectedProductId(productId === "manual" ? "" : productId);
+    setSelectedProductId(productId);
     
     if (!productId || productId === "manual") {
       // Clear fields if no product selected or manual entry
+      if (productId === "manual") {
+        // Reset item fields for manual entry
+        setCurrentItem({
+          id: "",
+          sku: "",
+          product_name: "",
+          quantity: 1,
+          unit_price: 0,
+          discount: 0,
+          tax_rate: 0,
+          total: 0,
+        });
+      }
       return;
     }
 
@@ -504,6 +523,33 @@ export function OrderFormDialog({
     }
   };
 
+  if (isDistributorAdmin) {
+    return (
+      <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Orders are read-only</DialogTitle>
+            <DialogDescription>
+              Distributor users can review orders but can only create or manage
+              Purchase Orders. Please contact your brand team for any order
+              updates.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 flex gap-3">
+            <AlertTriangle className="h-5 w-5 flex-none" />
+            <p>
+              Need to make a change? Submit a Purchase Order adjustment so the
+              brand fulfillment team can process it for you.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={onClose}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl h-[95vh] overflow-hidden flex flex-col">
@@ -541,31 +587,54 @@ export function OrderFormDialog({
                   <Label htmlFor="distributor_id">
                     Distributor <span className="text-red-500">*</span>
                   </Label>
-                  <Select
-                    value={formData.distributor_id || "none"}
-                    onValueChange={(value) =>
-                      setFormData({
-                        ...formData,
-                        distributor_id: value === "none" ? "" : value,
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select distributor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Select a distributor</SelectItem>
-                      {distributors.map((dist) => (
-                        <SelectItem key={dist.id} value={dist.id}>
-                          {dist.name} {dist.code && `(${dist.code})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formData.distributor_id && (
-                    <p className="text-xs text-muted-foreground">
-                      Customer & shipping details will be auto-populated
-                    </p>
+                  {isDistributorAdmin ? (
+                    // For Distributor Admin users, show a read-only field with their distributor
+                    <>
+                      <Input
+                        id="distributor_id"
+                        value={
+                          distributorsLoading
+                            ? "Loading..."
+                            : distributors.find((d) => d.id === formData.distributor_id)?.name ||
+                              "Your Distributor"
+                        }
+                        disabled
+                        className="bg-muted cursor-not-allowed"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Orders are automatically associated with your distributor account
+                      </p>
+                    </>
+                  ) : (
+                    // For Brand Admin / Super Admin users, show the dropdown selector
+                    <>
+                      <Select
+                        value={formData.distributor_id || "none"}
+                        onValueChange={(value) =>
+                          setFormData({
+                            ...formData,
+                            distributor_id: value === "none" ? "" : value,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select distributor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Select a distributor</SelectItem>
+                          {distributors.map((dist) => (
+                            <SelectItem key={dist.id} value={dist.id}>
+                              {dist.name} {dist.code && `(${dist.code})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {formData.distributor_id && (
+                        <p className="text-xs text-muted-foreground">
+                          Customer & shipping details will be auto-populated
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -653,36 +722,17 @@ export function OrderFormDialog({
               <div className="bg-muted/30 p-3 rounded-lg space-y-2.5">
                 {/* Product Lookup */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="product_lookup" className="text-sm flex items-center gap-2">
-                    <Package className="h-3 w-3" />
-                    Select from Product Catalog
+                  <Label htmlFor="product_lookup" className="text-sm">
+                    Select Product
                   </Label>
-                  <Select
-                    value={selectedProductId || "manual"}
-                    onValueChange={handleProductSelect}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a product or enter manually below..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manual">Manual Entry</SelectItem>
-                      {products
-                        .filter((p) => p.status === "active")
-                        .map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            <div className="flex items-center justify-between w-full">
-                              <span>{product.product_name} ({product.sku})</span>
-                              <span className="text-xs text-gray-500 ml-2">
-                                ${product.unit_price.toFixed(2)} - Stock: {product.quantity_in_stock}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  {productsLoading && (
-                    <p className="text-xs text-gray-500">Loading products...</p>
-                  )}
+                  <ProductLookup
+                    products={products}
+                    selectedProductId={selectedProductId}
+                    onSelect={handleProductSelect}
+                    loading={productsLoading}
+                    allowManualEntry={!isDistributorAdmin}
+                    placeholder="Search products by name or SKU..."
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -691,10 +741,12 @@ export function OrderFormDialog({
                     <Input
                       id="sku"
                       value={currentItem.sku}
+                      readOnly={isDistributorAdmin}
                       onChange={(e) =>
                         setCurrentItem({ ...currentItem, sku: e.target.value })
                       }
                       placeholder="Enter SKU"
+                      className={isDistributorAdmin ? "bg-muted cursor-not-allowed" : ""}
                     />
                   </div>
 
@@ -703,6 +755,7 @@ export function OrderFormDialog({
                     <Input
                       id="product_name"
                       value={currentItem.product_name}
+                      readOnly={isDistributorAdmin}
                       onChange={(e) =>
                         setCurrentItem({
                           ...currentItem,
@@ -710,6 +763,7 @@ export function OrderFormDialog({
                         })
                       }
                       placeholder="Enter product name"
+                      className={isDistributorAdmin ? "bg-muted cursor-not-allowed" : ""}
                     />
                   </div>
                 </div>
@@ -753,6 +807,7 @@ export function OrderFormDialog({
                       inputMode="decimal"
                       placeholder="e.g., 99.99"
                       value={currentItem.unit_price === 0 ? "" : currentItem.unit_price}
+                      readOnly={isDistributorAdmin}
                       onChange={(e) => {
                         const value = e.target.value;
                         // Allow empty, numbers, and decimals
@@ -766,6 +821,7 @@ export function OrderFormDialog({
                           }
                         }
                       }}
+                      className={isDistributorAdmin ? "bg-muted cursor-not-allowed" : ""}
                     />
                   </div>
 

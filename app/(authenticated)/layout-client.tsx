@@ -36,8 +36,8 @@ function LayoutContent({
           onMenuClick={() => setSidebarOpen(true)}
         />
 
-        <main className="flex-1 overflow-y-auto py-4 sm:py-6">
-          <div className="mx-auto max-w-8xl px-3 sm:px-6 lg:px-8">
+        <main className="flex-1 overflow-y-auto py-4 sm:py-6 bg-gray-50">
+          <div className="mx-auto max-w-8xl px-3 sm:px-6 lg:px-8 min-h-full flex flex-col">
             {children}
           </div>
         </main>

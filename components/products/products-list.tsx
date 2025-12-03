@@ -39,6 +39,7 @@ import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { ProductFormDialog } from "@/components/products/product-form-dialog";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { formatCurrency } from "@/lib/formatters";
 
 const statusColors: Record<ProductStatus, string> = {
   active: "bg-green-100 text-green-800",
@@ -119,13 +120,6 @@ export function ProductsList() {
     router.push(`/products/${productId}`);
   };
 
-  const formatCurrency = (amount: number, currency: string = "USD") => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency,
-    }).format(amount);
-  };
-
   if (loading) {
     return (
       <div className="space-y-4">
@@ -145,9 +139,9 @@ export function ProductsList() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 h-full flex flex-col">
       {/* Header with Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between flex-none">
         <div className="flex flex-1 gap-2 w-full sm:w-auto">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -189,12 +183,12 @@ export function ProductsList() {
       </div>
 
       {/* Products Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+      <Card className="flex-1 flex flex-col overflow-hidden">
+        <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
+          <div className="overflow-x-auto flex-1 flex flex-col">
             <div
               ref={tableContainerRef}
-              className="max-h-[600px] overflow-y-auto"
+              className="flex-1 overflow-y-auto"
             >
               <table className="w-full">
                 <thead className="bg-gray-50 border-b sticky top-0 z-10">
@@ -391,7 +385,7 @@ export function ProductsList() {
 
       {/* Summary */}
       {products.length > 0 && (
-        <div className="flex flex-col gap-3 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between flex-none">
           <div>
             Showing {startItem}-{endItem} of {totalCount} products
           </div>

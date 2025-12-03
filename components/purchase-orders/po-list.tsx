@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { useRef, useState, useEffect } from "react";
+import { Search, ChevronLeft, ChevronRight, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -16,12 +17,13 @@ import {
 import { usePurchaseOrders } from "@/hooks/use-purchase-orders";
 import type { PurchaseOrder, POStatus } from "@/types/purchase-orders";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
-import { MainLayout } from "@/components/layout/main-layout";
 import { format } from "date-fns";
 import { POActionsMenu } from "./po-actions-menu";
 import { useRouter } from "next/navigation";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { POBulkApprovalDialog } from "./po-bulk-approval-dialog";
+import { formatCurrency } from "@/lib/formatters";
 
 const statusColors: Record<POStatus, string> = {
   draft: "bg-gray-100 text-gray-800",
@@ -52,13 +54,15 @@ export function PurchaseOrdersList() {
     dateRange: "all",
   });
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkApproveDialog, setShowBulkApproveDialog] = useState(false);
+
   const {
     purchaseOrders,
     loading,
     error,
     totalCount,
     deletePurchaseOrder,
-    updatePurchaseOrder,
     duplicatePurchaseOrder,
     refetch,
     page,
@@ -72,6 +76,11 @@ export function PurchaseOrdersList() {
     brandId: profile?.brand_id,
     distributorId: profile?.role_name?.startsWith("distributor_") ? profile.distributor_id : undefined,
   });
+
+  // Reset selection when filters/page changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, pageSize, filters, searchTerm]);
 
   const startItem = totalCount === 0 ? 0 : page * pageSize + 1;
   const endItem =
@@ -108,25 +117,42 @@ export function PurchaseOrdersList() {
   };
 
   const handleEdit = (poId: string) => {
-    // Edit functionality handled in detail page
     router.push(`/purchase-orders/${poId}`);
   };
 
   const handleDuplicate = async (poId: string) => {
     try {
       const duplicatedPO = await duplicatePurchaseOrder(poId);
-      // Optionally navigate to the new PO
       router.push(`/purchase-orders/${duplicatedPO.id}`);
     } catch (error) {
-      // Error is already handled by the mutation's onError
       console.error("Failed to duplicate purchase order:", error);
     }
   };
 
+  const toggleSelectAll = () => {
+    if (selectedIds.size === purchaseOrders.length && purchaseOrders.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(purchaseOrders.map((po) => po.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const selectedPOs = purchaseOrders.filter((po) => selectedIds.has(po.id));
+
   if (loading) {
     return (
       <div className="space-y-4">
-        <TableSkeleton rows={8} columns={7} />
+        <TableSkeleton rows={8} columns={9} />
       </div>
     );
   }
@@ -142,9 +168,9 @@ export function PurchaseOrdersList() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex-1 w-full sm:w-auto">
+    <div className="space-y-4 h-full flex flex-col">
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between flex-none">
+        <div className="flex-1 w-full sm:w-auto flex gap-2 items-center">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
@@ -154,6 +180,15 @@ export function PurchaseOrdersList() {
               className="pl-10 w-full sm:w-64"
             />
           </div>
+          {selectedIds.size > 0 && (
+            <Button 
+              onClick={() => setShowBulkApproveDialog(true)}
+              className="ml-2"
+            >
+              <CheckCircle className="mr-2 h-4 w-4" />
+              Bulk Approve ({selectedIds.size})
+            </Button>
+          )}
         </div>
         <div className="flex gap-2 flex-wrap">
           <Select
@@ -214,16 +249,25 @@ export function PurchaseOrdersList() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+      <Card className="flex-1 flex flex-col overflow-hidden">
+        <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
+          <div className="overflow-x-auto flex-1 flex flex-col">
             <div
               ref={tableContainerRef}
-              className="max-h-[600px] overflow-y-auto"
+              className="flex-1 overflow-y-auto"
             >
               <table className="w-full">
                 <thead className="bg-gray-50 border-b sticky top-0 z-10">
                 <tr>
+                  <th className="px-6 py-3 text-left">
+                    <Checkbox
+                      checked={
+                        purchaseOrders.length > 0 &&
+                        selectedIds.size === purchaseOrders.length
+                      }
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     PO #
                   </th>
@@ -242,6 +286,9 @@ export function PurchaseOrdersList() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Payment
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Expected Delivery
+                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
@@ -250,7 +297,7 @@ export function PurchaseOrdersList() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {purchaseOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                       No purchase orders found. Create your first purchase order to get started.
                     </td>
                   </tr>
@@ -258,7 +305,7 @@ export function PurchaseOrdersList() {
                   <>
                     {paddingTop > 0 && (
                       <tr>
-                        <td colSpan={7} style={{ height: `${paddingTop}px` }} />
+                        <td colSpan={9} style={{ height: `${paddingTop}px` }} />
                       </tr>
                     )}
                     {virtualRows.map((virtualRow) => {
@@ -270,6 +317,12 @@ export function PurchaseOrdersList() {
                           ref={(node) => rowVirtualizer.measureElement(node)}
                           className="hover:bg-gray-50"
                         >
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Checkbox
+                              checked={selectedIds.has(po.id)}
+                              onCheckedChange={() => toggleSelect(po.id)}
+                            />
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
                               onClick={() => handleViewDetails(po.id)}
@@ -292,7 +345,7 @@ export function PurchaseOrdersList() {
                             {format(new Date(po.po_date), "MMM dd, yyyy")}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {po.currency || "USD"} {po.total_amount?.toFixed(2) || "0.00"}
+                            {formatCurrency(po.total_amount, po.currency)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <Badge className={statusColors[po.po_status]}>
@@ -303,6 +356,11 @@ export function PurchaseOrdersList() {
                             <Badge className={paymentColors[po.payment_status]}>
                               {po.payment_status.replace("_", " ")}
                             </Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {po.expected_delivery_date
+                              ? format(new Date(po.expected_delivery_date), "MMM dd, yyyy")
+                              : "—"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <POActionsMenu
@@ -319,7 +377,7 @@ export function PurchaseOrdersList() {
                     })}
                     {paddingBottom > 0 && (
                       <tr>
-                        <td colSpan={7} style={{ height: `${paddingBottom}px` }} />
+                        <td colSpan={9} style={{ height: `${paddingBottom}px` }} />
                       </tr>
                     )}
                   </>
@@ -332,7 +390,7 @@ export function PurchaseOrdersList() {
       </Card>
 
       {totalCount > 0 && (
-        <div className="flex flex-col gap-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between flex-none">
           <div>
             Showing {startItem}-{endItem} of {totalCount} purchase orders
           </div>
@@ -384,7 +442,16 @@ export function PurchaseOrdersList() {
           </div>
         </div>
       )}
+
+      <POBulkApprovalDialog
+        open={showBulkApproveDialog}
+        onClose={() => setShowBulkApproveDialog(false)}
+        selectedPOs={selectedPOs}
+        onSuccess={() => {
+          setSelectedIds(new Set());
+          refetch();
+        }}
+      />
     </div>
   );
 }
-

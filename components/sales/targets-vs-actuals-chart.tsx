@@ -17,6 +17,7 @@ import { useDateFilters } from "@/contexts/date-filter-context";
 import { Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import { format, parseISO } from "date-fns";
+import { formatCurrency } from "@/lib/formatters";
 
 const fallbackData = [
   { month: "Jan", target: 400000, actual: 385000, achievement: 96.3 },
@@ -218,7 +219,7 @@ export function TargetsVsActualsChart() {
                 if (name === "achievement")
                   return [`${value.toFixed(1)}%`, "Achievement"];
                 return [
-                  `$${value.toLocaleString()}`,
+                  formatCurrency(value),
                   name === "target" ? "Target" : "Actual",
                 ];
               }}

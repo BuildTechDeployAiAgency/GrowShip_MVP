@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { SupabaseClient } from "@supabase/supabase-js";
 import DashboardClient from "./dashboard-client";
 import type { DashboardMetrics } from "@/types/dashboard";
 
@@ -7,14 +8,14 @@ function toNumber(value: unknown, fallback: number = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// Reuse supabase client to avoid creating multiple connections
 async function fetchDashboardMetricsServer(
+  supabase: SupabaseClient,
   userId: string,
   brandId: string | null,
   userRole: string | null
 ): Promise<DashboardMetrics | null> {
   try {
-    const supabase = await createClient();
-    
     // Determine table suffix based on role
     const tableSuffix = userRole?.startsWith("brand_admin") && brandId
       ? `sales_documents_view_${brandId.replace(/-/g, "_")}`
@@ -90,9 +91,10 @@ export default async function DashboardPage() {
   let initialMetrics: DashboardMetrics | null = null;
 
   try {
+    // Create single supabase client for all operations
     const supabase = await createClient();
     
-    // Get user session
+    // Get user session - layout already verified auth, but we need user.id
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
@@ -104,8 +106,9 @@ export default async function DashboardPage() {
         .single();
 
       if (profile) {
-        // Fetch dashboard metrics on the server
+        // Fetch dashboard metrics on the server - reuse same supabase client
         initialMetrics = await fetchDashboardMetricsServer(
+          supabase,
           user.id,
           profile.brand_id,
           profile.role_name

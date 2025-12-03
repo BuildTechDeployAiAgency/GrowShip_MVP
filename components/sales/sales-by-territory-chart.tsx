@@ -16,6 +16,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { formatCurrency } from "@/lib/formatters";
 
 const COLORS = ["#0d9488", "#14b8a6", "#2dd4bf", "#5eead4", "#99f6e4"];
 
@@ -191,7 +192,7 @@ export function SalesByTerritoryChart() {
                         const growth = props.payload.revenue_growth_percentage || 0;
                         return [
                           [
-                            `$${value.toLocaleString()}`,
+                            formatCurrency(value),
                             `${growth >= 0 ? '+' : ''}${growth.toFixed(1)}% growth`
                           ],
                           "Revenue & Growth"
@@ -232,7 +233,7 @@ export function SalesByTerritoryChart() {
                   </div>
                   <div className="text-right flex-shrink-0 ml-2">
                     <div className="text-sm font-semibold text-gray-900">
-                      {item.revenue_display || `$${(item.revenue / 1000).toFixed(0)}k`}
+                      {formatCurrency(item.revenue)}
                     </div>
                     <div className={`text-xs font-medium ${
                       (item.revenue_growth_percentage || 0) >= 0 ? "text-green-600" : "text-red-600"

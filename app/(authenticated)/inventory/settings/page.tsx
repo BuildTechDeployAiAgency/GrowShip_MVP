@@ -3,7 +3,6 @@
 import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { InventorySettingsContent } from "@/components/inventory/inventory-settings-content";
 
 export default function InventorySettingsPage() {
@@ -20,16 +19,14 @@ export default function InventorySettingsPage() {
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle="Inventory Settings"
-          pageSubtitle="Configure stock alert thresholds for your products"
-        >
-          <InventorySettingsContent brandId={profile?.brand_id} />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
+        pageTitle="Inventory Settings"
+        pageSubtitle="Configure stock alert thresholds for your products"
+      >
+        <InventorySettingsContent brandId={profile?.brand_id} />
+      </MainLayout>
+    </ProtectedPage>
   );
 }
 

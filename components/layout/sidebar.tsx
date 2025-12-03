@@ -22,7 +22,6 @@ import {
 const COMING_SOON_ROUTES = [
   "/reports",
   "/invoices",
-  "/shipments",
   "/sales",
   "/marketing",
   "/manufacturers",

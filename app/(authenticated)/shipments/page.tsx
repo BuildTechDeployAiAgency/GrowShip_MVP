@@ -4,12 +4,9 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { ShipmentsList } from "@/components/shipments/shipments-list";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export default function ShipmentsPage() {
-  const { user, profile, loading } = useRequireProfile();
+  const { loading } = useRequireProfile();
 
   if (loading) {
     return (
@@ -22,22 +19,14 @@ export default function ShipmentsPage() {
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle="Shipments"
-          pageSubtitle="Track and manage shipments"
-          actions={
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Shipment
-            </Button>
-          }
-        >
-          <ShipmentsList />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
+        pageTitle="Shipments"
+        pageSubtitle="Track and manage all shipments. Create new shipments from the Orders page."
+      >
+        <ShipmentsList />
+      </MainLayout>
+    </ProtectedPage>
   );
 }
 

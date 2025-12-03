@@ -3,7 +3,6 @@
 import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { InventoryTabs } from "@/components/inventory/inventory-tabs";
 
 export default function InventoryPage() {
@@ -20,16 +19,14 @@ export default function InventoryPage() {
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle="Inventory"
-          pageSubtitle="Real-time stock visibility and alerts"
-        >
-          <InventoryTabs />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
+        pageTitle="Inventory"
+        pageSubtitle="Real-time stock visibility and alerts"
+      >
+        <InventoryTabs />
+      </MainLayout>
+    </ProtectedPage>
   );
 }
 

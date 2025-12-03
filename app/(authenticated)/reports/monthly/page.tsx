@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { MonthlyReportsDashboard } from "@/components/reports/monthly-reports-dashboard";
 
 export default function MonthlyReportsPage() {
@@ -26,16 +25,14 @@ export default function MonthlyReportsPage() {
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle="Monthly Reports"
-          pageSubtitle="View monthly distributor performance and sales reports"
-        >
-          <MonthlyReportsDashboard />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
+        pageTitle="Monthly Reports"
+        pageSubtitle="View monthly distributor performance and sales reports"
+      >
+        <MonthlyReportsDashboard />
+      </MainLayout>
+    </ProtectedPage>
   );
 }
 

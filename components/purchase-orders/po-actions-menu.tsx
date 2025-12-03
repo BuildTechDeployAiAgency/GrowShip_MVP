@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { getAvailableActions } from "@/lib/po/workflow-utils";
+import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 
 interface POActionsMenuProps {
   po: PurchaseOrder;
@@ -41,6 +42,7 @@ export function POActionsMenu({
   onEdit,
   onDuplicate,
 }: POActionsMenuProps) {
+  const { profile } = useEnhancedAuth();
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject">("approve");
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -48,6 +50,9 @@ export function POActionsMenu({
   const [cancelReason, setCancelReason] = useState("");
 
   const availableActions = getAvailableActions(po.po_status);
+  
+  // Only Super Admin and Brand Admin can approve, reject, or cancel POs
+  const canManagePO = profile?.role_name === "super_admin" || profile?.role_name === "brand_admin";
 
   const handleApprove = () => {
     setApprovalAction("approve");
@@ -145,14 +150,14 @@ export function POActionsMenu({
             </DropdownMenuItem>
           )}
 
-          {availableActions.includes("approve") && po.po_status === "submitted" && (
+          {canManagePO && availableActions.includes("approve") && po.po_status === "submitted" && (
             <DropdownMenuItem onClick={handleApprove}>
               <CheckCircle className="mr-2 h-4 w-4" />
               Approve
             </DropdownMenuItem>
           )}
 
-          {availableActions.includes("reject") && po.po_status === "submitted" && (
+          {canManagePO && availableActions.includes("reject") && po.po_status === "submitted" && (
             <DropdownMenuItem onClick={handleReject}>
               <XCircle className="mr-2 h-4 w-4" />
               Reject
@@ -173,7 +178,7 @@ export function POActionsMenu({
             </DropdownMenuItem>
           )}
 
-          {availableActions.includes("cancel") && po.po_status !== "cancelled" && po.po_status !== "received" && (
+          {canManagePO && availableActions.includes("cancel") && po.po_status !== "cancelled" && po.po_status !== "received" && (
             <DropdownMenuItem onClick={() => setCancelDialogOpen(true)}>
               <X className="mr-2 h-4 w-4" />
               Cancel

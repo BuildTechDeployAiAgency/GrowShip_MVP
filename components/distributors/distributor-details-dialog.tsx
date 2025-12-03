@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
+import { formatCurrency } from "@/lib/formatters";
 
 interface DistributorDetailsDialogProps {
   open: boolean;
@@ -54,14 +55,6 @@ export function DistributorDetailsDialog({
   }, [distributor?.brand_id, open]);
 
   if (!distributor) return null;
-
-  const formatCurrency = (amount?: number, currency?: string) => {
-    if (amount === undefined || amount === null) return "N/A";
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency || "USD",
-    }).format(amount);
-  };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "N/A";

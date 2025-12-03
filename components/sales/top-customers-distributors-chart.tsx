@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { TrendingUp, TrendingDown, Store, Building2 } from "lucide-react";
+import { formatCurrency, formatNumber } from "@/lib/formatters";
 
 // TODO: Replace hardcoded data with real API integration
 // This component currently uses mock data and should be updated to fetch real customer/distributor data
@@ -115,7 +116,7 @@ export function TopCustomersDistributorsChart() {
                   color: "#fff",
                 }}
                 formatter={(value: number) => [
-                  `$${value.toLocaleString()}`,
+                  formatCurrency(value),
                   "Revenue",
                 ]}
               />
@@ -144,13 +145,13 @@ export function TopCustomersDistributorsChart() {
                   <div>
                     <p className="font-bold text-gray-900">{customer.name}</p>
                     <p className="text-sm text-blue-600 font-medium">
-                      {customer.orders.toLocaleString()} orders
+                      {formatNumber(customer.orders)} orders
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-lg text-gray-900">
-                    ${(customer.revenue / 1000).toFixed(0)}k
+                    {formatCurrency(customer.revenue)}
                   </p>
                   <div
                     className={`flex items-center gap-1 text-sm font-bold justify-end ${

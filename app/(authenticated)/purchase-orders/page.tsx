@@ -6,7 +6,6 @@ import { useRequireProfile } from "@/hooks/use-auth";
 import { PurchaseOrdersList } from "@/components/purchase-orders/po-list";
 import { POFormDialog } from "@/components/purchase-orders/po-form-dialog";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -31,31 +30,29 @@ export default function PurchaseOrdersPage() {
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle="Purchase Orders"
-          pageSubtitle="Manage purchase orders and supplier relationships"
-          actions={
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Purchase Order
-            </Button>
-          }
-        >
-          <PurchaseOrdersList />
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
+        pageTitle="Purchase Orders"
+        pageSubtitle="Manage purchase orders and supplier relationships"
+        actions={
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Purchase Order
+          </Button>
+        }
+      >
+        <PurchaseOrdersList />
 
-          <POFormDialog
-            open={showCreateDialog}
-            onClose={() => setShowCreateDialog(false)}
-            onSuccess={() => {
-              // Trigger refresh of purchase orders list
-              window.location.reload();
-            }}
-          />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+        <POFormDialog
+          open={showCreateDialog}
+          onClose={() => setShowCreateDialog(false)}
+          onSuccess={() => {
+            // Trigger refresh of purchase orders list
+            window.location.reload();
+          }}
+        />
+      </MainLayout>
+    </ProtectedPage>
   );
 }
 

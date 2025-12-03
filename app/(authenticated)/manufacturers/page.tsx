@@ -5,7 +5,6 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { ManufacturersList } from "@/components/manufacturers/manufacturers-list";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 
 export default function ManufacturersPage() {
   const { user, profile, loading } = useRequireProfile();
@@ -27,15 +26,13 @@ export default function ManufacturersPage() {
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle="Manufacturers"
-          pageSubtitle="Manage your manufacturer relationships and supplier network"
-        >
-          <ManufacturersList />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
+        pageTitle="Manufacturers"
+        pageSubtitle="Manage your manufacturer relationships and supplier network"
+      >
+        <ManufacturersList />
+      </MainLayout>
+    </ProtectedPage>
   );
 }

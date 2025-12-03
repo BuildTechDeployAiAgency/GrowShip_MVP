@@ -16,6 +16,7 @@ import { ParsedTarget, ValidationResult } from "@/types/import";
 import { CheckCircle2, XCircle, Download, Loader2, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/formatters";
 
 interface TargetUploadDialogProps {
   open: boolean;
@@ -243,10 +244,7 @@ export function TargetUploadDialog({
                         </td>
                         <td className="px-4 py-2 text-gray-600">
                           {target.target_revenue
-                            ? `$${target.target_revenue.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`
+                            ? formatCurrency(target.target_revenue)
                             : "-"}
                         </td>
                       </tr>

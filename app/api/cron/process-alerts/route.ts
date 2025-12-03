@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkInventoryAlerts } from "@/lib/notifications/inventory-alerts";
 import { checkPaymentDueAlerts } from "@/lib/notifications/payment-alerts";
+import { checkCalendarEventAlerts, checkComplianceAlerts } from "@/lib/notifications/compliance-alerts";
 import { syncCalendarEvents } from "@/lib/calendar/event-generator";
 import { createClient } from "@/lib/supabase/server";
 
@@ -8,8 +9,9 @@ import { createClient } from "@/lib/supabase/server";
  * POST /api/cron/process-alerts
  * 
  * Automated background job to:
- * - Check inventory levels and create alerts
+ * - Check inventory levels and create alerts (including predictive stock-out risk)
  * - Check upcoming invoice payments
+ * - Check upcoming calendar events (shipments, PO arrivals, etc.)
  * - Sync calendar events for reminders
  * 
  * Can be triggered by:
@@ -31,10 +33,18 @@ export async function POST(request: NextRequest) {
     }
 
     const startTime = Date.now();
-    const results = {
+    const results: {
+      inventory_alerts: { success: boolean; brands_checked: number; error: string | null };
+      payment_alerts: { success: boolean; alerts_created: number; error: string | null };
+      calendar_sync: { success: boolean; brands_synced: number; error: string | null };
+      calendar_event_alerts: { success: boolean; notifications_created: number; error: string | null };
+      compliance_alerts: { success: boolean; notifications_created: number; error: string | null };
+    } = {
       inventory_alerts: { success: false, brands_checked: 0, error: null },
       payment_alerts: { success: false, alerts_created: 0, error: null },
       calendar_sync: { success: false, brands_synced: 0, error: null },
+      calendar_event_alerts: { success: false, notifications_created: 0, error: null },
+      compliance_alerts: { success: false, notifications_created: 0, error: null },
     };
 
     // Get all active brands
@@ -90,6 +100,36 @@ export async function POST(request: NextRequest) {
         }
       }
       results.calendar_sync.success = true;
+    }
+
+    // 4. Check Calendar Event Alerts (Shipments, PO Arrivals, etc.)
+    console.log(`[CRON] Checking calendar event alerts for ${brands?.length || 0} brands...`);
+    if (brands && brands.length > 0) {
+      for (const brand of brands) {
+        try {
+          const result = await checkCalendarEventAlerts(brand.id);
+          results.calendar_event_alerts.notifications_created += result.notificationsCreated;
+        } catch (error: any) {
+          console.error(`Error checking calendar event alerts for brand ${brand.id}:`, error);
+          results.calendar_event_alerts.error = error.message;
+        }
+      }
+      results.calendar_event_alerts.success = true;
+    }
+
+    // 5. Check Compliance Alerts (Monthly Distributor Reports)
+    console.log(`[CRON] Checking compliance alerts for ${brands?.length || 0} brands...`);
+    if (brands && brands.length > 0) {
+      for (const brand of brands) {
+        try {
+          const result = await checkComplianceAlerts(brand.id);
+          results.compliance_alerts.notifications_created += result.notificationsCreated;
+        } catch (error: any) {
+          console.error(`Error checking compliance alerts for brand ${brand.id}:`, error);
+          results.compliance_alerts.error = error.message;
+        }
+      }
+      results.compliance_alerts.success = true;
     }
 
     const duration = Date.now() - startTime;

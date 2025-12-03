@@ -1,8 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// Cookie name for profile completion status (cached to avoid DB queries)
+const PROFILE_COMPLETE_COOKIE = "growship_profile_complete";
+const LAST_PATH_COOKIE_PREFIX = "growship_lp_";
+
 export async function middleware(request: NextRequest) {
-  const LAST_PATH_COOKIE_PREFIX = "growship_lp_";
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
     !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -110,6 +113,17 @@ export async function middleware(request: NextRequest) {
     isProtectedRoute &&
     !request.nextUrl.pathname.startsWith("/profile/setup")
   ) {
+    // OPTIMIZATION: Check cookie first to avoid DB query on every request
+    const profileCompleteCookie = request.cookies.get(
+      `${PROFILE_COMPLETE_COOKIE}_${user.id}`
+    );
+    
+    // If cookie indicates profile is complete, skip DB query
+    if (profileCompleteCookie?.value === "true") {
+      return supabaseResponse;
+    }
+
+    // Cookie doesn't exist or indicates incomplete - need to verify with DB
     try {
       const { data: profile, error: profileError } = await supabase
         .from("user_profiles")
@@ -137,14 +151,25 @@ export async function middleware(request: NextRequest) {
       }
 
       // Only redirect if profile is explicitly incomplete
-      // Use strict equality check to avoid issues with null/undefined
       if (!profile || profile.is_profile_complete === false) {
         const url = request.nextUrl.clone();
         url.pathname = "/profile/setup";
         return NextResponse.redirect(url);
       }
 
-      // Profile is complete, allow access
+      // Profile is complete - set cookie to avoid future DB queries
+      // Cookie expires in 7 days (will be refreshed on each successful check)
+      supabaseResponse.cookies.set(
+        `${PROFILE_COMPLETE_COOKIE}_${user.id}`,
+        "true",
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 60 * 60 * 24 * 7, // 7 days
+          path: "/",
+        }
+      );
     } catch (error) {
       console.error("[Middleware] Unexpected error checking profile:", {
         userId: user.id,

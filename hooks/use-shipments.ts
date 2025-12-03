@@ -4,49 +4,25 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-toastify";
+import type {
+  Shipment,
+  ShipmentItem,
+  ShipmentFilters,
+  ShipmentStatus,
+  CreateShipmentInput,
+  CreateShipmentResult,
+  UpdateShipmentStatusResult,
+} from "@/types/shipments";
 
-export type ShipmentStatus = "pending" | "in_transit" | "out_for_delivery" | "delivered" | "failed" | "returned";
-
-export interface Shipment {
-  id: string;
-  shipment_number: string;
-  order_id?: string;
-  po_id?: string;
-  user_id?: string;
-  brand_id: string;
-  distributor_id?: string;
-  carrier?: string;
-  tracking_number?: string;
-  shipping_method?: string;
-  shipping_cost?: number;
-  shipping_address_line1?: string;
-  shipping_address_line2?: string;
-  shipping_city?: string;
-  shipping_state?: string;
-  shipping_zip_code?: string;
-  shipping_country?: string;
-  shipped_date?: string;
-  estimated_delivery_date?: string;
-  actual_delivery_date?: string;
-  shipment_status: ShipmentStatus;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
-  updated_by?: string;
-}
-
-interface ShipmentFilters {
-  status: string;
-  dateRange: string;
-  distributorId?: string;
-}
+// Re-export types for backward compatibility
+export type { Shipment, ShipmentItem, ShipmentStatus, ShipmentFilters };
 
 interface UseShipmentsOptions {
   searchTerm: string;
   filters: ShipmentFilters;
   brandId?: string;
-  distributorId?: string; // For distributor_admin users, auto-filter by their distributor_id
+  distributorId?: string;
+  orderId?: string; // Filter by specific order
   debounceMs?: number;
 }
 
@@ -55,7 +31,12 @@ interface UseShipmentsReturn {
   loading: boolean;
   error: string | null;
   refetch: () => void;
-  createShipment: (shipment: Partial<Shipment>) => Promise<Shipment>;
+  createShipment: (input: CreateShipmentInput) => Promise<CreateShipmentResult>;
+  updateShipmentStatus: (
+    shipmentId: string,
+    newStatus: ShipmentStatus,
+    notes?: string
+  ) => Promise<UpdateShipmentStatusResult>;
   updateShipment: (shipmentId: string, updates: Partial<Shipment>) => Promise<void>;
   deleteShipment: (shipmentId: string) => Promise<void>;
   totalCount: number;
@@ -65,18 +46,49 @@ async function fetchShipments(
   debouncedSearchTerm: string,
   filters: ShipmentFilters,
   brandId?: string,
-  distributorId?: string
+  distributorId?: string,
+  orderId?: string
 ): Promise<{ shipments: Shipment[]; totalCount: number }> {
   const supabase = createClient();
-  let query = supabase.from("shipments").select("*", { count: "exact" });
+  let query = supabase
+    .from("shipments")
+    .select(
+      `
+      *,
+      shipment_items (
+        id,
+        order_line_id,
+        product_id,
+        sku,
+        product_name,
+        quantity_shipped,
+        unit_price,
+        cost_price,
+        total_value
+      ),
+      orders!inner (
+        order_number,
+        customer_name
+      )
+    `,
+      { count: "exact" }
+    );
 
   if (brandId) {
     query = query.eq("brand_id", brandId);
   }
 
+  if (orderId) {
+    query = query.eq("order_id", orderId);
+  }
+
   // For distributor_admin users, always filter by their distributor_id
-  const finalDistributorId = distributorId || (filters.distributorId && filters.distributorId !== "all" ? filters.distributorId : undefined);
-  
+  const finalDistributorId =
+    distributorId ||
+    (filters.distributorId && filters.distributorId !== "all"
+      ? filters.distributorId
+      : undefined);
+
   if (finalDistributorId) {
     query = query.eq("distributor_id", finalDistributorId);
   }
@@ -94,7 +106,7 @@ async function fetchShipments(
   if (filters.dateRange !== "all") {
     const now = new Date();
     let startDate: Date;
-    
+
     switch (filters.dateRange) {
       case "today":
         startDate = new Date(now.setHours(0, 0, 0, 0));
@@ -111,7 +123,7 @@ async function fetchShipments(
       default:
         startDate = new Date(0);
     }
-    
+
     query = query.gte("created_at", startDate.toISOString());
   }
 
@@ -123,8 +135,19 @@ async function fetchShipments(
     throw fetchError;
   }
 
+  // Transform the data to match our interface
+  const shipments: Shipment[] = (data || []).map((s: any) => ({
+    ...s,
+    order: s.orders
+      ? {
+          order_number: s.orders.order_number,
+          customer_name: s.orders.customer_name,
+        }
+      : undefined,
+  }));
+
   return {
-    shipments: data || [],
+    shipments,
     totalCount: count || 0,
   };
 }
@@ -134,6 +157,7 @@ export function useShipments({
   filters,
   brandId,
   distributorId,
+  orderId,
   debounceMs = 300,
 }: UseShipmentsOptions): UseShipmentsReturn {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -148,46 +172,129 @@ export function useShipments({
   }, [searchTerm, debounceMs]);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["shipments", debouncedSearchTerm, filters, brandId, distributorId],
-    queryFn: () => fetchShipments(debouncedSearchTerm, filters, brandId, distributorId),
+    queryKey: [
+      "shipments",
+      debouncedSearchTerm,
+      filters,
+      brandId,
+      distributorId,
+      orderId,
+    ],
+    queryFn: () =>
+      fetchShipments(
+        debouncedSearchTerm,
+        filters,
+        brandId,
+        distributorId,
+        orderId
+      ),
     staleTime: 0,
   });
 
+  // Create shipment using the atomic RPC function
   const createShipmentMutation = useMutation({
-    mutationFn: async (shipment: Partial<Shipment>): Promise<Shipment> => {
+    mutationFn: async (input: CreateShipmentInput): Promise<CreateShipmentResult> => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      const shipmentData = {
-        ...shipment,
-        user_id: user?.id,
-        shipment_number: `SHIP-${Date.now()}`,
-        created_by: user?.id,
-        updated_by: user?.id,
-      };
+      const { data, error: rpcError } = await supabase.rpc(
+        "create_shipment_transaction",
+        {
+          p_order_id: input.order_id,
+          p_carrier: input.carrier || null,
+          p_tracking_number: input.tracking_number || null,
+          p_shipping_method: input.shipping_method || null,
+          p_notes: input.notes || null,
+          p_items: input.items,
+          p_user_id: user?.id || null,
+        }
+      );
 
-      const { data: newShipment, error: createError } = await supabase
-        .from("shipments")
-        .insert(shipmentData)
-        .select()
-        .single();
-
-      if (createError) {
-        throw createError;
+      if (rpcError) {
+        throw rpcError;
       }
 
-      return newShipment;
+      // The RPC returns a JSONB object
+      const result = data as CreateShipmentResult;
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to create shipment");
+      }
+
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["shipments"] });
-      toast.success("Shipment created successfully!");
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["order-lines"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      toast.success(
+        `Shipment ${result.shipment_number} created successfully!`
+      );
     },
     onError: (error: any) => {
       console.error("Error creating shipment:", error);
-      toast.error(error?.message || "Failed to create shipment. Please try again.");
+      toast.error(
+        error?.message || "Failed to create shipment. Please try again."
+      );
     },
   });
 
+  // Update shipment status using the RPC function
+  const updateShipmentStatusMutation = useMutation({
+    mutationFn: async ({
+      shipmentId,
+      newStatus,
+      notes,
+    }: {
+      shipmentId: string;
+      newStatus: ShipmentStatus;
+      notes?: string;
+    }): Promise<UpdateShipmentStatusResult> => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const { data, error: rpcError } = await supabase.rpc(
+        "update_shipment_status",
+        {
+          p_shipment_id: shipmentId,
+          p_new_status: newStatus,
+          p_user_id: user?.id || null,
+          p_notes: notes || null,
+        }
+      );
+
+      if (rpcError) {
+        throw rpcError;
+      }
+
+      const result = data as UpdateShipmentStatusResult;
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to update shipment status");
+      }
+
+      return result;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["shipments"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      toast.success(`Shipment status updated to ${result.new_status}`);
+    },
+    onError: (error: any) => {
+      console.error("Error updating shipment status:", error);
+      toast.error(
+        error?.message || "Failed to update shipment status. Please try again."
+      );
+    },
+  });
+
+  // Direct update mutation (for non-status fields like tracking number)
   const updateShipmentMutation = useMutation({
     mutationFn: async ({
       shipmentId,
@@ -197,7 +304,9 @@ export function useShipments({
       updates: Partial<Shipment>;
     }): Promise<void> => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       const { error } = await supabase
         .from("shipments")
@@ -218,7 +327,9 @@ export function useShipments({
     },
     onError: (error: any) => {
       console.error("Error updating shipment:", error);
-      toast.error(error?.message || "Failed to update shipment. Please try again.");
+      toast.error(
+        error?.message || "Failed to update shipment. Please try again."
+      );
     },
   });
 
@@ -237,11 +348,14 @@ export function useShipments({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shipments"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
       toast.success("Shipment deleted successfully!");
     },
     onError: (error: any) => {
       console.error("Error deleting shipment:", error);
-      toast.error(error?.message || "Failed to delete shipment. Please try again.");
+      toast.error(
+        error?.message || "Failed to delete shipment. Please try again."
+      );
     },
   });
 
@@ -252,8 +366,19 @@ export function useShipments({
     refetch: () => {
       refetch();
     },
-    createShipment: async (shipment: Partial<Shipment>) => {
-      return await createShipmentMutation.mutateAsync(shipment);
+    createShipment: async (input: CreateShipmentInput) => {
+      return await createShipmentMutation.mutateAsync(input);
+    },
+    updateShipmentStatus: async (
+      shipmentId: string,
+      newStatus: ShipmentStatus,
+      notes?: string
+    ) => {
+      return await updateShipmentStatusMutation.mutateAsync({
+        shipmentId,
+        newStatus,
+        notes,
+      });
     },
     updateShipment: async (shipmentId: string, updates: Partial<Shipment>) => {
       await updateShipmentMutation.mutateAsync({ shipmentId, updates });
@@ -265,3 +390,79 @@ export function useShipments({
   };
 }
 
+/**
+ * Hook to fetch shipments for a specific order
+ */
+export function useOrderShipments(orderId: string, brandId?: string) {
+  return useShipments({
+    searchTerm: "",
+    filters: { status: "all", dateRange: "all" },
+    brandId,
+    orderId,
+  });
+}
+
+/**
+ * Hook to fetch a single shipment by ID
+ */
+export function useShipment(shipmentId: string) {
+  const queryClient = useQueryClient();
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["shipment", shipmentId],
+    queryFn: async () => {
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from("shipments")
+        .select(
+          `
+          *,
+          shipment_items (
+            id,
+            order_line_id,
+            product_id,
+            sku,
+            product_name,
+            quantity_shipped,
+            unit_price,
+            cost_price,
+            total_value
+          ),
+          orders (
+            id,
+            order_number,
+            customer_name,
+            customer_email,
+            order_status,
+            fulfilment_status
+          ),
+          distributors (
+            id,
+            name,
+            code
+          )
+        `
+        )
+        .eq("id", shipmentId)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data as Shipment & {
+        orders: any;
+        distributors: any;
+      };
+    },
+    enabled: !!shipmentId,
+  });
+
+  return {
+    shipment: data || null,
+    loading: isLoading,
+    error: error ? (error as Error).message : null,
+    refetch,
+  };
+}

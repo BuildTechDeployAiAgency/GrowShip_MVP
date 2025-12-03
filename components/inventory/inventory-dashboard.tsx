@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, AlertTriangle, Truck, TrendingDown } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/formatters";
 
 export function InventoryDashboard() {
   const { profile } = useEnhancedAuth();
@@ -43,10 +44,7 @@ export function InventoryDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${summary?.total_value?.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              }) || "0.00"}
+              {formatCurrency(summary?.total_value)}
             </div>
             <p className="text-xs text-gray-500 mt-1">Total inventory value</p>
           </CardContent>
@@ -145,7 +143,7 @@ export function InventoryDashboard() {
                       {format(new Date(shipment.expected_delivery_date), "MMM dd, yyyy")}
                     </div>
                     <div className="text-sm text-gray-500">
-                      ${shipment.total_amount?.toLocaleString()}
+                      {formatCurrency(shipment.total_amount)}
                     </div>
                   </div>
                 </div>

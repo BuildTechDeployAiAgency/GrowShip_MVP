@@ -3,7 +3,6 @@
 import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { NotificationList } from "@/components/notifications/notification-list";
 
 export default function NotificationsPage() {
@@ -20,16 +19,14 @@ export default function NotificationsPage() {
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle="Notifications"
-          pageSubtitle="View and manage notifications"
-        >
-          <NotificationList />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
+        pageTitle="Notifications"
+        pageSubtitle="View and manage notifications"
+      >
+        <NotificationList />
+      </MainLayout>
+    </ProtectedPage>
   );
 }
 

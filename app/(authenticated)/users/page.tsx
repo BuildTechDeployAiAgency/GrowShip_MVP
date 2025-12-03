@@ -4,7 +4,6 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { UsersManagement } from "@/components/users/users-management";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 
 export default function UsersPage() {
   const { user, profile, loading } = useRequireProfile();
@@ -20,10 +19,8 @@ export default function UsersPage() {
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <UsersManagement />
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <UsersManagement />
+    </ProtectedPage>
   );
 }

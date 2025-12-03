@@ -5,6 +5,7 @@ export type PaymentStatus =
   | "failed"
   | "refunded"
   | "partially_paid";
+export type FulfilmentStatus = "pending" | "partial" | "fulfilled";
 
 export interface OrderLine {
   id: string;
@@ -19,6 +20,7 @@ export interface OrderLine {
   total: number;
   currency?: string;
   notes?: string;
+  shipped_quantity?: number;
   created_at: string;
   updated_at: string;
 }
@@ -31,6 +33,11 @@ export interface Order {
   brand_id: string;
   distributor_id?: string;
   purchase_order_id?: string;
+  // Joined relation from purchase_orders table
+  purchase_orders?: {
+    id: string;
+    po_number: string;
+  } | null;
   customer_id?: string;
   customer_name: string;
   customer_email?: string;
@@ -56,6 +63,7 @@ export interface Order {
   payment_method?: string;
   payment_status: PaymentStatus;
   order_status: OrderStatus;
+  fulfilment_status?: FulfilmentStatus;
   notes?: string;
   tags?: string[];
   created_at: string;

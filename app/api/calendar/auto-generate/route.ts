@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { syncCalendarEvents } from "@/lib/calendar/event-generator";
+import { checkComplianceAlerts, checkCalendarEventAlerts } from "@/lib/notifications/compliance-alerts";
 
 /**
  * POST /api/calendar/auto-generate
  * Trigger auto-generation of calendar events from invoices, POs, shipments, campaigns, and reports
+ * Also checks for upcoming events and creates notifications for compliance and other calendar events
  */
 export async function POST(request: NextRequest) {
   try {
@@ -52,6 +54,12 @@ export async function POST(request: NextRequest) {
     // Sync calendar events
     const result = await syncCalendarEvents(finalBrandId, event_types);
 
+    // Check for upcoming events and create notifications
+    // This ensures users are alerted about compliance reviews, PO deliveries, etc.
+    const complianceAlerts = await checkComplianceAlerts(finalBrandId);
+    const calendarAlerts = await checkCalendarEventAlerts(finalBrandId);
+    const totalNotifications = complianceAlerts.notificationsCreated + calendarAlerts.notificationsCreated;
+
     return NextResponse.json({
       success: true,
       data: {
@@ -59,6 +67,7 @@ export async function POST(request: NextRequest) {
         updated: result.updated,
         cancelled: result.cancelled,
         total: result.created + result.updated,
+        notificationsSent: totalNotifications,
       },
     });
   } catch (error: any) {

@@ -43,10 +43,7 @@ import {
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import {
-  EnhancedAuthProvider,
-  useEnhancedAuth,
-} from "@/contexts/enhanced-auth-context";
+import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { HeaderNotificationButton } from "@/components/sales/header-notification-button";
 import { FilePreviewDialog } from "@/components/ui/file-preview-dialog";
 
@@ -87,11 +84,7 @@ interface UploadedReport {
 }
 
 export default function SalesReportPage() {
-  return (
-    <EnhancedAuthProvider>
-      <SalesReportsComponent />
-    </EnhancedAuthProvider>
-  );
+  return <SalesReportsComponent />;
 }
 
 function SalesReportsComponent() {

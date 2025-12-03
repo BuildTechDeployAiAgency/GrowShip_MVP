@@ -277,8 +277,13 @@ export function useOrders({
       return newOrder;
     },
     onSuccess: (newOrder) => {
+      // Optimistically update cache - no need for broad invalidation
       prependOrderToCaches(queryClient, newOrder);
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      // Only invalidate order detail query if it exists
+      queryClient.invalidateQueries({ 
+        queryKey: ["order", newOrder.id],
+        exact: true 
+      });
       toast.success("Order created successfully!");
     },
     onError: (error: any) => {
@@ -312,9 +317,14 @@ export function useOrders({
     },
     onSuccess: (updatedOrder) => {
       if (updatedOrder) {
+        // Optimistically update cache - no need for broad invalidation
         updateOrderInCaches(queryClient, updatedOrder);
+        // Only invalidate specific order detail query
+        queryClient.invalidateQueries({ 
+          queryKey: ["order", updatedOrder.id],
+          exact: true 
+        });
       }
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
       toast.success("Order updated successfully!");
     },
     onError: (error: any) => {
@@ -337,8 +347,13 @@ export function useOrders({
       }
     },
     onSuccess: (_data, orderId) => {
+      // Optimistically update cache - no need for broad invalidation
       removeOrderFromCaches(queryClient, orderId);
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      // Remove specific order detail query from cache
+      queryClient.removeQueries({ 
+        queryKey: ["order", orderId],
+        exact: true 
+      });
       toast.success("Order deleted successfully!");
     },
     onError: (error: any) => {

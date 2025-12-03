@@ -249,9 +249,10 @@ export async function createBatchStockAlerts(
 /**
  * Check inventory alerts for all products in a brand
  * This function evaluates thresholds and creates alerts as needed
+ * Also includes predictive stock-out alerts based on sales velocity
  */
 export async function checkInventoryAlerts(brandId: string): Promise<void> {
-  const { checkAllProductThresholds, evaluateStockThresholds } = await import("@/lib/inventory/alert-evaluator");
+  const { checkAllProductThresholds, evaluateStockThresholds, getProductsRunningOutSoon } = await import("@/lib/inventory/alert-evaluator");
   const supabase = await createClient();
 
   // Get all products that need threshold evaluation
@@ -284,6 +285,42 @@ export async function checkInventoryAlerts(brandId: string): Promise<void> {
   }
 
   console.log(`Checked inventory alerts for brand ${brandId}: ${evaluations.length} products evaluated`);
+
+  // ================================================
+  // PREDICTIVE STOCK-OUT ALERTS (Out-of-Stock Risk)
+  // ================================================
+  // Check for products that will run out soon based on sales velocity
+  try {
+    const runningOutSoon = await getProductsRunningOutSoon(brandId, 7); // Products running out within 7 days
+
+    for (const product of runningOutSoon) {
+      // Check if we already sent a "running out soon" alert for this product recently (within 3 days)
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+      const { data: existingAlert } = await supabase
+        .from("notifications")
+        .select("id")
+        .eq("related_entity_type", "inventory")
+        .eq("related_entity_id", product.product_id)
+        .ilike("title", "%Running Out Soon%")
+        .gte("created_at", threeDaysAgo.toISOString())
+        .limit(1)
+        .maybeSingle();
+
+      // Skip if we already sent an alert recently
+      if (existingAlert) {
+        continue;
+      }
+
+      // Create the predictive alert
+      await createRunningOutSoonAlert(product.product_id, product.days_until_out);
+    }
+
+    console.log(`Checked predictive stock-out alerts for brand ${brandId}: ${runningOutSoon.length} products at risk`);
+  } catch (error) {
+    console.error(`Error checking predictive stock-out alerts for brand ${brandId}:`, error);
+  }
 }
 
 /**

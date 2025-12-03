@@ -5,7 +5,6 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { DistributorsList } from "@/components/distributors/distributors-list";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 
 export default function DistributorsPage() {
   const { user, profile, loading } = useRequireProfile();
@@ -27,15 +26,13 @@ export default function DistributorsPage() {
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle="Customers"
-          pageSubtitle="Manage customer relationships"
-        >
-          <DistributorsList />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
+        pageTitle="Customers"
+        pageSubtitle="Manage customer relationships"
+      >
+        <DistributorsList />
+      </MainLayout>
+    </ProtectedPage>
   );
 }

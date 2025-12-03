@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/formatters";
 
 interface ForecastTableProps {
   forecasts: Array<DemandForecast & {
@@ -149,17 +150,11 @@ export function ForecastTable({ forecasts, onExport }: ForecastTableProps) {
                       )}
                     </TableCell>
                     <TableCell>
-                      ${forecast.forecasted_revenue?.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      }) || "0.00"}
+                      {formatCurrency(forecast.forecasted_revenue)}
                     </TableCell>
                     <TableCell>
                       {forecast.actual_revenue !== undefined
-                        ? `$${forecast.actual_revenue.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}`
+                        ? formatCurrency(forecast.actual_revenue)
                         : "-"}
                     </TableCell>
                     <TableCell>

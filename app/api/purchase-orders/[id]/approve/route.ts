@@ -51,7 +51,7 @@ export async function POST(
       );
     }
 
-    // Create notification
+    // Create notification for PO approval
     await createPOStatusChangeAlert(
       id,
       po.po_number,
@@ -60,7 +60,13 @@ export async function POST(
       po.brand_id
     );
 
-    return NextResponse.json({ purchase_order: result.updatedPO });
+    // NOTE: Order creation is now handled manually via the frontend dialog
+    // after approval. The user will be prompted to create orders from the
+    // PO details page or via the "Create Related Order?" dialog.
+
+    return NextResponse.json({ 
+      purchase_order: result.updatedPO
+    });
   } catch (error) {
     console.error("Unexpected error:", error);
     return NextResponse.json(

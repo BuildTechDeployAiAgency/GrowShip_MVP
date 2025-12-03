@@ -3,7 +3,6 @@
 import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { InventoryTransactionsList } from "@/components/inventory/inventory-transactions-list";
 
 export default function InventoryTransactionsPage() {
@@ -20,16 +19,14 @@ export default function InventoryTransactionsPage() {
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <MainLayout
-          pageTitle="Inventory Transactions"
-          pageSubtitle="Complete history of all stock movements"
-        >
-          <InventoryTransactionsList />
-        </MainLayout>
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <MainLayout
+        pageTitle="Inventory Transactions"
+        pageSubtitle="Complete history of all stock movements"
+      >
+        <InventoryTransactionsList />
+      </MainLayout>
+    </ProtectedPage>
   );
 }
 

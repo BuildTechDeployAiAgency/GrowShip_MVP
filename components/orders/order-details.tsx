@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -13,19 +13,26 @@ import {
   Truck,
   Edit,
   Printer,
-  Download
+  Download,
+  Plus
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
-import type { Order, OrderStatus, PaymentStatus } from "@/types/orders";
+import type { Order, OrderStatus, PaymentStatus, FulfilmentStatus } from "@/types/orders";
 import { Distributor } from "@/hooks/use-distributors";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import { OrderFormDialog } from "./order-form-dialog";
 import { OrderHistory } from "./order-history";
+import { OrderStatusTimeline } from "./order-status-timeline";
+import { StatusUpdateDialog } from "./status-update-dialog";
+import { CreateShipmentDialog } from "@/components/shipments/create-shipment-dialog";
+import { ShipmentsList } from "@/components/shipments/shipments-list";
+import { formatCurrency } from "@/lib/formatters";
+import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 
 const statusColors: Record<OrderStatus, string> = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -43,17 +50,35 @@ const paymentColors: Record<PaymentStatus, string> = {
   partially_paid: "bg-yellow-100 text-yellow-800",
 };
 
+const fulfilmentColors: Record<FulfilmentStatus, string> = {
+  pending: "bg-gray-100 text-gray-800",
+  partial: "bg-yellow-100 text-yellow-800",
+  fulfilled: "bg-green-100 text-green-800",
+};
+
 interface OrderDetailsProps {
   orderId: string;
 }
 
 export function OrderDetails({ orderId }: OrderDetailsProps) {
   const router = useRouter();
+  const { profile } = useEnhancedAuth();
+  const isDistributorAdmin = profile?.role_name?.startsWith("distributor_");
+  const canManageOrders = !isDistributorAdmin;
   const [order, setOrder] = useState<Order | null>(null);
   const [distributor, setDistributor] = useState<Distributor | null>(null);
+  const [sourcePO, setSourcePO] = useState<{ po_number: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [showShipmentDialog, setShowShipmentDialog] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<OrderStatus | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [shipmentsKey, setShipmentsKey] = useState(0); // Key to force refresh shipments list
+  const [hasActiveShipment, setHasActiveShipment] = useState(false);
+  const autoPromptedRef = useRef(false);
+  const autoPromptTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchOrderDetails = async () => {
     try {
@@ -84,6 +109,19 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
           setDistributor(distributorData);
         }
       }
+
+      // Fetch source PO if exists
+      if (orderData.purchase_order_id) {
+        const { data: poData } = await supabase
+          .from("purchase_orders")
+          .select("po_number")
+          .eq("id", orderData.purchase_order_id)
+          .single();
+          
+        if (poData) {
+          setSourcePO(poData);
+        }
+      }
     } catch (err: any) {
       console.error("Error fetching order details:", err);
       setError(err.message || "Failed to load order details");
@@ -104,6 +142,179 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
     setShowEditDialog(false);
     fetchOrderDetails(); // Refresh order data
     toast.success("Order updated successfully!");
+  };
+
+  // Reusable function to update order status via API
+  const updateOrderStatus = async (
+    newStatus: OrderStatus,
+    comment?: string
+  ): Promise<boolean> => {
+    if (!order) return false;
+
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          order_status: newStatus,
+          change_reason: comment || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to update order status");
+      }
+
+      return true;
+    } catch (err: any) {
+      console.error("Error updating order status:", err);
+      toast.error(err.message || "Failed to update order status");
+      return false;
+    }
+  };
+
+  const handleShipmentSuccess = async () => {
+    handleCloseShipmentDialog();
+
+    // After successful shipment creation, update order status to "shipped"
+    // if the order is still in "processing" status
+    if (order && order.order_status === "processing") {
+      setIsUpdatingStatus(true);
+      const success = await updateOrderStatus(
+        "shipped",
+        "Shipment created - order marked as shipped"
+      );
+      if (success) {
+        toast.success("Shipment created and order marked as shipped!");
+      }
+      setIsUpdatingStatus(false);
+    } else {
+      toast.success("Shipment created successfully!");
+    }
+
+    fetchOrderDetails(); // Refresh order data to get updated fulfilment_status
+    setShipmentsKey((prev) => prev + 1); // Force refresh shipments list
+    setHasActiveShipment(true);
+  };
+
+  // Check if order can have shipments created
+  const canCreateShipment = 
+    canManageOrders &&
+    order && 
+    order.order_status !== "cancelled" && 
+    order.fulfilment_status !== "fulfilled";
+
+  // Fetch active shipments (non-terminal statuses) so we don't prompt when one exists
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadActiveShipments = async () => {
+      if (!order?.id) return;
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("shipments")
+        .select("id, shipment_status")
+        .eq("order_id", order.id)
+        .not("shipment_status", "in", "('delivered','cancelled','returned')");
+
+      if (!isMounted) return;
+
+      if (error) {
+        console.error("Error checking active shipments:", error);
+        setHasActiveShipment(false);
+      } else {
+        setHasActiveShipment((data || []).length > 0);
+      }
+    };
+
+    loadActiveShipments();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [order?.id, shipmentsKey]);
+
+  // Auto-open shipment dialog after 10 seconds if eligible and no active shipment exists
+  useEffect(() => {
+    if (!order || !canCreateShipment || hasActiveShipment) {
+      if (autoPromptTimerRef.current) {
+        clearTimeout(autoPromptTimerRef.current);
+      }
+      return;
+    }
+
+    if (autoPromptTimerRef.current) {
+      clearTimeout(autoPromptTimerRef.current);
+    }
+
+    autoPromptTimerRef.current = setTimeout(() => {
+      if (
+        !autoPromptedRef.current &&
+        canCreateShipment &&
+        !hasActiveShipment &&
+        order.order_status === "processing"
+      ) {
+        autoPromptedRef.current = true;
+        setShowShipmentDialog(true);
+      }
+    }, 10000);
+
+    return () => {
+      if (autoPromptTimerRef.current) {
+        clearTimeout(autoPromptTimerRef.current);
+      }
+    };
+  }, [order?.id, order?.order_status, canCreateShipment, hasActiveShipment]);
+
+  const handleCloseShipmentDialog = () => {
+    autoPromptedRef.current = true; // User dismissed; don't auto-open again this session
+    setShowShipmentDialog(false);
+  };
+
+  const handleStatusClick = (newStatus: OrderStatus) => {
+    if (isDistributorAdmin) {
+      toast.info("Distributor users cannot update order status.");
+      return;
+    }
+
+    // Intercept "shipped" status: require creating a shipment instead of direct status update
+    if (newStatus === "shipped") {
+      // Only allow creating shipment if order can have shipments
+      if (canCreateShipment) {
+        setShowShipmentDialog(true);
+      } else {
+        toast.error("Cannot create shipment: order is cancelled or fully fulfilled");
+      }
+      return;
+    }
+
+    // For all other statuses, proceed with the normal status update dialog
+    setPendingStatus(newStatus);
+    setShowStatusDialog(true);
+  };
+
+  const handleStatusConfirm = async (comment: string) => {
+    if (!pendingStatus || !order) return;
+    
+    setIsUpdatingStatus(true);
+    try {
+      const success = await updateOrderStatus(pendingStatus, comment);
+      if (!success) {
+        throw new Error("Failed to update order status");
+      }
+
+      toast.success(`Order status updated to ${pendingStatus}`);
+      fetchOrderDetails(); // Refresh order data
+    } catch (err: any) {
+      console.error("Error updating order status:", err);
+      throw err; // Re-throw so dialog knows update failed
+    } finally {
+      setIsUpdatingStatus(false);
+      setPendingStatus(null);
+    }
   };
 
   if (loading) {
@@ -199,20 +410,74 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
             <Download className="mr-2 h-4 w-4" />
             Download
           </Button>
-          <Button size="sm" onClick={() => setShowEditDialog(true)}>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Order
-          </Button>
+          {canManageOrders && (
+            <>
+              <Button size="sm" onClick={() => setShowEditDialog(true)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Order
+              </Button>
+              {canCreateShipment && (
+                <Button 
+                  size="sm" 
+                  onClick={() => setShowShipmentDialog(true)}
+                  className="bg-teal-600 hover:bg-teal-700"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Shipment
+                </Button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
       {/* Edit Order Dialog */}
-      <OrderFormDialog
-        open={showEditDialog}
-        onClose={() => setShowEditDialog(false)}
-        order={order}
-        onSuccess={handleEditSuccess}
-      />
+      {canManageOrders && (
+        <OrderFormDialog
+          open={showEditDialog}
+          onClose={() => setShowEditDialog(false)}
+          order={order}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      {/* Create Shipment Dialog */}
+      {order && canManageOrders && (
+        <CreateShipmentDialog
+          open={showShipmentDialog}
+          onClose={handleCloseShipmentDialog}
+          order={order}
+          onSuccess={handleShipmentSuccess}
+        />
+      )}
+
+      {/* Status Update Dialog */}
+      {pendingStatus && (
+        <StatusUpdateDialog
+          open={showStatusDialog}
+          onClose={() => {
+            setShowStatusDialog(false);
+            setPendingStatus(null);
+          }}
+          currentStatus={order.order_status}
+          newStatus={pendingStatus}
+          onConfirm={handleStatusConfirm}
+        />
+      )}
+
+      {/* Order Status Timeline */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium">Order Progress</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0 pb-6">
+          <OrderStatusTimeline
+            currentStatus={order.order_status}
+            onStatusClick={handleStatusClick}
+          disabled={isDistributorAdmin || isUpdatingStatus}
+        />
+      </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Order Details */}
@@ -226,7 +491,7 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Status</p>
                   <Badge className={`mt-1 ${statusColors[order.order_status]}`}>
@@ -239,6 +504,24 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
                     {order.payment_status.replace("_", " ")}
                   </Badge>
                 </div>
+                <div>
+                  <p className="text-sm text-gray-500">Fulfilment</p>
+                  <Badge className={`mt-1 ${fulfilmentColors[order.fulfilment_status || "pending"]}`}>
+                    {order.fulfilment_status || "pending"}
+                  </Badge>
+                </div>
+                {sourcePO && (
+                  <div>
+                    <p className="text-sm text-gray-500">Source Purchase Order</p>
+                    <Button 
+                      variant="link" 
+                      className="p-0 h-auto font-medium text-teal-600 mt-1"
+                      onClick={() => router.push(`/purchase-orders/${order.purchase_order_id}`)}
+                    >
+                      {sourcePO.po_number}
+                    </Button>
+                  </div>
+                )}
               </div>
               
               <Separator />
@@ -253,7 +536,7 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
                 <div>
                   <p className="text-sm text-gray-500">Total Amount</p>
                   <p className="font-medium text-lg">
-                    {order.currency || "USD"} {order.total_amount.toFixed(2)}
+                    {formatCurrency(order.total_amount, order.currency)}
                   </p>
                 </div>
               </div>
@@ -305,13 +588,13 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
                               {item.quantity}
                             </td>
                             <td className="px-4 py-3 text-sm text-right">
-                              ${item.unit_price.toFixed(2)}
+                              {formatCurrency(item.unit_price, order.currency)}
                             </td>
                             <td className="px-4 py-3 text-sm text-right text-red-600">
                               {item.discount > 0 ? `-${item.discount}%` : '-'}
                             </td>
                             <td className="px-4 py-3 text-sm font-medium text-right">
-                              ${item.total.toFixed(2)}
+                              {formatCurrency(item.total, order.currency)}
                             </td>
                           </tr>
                         ))}
@@ -325,33 +608,33 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
                   <div className="space-y-2 max-w-xs ml-auto">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Subtotal:</span>
-                      <span className="font-medium">${order.subtotal.toFixed(2)}</span>
+                      <span className="font-medium">{formatCurrency(order.subtotal, order.currency)}</span>
                     </div>
                     {order.discount_total && order.discount_total > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Discount:</span>
                         <span className="font-medium text-red-600">
-                          -${order.discount_total.toFixed(2)}
+                          -{formatCurrency(order.discount_total, order.currency)}
                         </span>
                       </div>
                     )}
                     {order.tax_total && order.tax_total > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Tax:</span>
-                        <span className="font-medium">${order.tax_total.toFixed(2)}</span>
+                        <span className="font-medium">{formatCurrency(order.tax_total, order.currency)}</span>
                       </div>
                     )}
                     {order.shipping_cost && order.shipping_cost > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Shipping:</span>
-                        <span className="font-medium">${order.shipping_cost.toFixed(2)}</span>
+                        <span className="font-medium">{formatCurrency(order.shipping_cost, order.currency)}</span>
                       </div>
                     )}
                     <Separator />
                     <div className="flex justify-between text-base font-semibold">
                       <span>Total:</span>
                       <span className="text-teal-600">
-                        {order.currency || "USD"} {order.total_amount.toFixed(2)}
+                        {formatCurrency(order.total_amount, order.currency)}
                       </span>
                     </div>
                   </div>
@@ -514,9 +797,31 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
         </div>
       </div>
 
+      {/* Shipments Section */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Truck className="h-5 w-5" />
+            Shipments
+          </CardTitle>
+          {canCreateShipment && (
+            <Button 
+              size="sm" 
+              onClick={() => setShowShipmentDialog(true)}
+              className="bg-teal-600 hover:bg-teal-700"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Create Shipment
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent>
+          <ShipmentsList key={shipmentsKey} orderId={order.id} />
+        </CardContent>
+      </Card>
+
       {/* Order History */}
       <OrderHistory orderId={order.id} />
     </div>
   );
 }
-

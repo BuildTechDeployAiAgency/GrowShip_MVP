@@ -4,7 +4,6 @@ import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useRequireProfile } from "@/hooks/use-auth";
 import { ProtectedPage } from "@/components/common/protected-page";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { ForecastChart } from "@/components/forecasting/forecast-chart";
 import { ForecastTable } from "@/components/forecasting/forecast-table";
 import { GenerateForecastDialog } from "@/components/forecasting/generate-forecast-dialog";
@@ -42,20 +41,18 @@ export default function ForecastingPage() {
   }
 
   return (
-    <EnhancedAuthProvider>
-      <ProtectedPage allowedStatuses={["approved"]}>
-        <ForecastingContent
-          isDialogOpen={isDialogOpen}
-          setIsDialogOpen={setIsDialogOpen}
-          selectedSku={selectedSku}
-          setSelectedSku={setSelectedSku}
-          metric={metric}
-          setMetric={setMetric}
-          algorithmFilter={algorithmFilter}
-          setAlgorithmFilter={setAlgorithmFilter}
-        />
-      </ProtectedPage>
-    </EnhancedAuthProvider>
+    <ProtectedPage allowedStatuses={["approved"]}>
+      <ForecastingContent
+        isDialogOpen={isDialogOpen}
+        setIsDialogOpen={setIsDialogOpen}
+        selectedSku={selectedSku}
+        setSelectedSku={setSelectedSku}
+        metric={metric}
+        setMetric={setMetric}
+        algorithmFilter={algorithmFilter}
+        setAlgorithmFilter={setAlgorithmFilter}
+      />
+    </ProtectedPage>
   );
 }
 

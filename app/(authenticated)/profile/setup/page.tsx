@@ -1,6 +1,5 @@
 "use client";
 
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { ProfileSetup } from "@/components/auth/profile-setup";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { useRouter } from "next/navigation";
@@ -100,9 +99,5 @@ function ProfileSetupPageContent() {
 }
 
 export default function ProfileSetupPage() {
-  return (
-    <EnhancedAuthProvider>
-      <ProfileSetupPageContent />
-    </EnhancedAuthProvider>
-  );
+  return <ProfileSetupPageContent />;
 }

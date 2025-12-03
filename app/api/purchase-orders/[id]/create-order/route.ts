@@ -107,7 +107,7 @@ export async function POST(
       user_id: user.id,
       order_number: `ORD-${Date.now()}`,
       order_date: new Date().toISOString(),
-      order_status: "draft",
+      order_status: "pending",
       payment_status: "pending",
       currency: po.currency || "USD",
       created_by: user.id,

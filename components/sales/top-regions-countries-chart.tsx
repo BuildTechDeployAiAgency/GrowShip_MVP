@@ -17,6 +17,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { TrendingUp, TrendingDown, MapPin } from "lucide-react";
+import { formatCurrency, formatNumber } from "@/lib/formatters";
 
 // Single orange color for all bars
 const SINGLE_COLOR = "#f97316";
@@ -307,13 +308,13 @@ export function TopRegionsCountriesChart() {
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Revenue</span>
                         <span className="font-bold text-lg text-orange-600">
-                          ${(region.revenue / 1000).toFixed(0)}k
+                          {formatCurrency(region.revenue)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between mt-1">
                         <span className="text-sm text-gray-600">Orders</span>
                         <span className="font-semibold text-sm text-gray-900">
-                          {region.orders.toLocaleString()}
+                          {formatNumber(region.orders)}
                         </span>
                       </div>
                     </div>

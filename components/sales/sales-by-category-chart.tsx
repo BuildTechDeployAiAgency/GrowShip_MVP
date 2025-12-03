@@ -16,6 +16,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import { formatCurrency } from "@/lib/formatters";
 
 const COLORS = ["#0d9488", "#14b8a6", "#2dd4bf", "#5eead4", "#99f6e4"];
 
@@ -147,7 +148,7 @@ export function SalesByCategoryChart() {
                     fontSize: "12px",
                   }}
                   formatter={(value: number, name: string, props: any) => [
-                    `$${value.toLocaleString()}`,
+                    formatCurrency(value),
                     `${props.payload.percentage}%`,
                   ]}
                   labelFormatter={(label) => `Category: ${label}`}

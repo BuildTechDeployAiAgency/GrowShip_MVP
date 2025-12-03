@@ -6,7 +6,6 @@ import {
   DateFilterProvider,
   useDateFilters,
 } from "@/contexts/date-filter-context";
-import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
 import { GlobalDateFilter } from "@/components/sales/global-date-filter";
 import { TrendingUp, BarChart3 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -116,10 +115,8 @@ function AnalyticsContent() {
 
 export default function SalesAnalyticsPage() {
   return (
-    <EnhancedAuthProvider>
-      <DateFilterProvider>
-        <AnalyticsContent />
-      </DateFilterProvider>
-    </EnhancedAuthProvider>
+    <DateFilterProvider>
+      <AnalyticsContent />
+    </DateFilterProvider>
   );
 }

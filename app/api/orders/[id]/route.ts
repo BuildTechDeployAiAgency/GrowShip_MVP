@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { isValidStatusTransition } from "@/lib/orders/status-workflow";
 import { OrderStatus } from "@/types/orders";
 import { 
@@ -48,6 +48,13 @@ export async function PATCH(
     const isSuperAdmin = profile?.role_name === "super_admin";
     const isDistributorAdmin = profile?.role_name?.startsWith("distributor_");
 
+    if (isDistributorAdmin) {
+      return NextResponse.json(
+        { error: "Distributor users cannot modify orders" },
+        { status: 403 }
+      );
+    }
+
     // Permission checks (enforce for all users including super admin)
     if (!isSuperAdmin) {
       // Brand admin or distributor admin must match brand_id
@@ -58,16 +65,6 @@ export async function PATCH(
         );
       }
       
-      // Distributor admin must also match distributor_id
-      if (
-        isDistributorAdmin &&
-        currentOrder.distributor_id !== profile?.distributor_id
-      ) {
-        return NextResponse.json(
-          { error: "You can only update orders for your distributor" },
-          { status: 403 }
-        );
-      }
     }
 
     // Validate Status Transition
@@ -87,6 +84,9 @@ export async function PATCH(
       }
     }
 
+    // Extract change_reason before preparing updates (not a column on orders table)
+    const changeReason = body.change_reason;
+    
     // Prepare updates
     const updates = {
       ...body,
@@ -100,6 +100,7 @@ export async function PATCH(
     delete updates.created_at;
     delete updates.created_by;
     delete updates.order_number;
+    delete updates.change_reason; // Not a column on orders table
 
     // Perform Update (the trigger will automatically log the change to order_history)
     const { data: updatedOrder, error: updateError } = await supabase
@@ -146,6 +147,32 @@ export async function PATCH(
         }
       }
       // "delivered" status has no inventory impact (just confirmation)
+      
+      // If a change_reason was provided and status changed, update the most recent order_history entry
+      if (changeReason) {
+        try {
+          const adminClient = createAdminClient();
+          // Find the most recent history entry for this order (created by the trigger)
+          const { data: historyEntry } = await adminClient
+            .from("order_history")
+            .select("id")
+            .eq("order_id", id)
+            .eq("field_name", "order_status")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+            
+          if (historyEntry) {
+            await adminClient
+              .from("order_history")
+              .update({ change_reason: changeReason })
+              .eq("id", historyEntry.id);
+          }
+        } catch (historyError) {
+          // Log but don't fail the request if history update fails
+          console.error("Failed to update order history with change reason:", historyError);
+        }
+      }
     }
 
     return NextResponse.json(updatedOrder);
@@ -157,4 +184,3 @@ export async function PATCH(
     );
   }
 }
-

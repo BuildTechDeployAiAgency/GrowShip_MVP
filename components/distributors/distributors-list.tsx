@@ -108,8 +108,8 @@ export function DistributorsList() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+    <div className="space-y-4 h-full flex flex-col">
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between flex-none">
         <div className="flex-1 w-full sm:w-auto">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -145,9 +145,9 @@ export function DistributorsList() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+      <Card className="flex-1 flex flex-col overflow-hidden">
+        <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
+          <div className="overflow-x-auto flex-1 overflow-y-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
@@ -257,7 +257,7 @@ export function DistributorsList() {
       </Card>
 
       {totalCount > 0 && (
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-gray-600 flex-none">
           Showing {distributors.length} of {totalCount} customers
         </div>
       )}

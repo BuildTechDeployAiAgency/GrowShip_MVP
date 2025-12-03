@@ -40,6 +40,7 @@ import { OrderFormDialog } from "./order-form-dialog";
 import { format } from "date-fns";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { formatCurrency } from "@/lib/formatters";
 
 const statusColors: Record<OrderStatus, string> = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -64,6 +65,7 @@ interface OrdersListProps {
 export function OrdersList({ onCreateOrder }: OrdersListProps) {
   const router = useRouter();
   const { profile } = useEnhancedAuth();
+  const isDistributorAdmin = profile?.role_name?.startsWith("distributor_");
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
@@ -114,16 +116,18 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
       ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
       : 0;
 
-  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
-    await updateOrder(orderId, { order_status: status });
-  };
-
   const handleEdit = (order: Order) => {
+    if (isDistributorAdmin) {
+      return;
+    }
     setSelectedOrder(order);
     setShowEditDialog(true);
   };
 
   const handleDelete = async (orderId: string) => {
+    if (isDistributorAdmin) {
+      return;
+    }
     if (confirm("Are you sure you want to delete this order?")) {
       await deleteOrder(orderId);
     }
@@ -158,8 +162,8 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+    <div className="space-y-4 h-full flex flex-col">
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between flex-none">
         <div className="flex-1 w-full sm:w-auto">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -228,18 +232,21 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+      <Card className="flex-1 flex flex-col overflow-hidden">
+        <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
+          <div className="overflow-x-auto flex-1 flex flex-col">
             <div
               ref={tableContainerRef}
-              className="max-h-[600px] overflow-y-auto"
+              className="flex-1 overflow-y-auto"
             >
               <table className="w-full">
                 <thead className="bg-gray-50 border-b sticky top-0 z-10">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Order #
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Parent PO
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Customer
@@ -264,7 +271,7 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {orders.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                         No orders found. Create your first order to get started.
                       </td>
                     </tr>
@@ -272,7 +279,7 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
                     <>
                       {paddingTop > 0 && (
                         <tr>
-                          <td colSpan={7} style={{ height: `${paddingTop}px` }} />
+                          <td colSpan={8} style={{ height: `${paddingTop}px` }} />
                         </tr>
                       )}
                       {virtualRows.map((virtualRow) => {
@@ -293,6 +300,18 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
                               </button>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
+                              {order.purchase_orders?.po_number ? (
+                                <button
+                                  onClick={() => router.push(`/purchase-orders/${order.purchase_order_id}`)}
+                                  className="text-sm font-medium text-purple-600 hover:text-purple-800 hover:underline cursor-pointer"
+                                >
+                                  {order.purchase_orders.po_number}
+                                </button>
+                              ) : (
+                                <span className="text-sm text-gray-400">—</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
                                 {order.customer_name}
                               </div>
@@ -306,7 +325,7 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
                               {format(new Date(order.order_date), "MMM dd, yyyy")}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {order.currency || "USD"} {order.total_amount.toFixed(2)}
+                              {formatCurrency(order.total_amount, order.currency)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <Badge className={statusColors[order.order_status]}>
@@ -332,7 +351,10 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
                                     <Eye className="mr-2 h-4 w-4" />
                                     View Details
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleEdit(order)}>
+                                  <DropdownMenuItem
+                                    onClick={() => handleEdit(order)}
+                                    disabled={isDistributorAdmin}
+                                  >
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit
                                   </DropdownMenuItem>
@@ -340,7 +362,7 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
                                     <FileText className="mr-2 h-4 w-4" />
                                     Generate Invoice
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem disabled={isDistributorAdmin}>
                                     <Truck className="mr-2 h-4 w-4" />
                                     Create Shipment
                                   </DropdownMenuItem>
@@ -348,6 +370,7 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
                                   <DropdownMenuItem
                                     onClick={() => handleDelete(order.id)}
                                     className="text-red-600"
+                                    disabled={isDistributorAdmin}
                                   >
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete
@@ -360,7 +383,7 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
                       })}
                       {paddingBottom > 0 && (
                         <tr>
-                          <td colSpan={7} style={{ height: `${paddingBottom}px` }} />
+                          <td colSpan={8} style={{ height: `${paddingBottom}px` }} />
                         </tr>
                       )}
                     </>
@@ -373,7 +396,7 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
       </Card>
 
       {totalCount > 0 && (
-        <div className="flex flex-col gap-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between flex-none">
           <div>
             Showing {startItem}-{endItem} of {totalCount} orders
           </div>
@@ -439,4 +462,3 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
     </div>
   );
 }
-

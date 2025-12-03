@@ -354,6 +354,60 @@ export async function POST(request: NextRequest) {
             insertedCount: insertedOrders?.length || 0,
             nextSequence: currentSequence,
           });
+
+          // Create order_lines for each inserted order to support shipments/fulfilment flows
+          if (insertedOrders && insertedOrders.length > 0) {
+            const orderLinesPayload: any[] = [];
+            insertedOrders.forEach((inserted, idx) => {
+              const source = batch[idx];
+              if (!source || !Array.isArray(source.items)) return;
+              source.items.forEach((item) => {
+                orderLinesPayload.push({
+                  order_id: inserted.id,
+                  product_id: item.product_id || null,
+                  sku: item.sku,
+                  product_name: item.product_name,
+                  quantity: item.quantity,
+                  unit_price: item.unit_price,
+                  discount: item.discount || 0,
+                  tax: item.tax_rate || 0,
+                  currency: "USD",
+                  notes: item.notes || null,
+                  created_by: user.id,
+                  updated_by: user.id,
+                  shipped_quantity: 0,
+                });
+              });
+            });
+
+            if (orderLinesPayload.length > 0) {
+              const { error: orderLinesError } = await adminSupabase
+                .from("order_lines")
+                .insert(orderLinesPayload);
+
+              if (orderLinesError) {
+                console.error(
+                  `[Import Confirm] Error inserting order_lines for batch ${batchNumber}`,
+                  {
+                    batchNumber,
+                    error: orderLinesError,
+                    message: orderLinesError.message,
+                    details: orderLinesError.details,
+                    hint: orderLinesError.hint,
+                    code: orderLinesError.code,
+                  }
+                );
+                errors.push({
+                  batch: batchNumber,
+                  error: orderLinesError.message,
+                  code: orderLinesError.code,
+                  details: orderLinesError.details,
+                  hint: orderLinesError.hint,
+                  rows: batch.map((o) => o.row),
+                });
+              }
+            }
+          }
         }
       } catch (batchError: any) {
         console.error(`[Import Confirm] Exception processing batch ${batchNumber}`, {
@@ -449,4 +503,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

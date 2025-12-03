@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { useDateFilters } from "@/contexts/date-filter-context";
 import { useTopSkus, TopSkusFilters } from "@/hooks/use-top-skus";
+import { formatCurrency, formatNumber } from "@/lib/formatters";
 
 interface TopSkusTableProps {
   filters?: TopSkusFilters;
@@ -178,13 +179,13 @@ export function TopSkusTable({ filters }: TopSkusTableProps = {}) {
                     </td>
                     <td className="py-3 px-2 text-right">
                       <p className="text-sm font-semibold text-gray-900">
-                        ${item.revenue.toLocaleString()}
+                        {formatCurrency(item.revenue)}
                       </p>
                     </td>
                     <td className="py-3 px-2 text-right">
                       <p className="text-sm text-gray-600">
                         {item.previous_period_revenue !== null
-                          ? `$${item.previous_period_revenue.toLocaleString()}`
+                          ? formatCurrency(item.previous_period_revenue)
                           : "N/A"}
                       </p>
                     </td>
@@ -204,7 +205,7 @@ export function TopSkusTable({ filters }: TopSkusTableProps = {}) {
                     </td>
                     <td className="py-3 px-2 text-right">
                       <p className="text-sm text-gray-600">
-                        {item.current_soh.toLocaleString()}
+                        {formatNumber(item.current_soh)}
                       </p>
                     </td>
                     <td className="py-3 px-2 text-center">

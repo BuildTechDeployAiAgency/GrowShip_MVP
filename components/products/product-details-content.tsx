@@ -13,20 +13,13 @@ import {
   Calendar,
   FileText,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/formatters";
 
 interface ProductDetailsContentProps {
   product: Product;
 }
 
 export function ProductDetailsContent({ product }: ProductDetailsContentProps) {
-  const formatCurrency = (amount?: number, currency?: string) => {
-    if (amount === undefined || amount === null) return "N/A";
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency || "USD",
-    }).format(amount);
-  };
-
   const formatDate = (dateString?: string) => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString();
