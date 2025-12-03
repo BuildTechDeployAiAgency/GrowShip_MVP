@@ -48,6 +48,13 @@ interface ShipmentFormData {
 interface OrderLineWithInventory extends OrderLine {
   available_stock?: number;
   quantity_in_stock?: number;
+  products?: {
+    id: string;
+    sku: string;
+    quantity_in_stock: number;
+    available_stock: number;
+    allocated_stock: number;
+  } | null;
 }
 
 const CARRIERS = [
