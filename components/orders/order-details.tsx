@@ -14,7 +14,9 @@ import {
   Edit,
   Printer,
   Download,
-  Plus
+  Plus,
+  Megaphone,
+  Globe
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -526,7 +528,7 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
               
               <Separator />
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Order Date</p>
                   <p className="font-medium">
@@ -539,6 +541,29 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
                     {formatCurrency(order.total_amount, order.currency)}
                   </p>
                 </div>
+                {/* Sales Channel */}
+                <div>
+                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                    <Globe className="h-3 w-3" /> Sales Channel
+                  </p>
+                  <Badge variant="outline" className="mt-1 capitalize">
+                    {order.sales_channel || "Portal"}
+                  </Badge>
+                </div>
+                {/* Campaign */}
+                {order.campaign_id && (
+                  <div>
+                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                      <Megaphone className="h-3 w-3" /> Campaign
+                    </p>
+                    <Badge 
+                      variant="outline" 
+                      className="mt-1 bg-pink-50 text-pink-700 border-pink-200"
+                    >
+                      {order.campaign_id}
+                    </Badge>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

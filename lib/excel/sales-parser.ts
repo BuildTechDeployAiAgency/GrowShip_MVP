@@ -8,6 +8,8 @@ import { getEnabledSalesFields, getSalesFieldConfig } from "./sales-template-con
 export interface SalesAutoPopulationData {
   brandId: string;
   distributorId?: string;
+  /** Territory lookup map: country code -> territory_id */
+  territoryMap?: Map<string, string>;
 }
 
 /**

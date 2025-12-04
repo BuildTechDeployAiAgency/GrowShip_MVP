@@ -50,6 +50,17 @@ interface OrderItem {
   total: number;
 }
 
+// Sales channel options
+const SALES_CHANNEL_OPTIONS = [
+  { value: "portal", label: "Brand Portal" },
+  { value: "edi", label: "EDI" },
+  { value: "shopify", label: "Shopify" },
+  { value: "amazon", label: "Amazon" },
+  { value: "direct", label: "Direct Sales" },
+  { value: "api", label: "API" },
+  { value: "other", label: "Other" },
+] as const;
+
 interface OrderFormData {
   // Required Fields
   distributor_id: string;
@@ -59,6 +70,10 @@ interface OrderFormData {
   order_status: OrderStatus;
   notes?: string;
   tags?: string;
+  
+  // Campaign & Channel tracking
+  campaign_id?: string;
+  sales_channel?: string;
   
   // Items
   items: OrderItem[];
@@ -153,6 +168,8 @@ export function OrderFormDialog({
     order_status: "pending", // Default to pending
     customer_name: "",
     customer_type: "distributor",
+    campaign_id: "",
+    sales_channel: "portal", // Default to portal
     items: [],
     subtotal: 0,
     discount_total: 0,
@@ -207,6 +224,8 @@ export function OrderFormDialog({
         order_status: order.order_status,
         notes: order.notes,
         tags: order.tags?.join(", "),
+        campaign_id: order.campaign_id || "",
+        sales_channel: order.sales_channel || "portal",
         customer_name: order.customer_name,
         customer_email: order.customer_email,
         customer_phone: order.customer_phone,
@@ -245,6 +264,8 @@ export function OrderFormDialog({
         order_status: "pending",
         customer_name: "",
         customer_type: "distributor",
+        campaign_id: "",
+        sales_channel: "portal", // Default to portal for new orders
         items: [],
         subtotal: 0,
         discount_total: 0,
@@ -464,6 +485,10 @@ export function OrderFormDialog({
         order_status: formData.order_status,
         notes: formData.notes,
         tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()) : [],
+        
+        // Campaign & Channel tracking
+        campaign_id: formData.campaign_id || undefined,
+        sales_channel: formData.sales_channel || undefined,
         
         // Customer info (auto-populated)
         customer_name: formData.customer_name,
@@ -708,6 +733,50 @@ export function OrderFormDialog({
                   }
                   placeholder="e.g., urgent, wholesale, promotion"
                 />
+              </div>
+
+              {/* Campaign & Channel Section */}
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                {/* Sales Channel */}
+                <div className="space-y-2">
+                  <Label htmlFor="sales_channel">Sales Channel</Label>
+                  <Select
+                    value={formData.sales_channel || "portal"}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, sales_channel: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select channel" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SALES_CHANNEL_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Source channel of this order
+                  </p>
+                </div>
+
+                {/* Campaign ID */}
+                <div className="space-y-2">
+                  <Label htmlFor="campaign_id">Campaign ID (optional)</Label>
+                  <Input
+                    id="campaign_id"
+                    value={formData.campaign_id || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, campaign_id: e.target.value })
+                    }
+                    placeholder="e.g., SUMMER2025, BF-PROMO"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Link to marketing campaign for tracking
+                  </p>
+                </div>
               </div>
             </div>
 

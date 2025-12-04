@@ -10,6 +10,7 @@ import {
   FileText,
   Calendar,
   AlertCircle,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useDistributors, Distributor } from "@/hooks/use-distributors";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { createClient } from "@/lib/supabase/client";
+import { CountrySelect, getCountryName } from "@/components/ui/country-select";
+import { TerritorySelect } from "@/components/ui/territory-select";
 
 interface DistributorFormDialogProps {
   open: boolean;
@@ -62,6 +65,9 @@ interface DistributorFormData {
   country: string;
   latitude: string;
   longitude: string;
+
+  // Geographic (normalized)
+  territory_id: string;
 
   // Business info
   status: "active" | "inactive" | "archived";
@@ -107,6 +113,7 @@ export function DistributorFormDialog({
     country: "",
     latitude: "",
     longitude: "",
+    territory_id: "",
     status: "active",
     currency: "USD",
     tax_id: "",
@@ -139,6 +146,7 @@ export function DistributorFormDialog({
           country: distributor.country || "",
           latitude: distributor.latitude?.toString() || "",
           longitude: distributor.longitude?.toString() || "",
+          territory_id: distributor.territory_id || "",
           status: distributor.status || "active",
           currency: distributor.currency || "USD",
           tax_id: distributor.tax_id || "",
@@ -169,6 +177,7 @@ export function DistributorFormDialog({
           country: "",
           latitude: "",
           longitude: "",
+          territory_id: "",
           status: "active",
           currency: "USD",
           tax_id: "",
@@ -253,6 +262,7 @@ export function DistributorFormDialog({
         country: formData.country.trim() || undefined,
         latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
         longitude: formData.longitude ? parseFloat(formData.longitude) : undefined,
+        territory_id: formData.territory_id || undefined,
         status: formData.status,
         currency: formData.currency,
         tax_id: formData.tax_id.trim() || undefined,
@@ -545,14 +555,36 @@ export function DistributorFormDialog({
 
                 <div>
                   <Label htmlFor="country">Country</Label>
-                  <Input
-                    id="country"
-                    placeholder="United States"
+                  <CountrySelect
                     value={formData.country}
-                    onChange={(e) =>
-                      setFormData({ ...formData, country: e.target.value })
+                    onChange={(value) =>
+                      setFormData({ ...formData, country: value })
                     }
+                    placeholder="Select country..."
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Territory will be auto-assigned based on country
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="territory_id">
+                    Territory
+                    <span className="text-xs text-muted-foreground ml-1">(Optional Override)</span>
+                  </Label>
+                  <TerritorySelect
+                    value={formData.territory_id}
+                    onChange={(value) =>
+                      setFormData({ ...formData, territory_id: value || "" })
+                    }
+                    brandId={formData.brand_id}
+                    placeholder="Auto-assign from country"
+                    showAutoAssignOption={true}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    <Info className="h-3 w-3" />
+                    Leave empty to auto-assign based on country
+                  </p>
                 </div>
 
                 <div>

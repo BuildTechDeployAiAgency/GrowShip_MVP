@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "react-toastify";
 import { Card, CardContent } from "@/components/ui/card";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
+import { CountrySelect } from "@/components/ui/country-select";
 
 interface InviteDistributorDialogProps {
   open: boolean;
@@ -525,13 +526,10 @@ export function InviteDistributorDialog({
 
                   <div>
                     <Label htmlFor="country">Country</Label>
-                    <Input
-                      id="country"
-                      placeholder="United States"
+                    <CountrySelect
                       value={formData.country}
-                      onChange={(e) =>
-                        handleInputChange("country", e.target.value)
-                      }
+                      onChange={(value) => handleInputChange("country", value)}
+                      placeholder="Select country..."
                     />
                   </div>
 

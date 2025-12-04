@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
-import { DollarSign, ShoppingCart, TrendingUp, Percent } from "lucide-react";
+import { DollarSign, ShoppingCart, Target, TrendingUp } from "lucide-react";
 
 interface DistributorMetricsCardProps {
   distributorId: string;
@@ -72,10 +72,10 @@ export function DistributorMetricsCard({
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
           <Card key={i} className="animate-pulse">
-            <CardContent className="h-24" />
+            <CardContent className="p-6 h-24" />
           </Card>
         ))}
       </div>
@@ -83,47 +83,72 @@ export function DistributorMetricsCard({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(metrics.revenue)}</div>
-          <p className="text-xs text-muted-foreground">Total revenue from orders</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-          <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{metrics.totalOrders}</div>
-          <p className="text-xs text-muted-foreground">Lifetime orders</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Avg Order Value</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(metrics.avgOrderValue)}</div>
-          <p className="text-xs text-muted-foreground">Average per order</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Margin</CardTitle>
-          <Percent className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {metrics.margin !== null ? `${metrics.margin}%` : "N/A"}
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Revenue</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {formatCurrency(metrics.revenue)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Total revenue from orders</p>
+            </div>
+            <div className="p-3 bg-teal-100 rounded-full">
+              <DollarSign className="h-6 w-6 text-teal-600" />
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground">Profit margin</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Orders</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {metrics.totalOrders}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Lifetime orders</p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-full">
+              <ShoppingCart className="h-6 w-6 text-blue-600" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {formatCurrency(metrics.avgOrderValue)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Average per order</p>
+            </div>
+            <div className="p-3 bg-purple-100 rounded-full">
+              <Target className="h-6 w-6 text-purple-600" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Margin</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {metrics.margin !== null ? `${metrics.margin}%` : "N/A"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Profit margin</p>
+            </div>
+            <div className="p-3 bg-orange-100 rounded-full">
+              <TrendingUp className="h-6 w-6 text-orange-600" />
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -23,6 +23,9 @@ export interface Distributor {
   country?: string;
   latitude?: number;
   longitude?: number;
+  // Geographic normalization
+  territory_id?: string;
+  region_id?: string;
   status: DistributorStatus;
   currency?: string;
   tax_id?: string;

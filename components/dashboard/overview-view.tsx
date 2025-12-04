@@ -109,6 +109,22 @@ const TopSkusTable = dynamic(
   { ssr: false }
 );
 
+const SalesByChannelChart = dynamic(
+  () =>
+    import("@/components/dashboard/sales-by-channel-chart").then((mod) => ({
+      default: mod.SalesByChannelChart,
+    })),
+  { ssr: false }
+);
+
+const CampaignPerformanceWidget = dynamic(
+  () =>
+    import("@/components/dashboard/campaign-performance-widget").then((mod) => ({
+      default: mod.CampaignPerformanceWidget,
+    })),
+  { ssr: false }
+);
+
 export interface OverviewViewProps {
   initialMetrics?: DashboardMetrics | null;
 }
@@ -192,6 +208,20 @@ export function OverviewView({ initialMetrics }: OverviewViewProps = {}) {
           <Suspense fallback={<ChartSkeleton />}>
             <TopSkusTable />
           </Suspense>
+        </div>
+
+        {/* Row 6: Sales by Channel & Campaign Performance - load in parallel */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="xl:col-span-1">
+            <Suspense fallback={<ChartSkeleton />}>
+              <SalesByChannelChart />
+            </Suspense>
+          </div>
+          <div className="xl:col-span-1">
+            <Suspense fallback={<ChartSkeleton />}>
+              <CampaignPerformanceWidget />
+            </Suspense>
+          </div>
         </div>
       </div>
     </div>

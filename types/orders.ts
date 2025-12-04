@@ -7,6 +7,15 @@ export type PaymentStatus =
   | "partially_paid";
 export type FulfilmentStatus = "pending" | "partial" | "fulfilled";
 
+export type SalesChannel = 
+  | "portal" 
+  | "edi" 
+  | "shopify" 
+  | "amazon" 
+  | "direct" 
+  | "api" 
+  | "other";
+
 export interface OrderLine {
   id: string;
   order_id: string;
@@ -15,6 +24,9 @@ export interface OrderLine {
   product_name?: string;
   quantity: number;
   unit_price: number;
+  unit_cost?: number; // Cost at time of order for margin calculations
+  margin?: number; // Computed: unit_price - unit_cost
+  margin_percent?: number; // Computed: ((unit_price - unit_cost) / unit_price) * 100
   discount?: number;
   tax?: number;
   total: number;
@@ -44,6 +56,10 @@ export interface Order {
   customer_phone?: string;
   customer_type?: "retail" | "wholesale" | "distributor" | "manufacturer";
   items: any[];
+  // Campaign & Channel tracking
+  campaign_id?: string; // Links order to marketing campaigns for Target vs Actuals
+  sales_channel?: SalesChannel | string; // Source channel: portal, edi, shopify, etc.
+  // Shipping details
   shipping_address_line1?: string;
   shipping_address_line2?: string;
   shipping_city?: string;
@@ -51,9 +67,13 @@ export interface Order {
   shipping_zip_code?: string;
   shipping_country?: string;
   shipping_method?: string;
+  // Geographic normalization
+  territory_id?: string;
+  region_id?: string;
   tracking_number?: string;
   estimated_delivery_date?: string;
   actual_delivery_date?: string;
+  // Financial details
   subtotal: number;
   discount_total?: number;
   tax_total?: number;
@@ -78,5 +98,44 @@ export interface OrderFilters {
   customerType: string;
   dateRange: string;
   distributorId?: string;
+  campaignId?: string;
+  salesChannel?: string;
+}
+
+// Order profitability view type (from order_profitability_view)
+export interface OrderProfitability {
+  order_id: string;
+  order_number: string;
+  order_date: string;
+  brand_id: string;
+  distributor_id?: string;
+  campaign_id?: string;
+  sales_channel?: string;
+  customer_name: string;
+  order_revenue: number;
+  order_cost: number;
+  order_profit: number;
+  profit_margin_percent: number;
+  line_count: number;
+  total_units: number;
+}
+
+// Campaign performance metrics type
+export interface CampaignPerformance {
+  campaign_id: string;
+  total_orders: number;
+  total_revenue: number;
+  total_units: number;
+  avg_order_value: number;
+  unique_customers: number;
+}
+
+// Sales channel performance type
+export interface SalesChannelPerformance {
+  sales_channel: string;
+  total_orders: number;
+  total_revenue: number;
+  avg_order_value: number;
+  order_count_percent: number;
 }
 

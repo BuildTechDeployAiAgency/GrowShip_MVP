@@ -129,27 +129,55 @@ export async function POST(
       orderData.shipping_country = shipping_address.country;
     }
 
-    // Convert PO items to order items
+    // Convert PO items to order items and prepare order_lines data
     let items: any[] = [];
     let subtotal = 0;
+    let orderLinesData: any[] = [];
 
     if (po.purchase_order_lines && po.purchase_order_lines.length > 0) {
-      // Use normalized line items
+      // Use normalized line items from purchase_order_lines table
       items = po.purchase_order_lines.map((line: any) => ({
         sku: line.sku,
-        name: line.product_name || line.sku,
+        product_name: line.product_name || line.sku,
         quantity: line.quantity,
-        price: line.unit_price,
+        unit_price: line.unit_price,
         total: line.quantity * line.unit_price,
+        product_id: line.product_id,
       }));
       subtotal = po.purchase_order_lines.reduce(
         (sum: number, line: any) => sum + line.quantity * line.unit_price,
         0
       );
+      // Prepare order_lines from purchase_order_lines
+      orderLinesData = po.purchase_order_lines.map((line: any) => ({
+        product_id: line.product_id || null,
+        sku: line.sku,
+        product_name: line.product_name,
+        quantity: line.quantity,
+        unit_price: line.unit_price,
+        discount: line.discount || 0,
+        tax: line.tax || 0,
+        currency: line.currency || po.currency || "USD",
+        notes: line.notes || null,
+        shipped_quantity: 0,
+      }));
     } else if (po.items && Array.isArray(po.items)) {
       // Fallback to JSONB items
       items = po.items;
       subtotal = po.subtotal || 0;
+      // Prepare order_lines from JSONB items
+      orderLinesData = po.items.map((item: any) => ({
+        product_id: item.product_id || null,
+        sku: item.sku || "",
+        product_name: item.product_name || item.name || item.sku || "",
+        quantity: item.quantity || 0,
+        unit_price: item.unit_price || item.price || 0,
+        discount: item.discount || 0,
+        tax: item.tax || item.tax_rate || 0,
+        currency: item.currency || po.currency || "USD",
+        notes: item.notes || null,
+        shipped_quantity: 0,
+      }));
     }
 
     orderData.items = items;
@@ -187,17 +215,13 @@ export async function POST(
       );
     }
 
-    // Create order_lines from purchase_order_lines
-    if (po.purchase_order_lines && po.purchase_order_lines.length > 0) {
-      const orderLines = po.purchase_order_lines.map((line: any) => ({
+    // Always create order_lines (from purchase_order_lines or JSONB items)
+    if (orderLinesData.length > 0) {
+      const orderLines = orderLinesData.map((line: any) => ({
+        ...line,
         order_id: newOrder.id,
-        product_id: line.product_id,
-        sku: line.sku,
-        product_name: line.product_name,
-        quantity: line.quantity,
-        unit_price: line.unit_price,
-        currency: line.currency || po.currency || "USD",
-        notes: line.notes,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       }));
 
       const { error: linesError } = await supabase
