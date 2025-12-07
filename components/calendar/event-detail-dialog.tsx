@@ -131,10 +131,10 @@ export function EventDetailDialog({
     if (!event.related_entity_type || !event.related_entity_id) return null;
 
     const linkMap: Record<string, string> = {
-      invoice: `/invoices/${event.related_entity_id}`,
+      invoice: `/invoices?highlight=${event.related_entity_id}`,
       po: `/purchase-orders/${event.related_entity_id}`,
       shipment: `/shipments/${event.related_entity_id}`,
-      campaign: `/marketing/${event.related_entity_id}`,
+      campaign: `/marketing?highlight=${event.related_entity_id}`,
       distributor: `/distributors/${event.related_entity_id}`,
     };
 
