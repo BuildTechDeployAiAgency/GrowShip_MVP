@@ -132,7 +132,8 @@ export function useDistributors({
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["distributors", debouncedSearchTerm, filters, brandId, isSuperAdmin, distributorId],
     queryFn: () => fetchDistributors(debouncedSearchTerm, filters || { status: "all" }, brandId, isSuperAdmin, distributorId),
-    staleTime: 0,
+    staleTime: 10 * 60 * 1000, // 10 minutes - distributor data changes infrequently
+    refetchOnWindowFocus: false,
   });
 
   const createDistributorMutation = useMutation({

@@ -225,7 +225,16 @@ export function useProducts({
     },
     onSuccess: (newProduct) => {
       prependProductToCaches(queryClient, newProduct);
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      // Only invalidate product queries for this brand to prevent unnecessary refetches
+      queryClient.invalidateQueries({
+        queryKey: ["products"],
+        predicate: (query) => {
+          const [, , , , brandId] = query.queryKey;
+          return brandId === newProduct.brand_id;
+        }
+      });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] }); // Products affect inventory
       toast.success("Product created successfully");
     },
     onError: (error: any) => {
@@ -262,7 +271,16 @@ export function useProducts({
       if (updatedProduct) {
         updateProductInCaches(queryClient, updatedProduct);
       }
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      // Only invalidate product queries for this brand to prevent unnecessary refetches
+      queryClient.invalidateQueries({
+        queryKey: ["products"],
+        predicate: (query) => {
+          const [, , , , brandId] = query.queryKey;
+          return brandId === updatedProduct?.brand_id;
+        }
+      });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] }); // Products affect inventory
       toast.success("Product updated successfully");
     },
     onError: (error: any) => {
@@ -283,7 +301,10 @@ export function useProducts({
     },
     onSuccess: (_data, productId) => {
       removeProductFromCaches(queryClient, productId);
+      // Invalidate all product queries since we don't have brand context for deleted item
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] }); // Products affect inventory
       toast.success("Product deleted successfully");
     },
     onError: (error: any) => {

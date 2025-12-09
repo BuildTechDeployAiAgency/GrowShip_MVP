@@ -109,7 +109,8 @@ export function useCustomers({
     queryKey: ["customers", debouncedSearchTerm, filters, brandId, isSuperAdmin],
     queryFn: () => fetchCustomers(debouncedSearchTerm, filters, brandId, isSuperAdmin),
     enabled: enabled, // Wait for profile to load before querying
-    staleTime: 0, // Always refetch to ensure fresh data
+    staleTime: 5 * 60 * 1000, // 5 minutes - customer data doesn't change frequently
+    refetchOnWindowFocus: false,
   });
 
   // Mutation for updating customer status

@@ -94,6 +94,36 @@ export async function POST(
       );
     }
 
+    // Fetch distributor payment terms for due date calculation
+    let paymentTermsDays = 30; // Default to 30 days
+    
+    if (order.distributor_id) {
+      const { data: distributor } = await supabase
+        .from("distributors")
+        .select("payment_terms")
+        .eq("id", order.distributor_id)
+        .single();
+      
+      if (distributor?.payment_terms) {
+        // Parse payment terms - handle formats like "30", "Net 30", "COD", etc.
+        const paymentTerms = distributor.payment_terms.trim().toLowerCase();
+        
+        if (paymentTerms === "cod" || paymentTerms === "cash on delivery") {
+          paymentTermsDays = 0; // Payment due immediately
+        } else {
+          // Extract number from payment terms (e.g., "30" from "Net 30" or "30 days")
+          const match = paymentTerms.match(/(\d+)/);
+          if (match) {
+            paymentTermsDays = parseInt(match[1], 10);
+          }
+        }
+      }
+    }
+    
+    // Calculate due date based on payment terms
+    const invoiceDate = new Date();
+    const dueDate = new Date(invoiceDate.getTime() + paymentTermsDays * 24 * 60 * 60 * 1000);
+
     // Create invoice from order data
     const invoiceData: Partial<Invoice> = {
       invoice_number, // Add the required invoice_number field
@@ -120,9 +150,9 @@ export async function POST(
       total_amount: order.total_amount,
       currency: order.currency || "USD",
       payment_status: "pending" as PaymentStatus,
-      invoice_date: new Date().toISOString(),
-      due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-      notes: `Generated from order ${order.order_number}`,
+      invoice_date: invoiceDate.toISOString(),
+      due_date: dueDate.toISOString(),
+      notes: `Generated from order ${order.order_number}${paymentTermsDays !== 30 ? ` - Payment terms: ${paymentTermsDays === 0 ? 'COD' : `${paymentTermsDays} days`}` : ''}`,
       created_by: user.id,
       updated_by: user.id,
     };

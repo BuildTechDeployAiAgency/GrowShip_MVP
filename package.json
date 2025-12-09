@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "NODE_ENV=development node node_modules/.bin/next dev -p 3000",
     "build": "node node_modules/.bin/next build",
+    "build:analyze": "ANALYZE=true npm run build",
     "start": "node node_modules/.bin/next start"
   },
   "dependencies": {
@@ -55,6 +56,7 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^15.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

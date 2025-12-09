@@ -250,7 +250,15 @@ export function usePurchaseOrders({
     },
     onSuccess: (newPO) => {
       prependPurchaseOrder(queryClient, newPO);
-      queryClient.invalidateQueries({ queryKey: ["purchaseOrders"] });
+      // Only invalidate purchase orders for this brand to prevent unnecessary refetches
+      queryClient.invalidateQueries({
+        queryKey: ["purchaseOrders"],
+        predicate: (query) => {
+          const [, , , , brandId] = query.queryKey;
+          return brandId === newPO.brand_id;
+        }
+      });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
       toast.success("Purchase order created successfully!");
     },
     onError: (error: any) => {
@@ -291,7 +299,15 @@ export function usePurchaseOrders({
       if (updatedPO) {
         updatePurchaseOrderInCaches(queryClient, updatedPO);
       }
-      queryClient.invalidateQueries({ queryKey: ["purchaseOrders"] });
+      // Only invalidate purchase orders for this brand to prevent unnecessary refetches
+      queryClient.invalidateQueries({
+        queryKey: ["purchaseOrders"],
+        predicate: (query) => {
+          const [, , , , brandId] = query.queryKey;
+          return brandId === updatedPO?.brand_id;
+        }
+      });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
       toast.success("Purchase order updated successfully!");
     },
     onError: (error: any) => {
@@ -315,7 +331,9 @@ export function usePurchaseOrders({
     },
     onSuccess: (_data, poId) => {
       removePurchaseOrderFromCaches(queryClient, poId);
+      // Invalidate all purchase order queries since we don't have brand context for deleted item
       queryClient.invalidateQueries({ queryKey: ["purchaseOrders"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
       toast.success("Purchase order deleted successfully!");
     },
     onError: (error: any) => {
@@ -343,7 +361,15 @@ export function usePurchaseOrders({
     },
     onSuccess: (duplicatedPO) => {
       prependPurchaseOrder(queryClient, duplicatedPO);
-      queryClient.invalidateQueries({ queryKey: ["purchaseOrders"] });
+      // Only invalidate purchase orders for this brand to prevent unnecessary refetches
+      queryClient.invalidateQueries({
+        queryKey: ["purchaseOrders"],
+        predicate: (query) => {
+          const [, , , , brandId] = query.queryKey;
+          return brandId === duplicatedPO.brand_id;
+        }
+      });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
       toast.success("Purchase order duplicated successfully!");
     },
     onError: (error: any) => {

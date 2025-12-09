@@ -188,7 +188,8 @@ export function useShipments({
         distributorId,
         orderId
       ),
-    staleTime: 0,
+    staleTime: 3 * 60 * 1000, // 3 minutes - shipment data updates moderately
+    refetchOnWindowFocus: false,
   });
 
   // Create shipment using the atomic RPC function
@@ -226,11 +227,9 @@ export function useShipments({
       return result;
     },
     onSuccess: (result) => {
+      // More targeted invalidation to prevent excessive refetching
       queryClient.invalidateQueries({ queryKey: ["shipments"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["order-lines"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
       toast.success(
         `Shipment ${result.shipment_number} created successfully!`
       );
@@ -282,8 +281,9 @@ export function useShipments({
       return result;
     },
     onSuccess: (result) => {
+      // More targeted invalidation to prevent excessive refetching
       queryClient.invalidateQueries({ queryKey: ["shipments"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
       toast.success(`Shipment status updated to ${result.new_status}`);
     },
     onError: (error: any) => {
@@ -347,8 +347,9 @@ export function useShipments({
       }
     },
     onSuccess: () => {
+      // More targeted invalidation to prevent excessive refetching
       queryClient.invalidateQueries({ queryKey: ["shipments"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
       toast.success("Shipment deleted successfully!");
     },
     onError: (error: any) => {

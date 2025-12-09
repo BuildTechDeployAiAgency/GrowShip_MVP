@@ -251,7 +251,8 @@ export function useUsers({
     queryKey: ["users", debouncedSearchTerm, filters, brandId, isSuperAdmin],
     queryFn: () => fetchUsers(debouncedSearchTerm, filters, brandId, isSuperAdmin),
     enabled: enabled, // Wait for profile to load before querying
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000, // 5 minutes - user data doesn't change frequently
+    refetchOnWindowFocus: false,
   });
 
   const updateStatusMutation = useMutation({

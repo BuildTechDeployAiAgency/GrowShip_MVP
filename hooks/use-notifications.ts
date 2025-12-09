@@ -47,8 +47,8 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       if (!response.ok) throw new Error("Failed to fetch notifications");
       return response.json();
     },
-    staleTime: 30000, // 30 seconds
-    refetchOnWindowFocus: true,
+    staleTime: 2 * 60 * 1000, // 2 minutes - notifications update moderately 
+    refetchOnWindowFocus: false,
   });
 
   // Update unreadCount from query data when fetching unread notifications

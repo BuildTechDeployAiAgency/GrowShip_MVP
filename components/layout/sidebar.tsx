@@ -23,7 +23,6 @@ const COMING_SOON_ROUTES = [
   "/reports",
   "/invoices",
   "/sales",
-  "/marketing",
   "/manufacturers",
 ];
 import { Button } from "@/components/ui/button";

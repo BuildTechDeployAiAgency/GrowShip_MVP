@@ -14,11 +14,13 @@ import { Invoice, PaymentStatus } from "@/hooks/use-invoices";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/formatters";
 import { FileText, Calendar, DollarSign, User, Mail, MapPin, CreditCard, Building } from "lucide-react";
+import { PaymentLinesManager } from "./payment-lines-manager";
 
 interface InvoiceDetailsDialogProps {
   open: boolean;
   onClose: () => void;
   invoice: Invoice | null;
+  onInvoiceUpdate?: () => void;
 }
 
 const paymentColors: Record<PaymentStatus, string> = {
@@ -29,7 +31,7 @@ const paymentColors: Record<PaymentStatus, string> = {
   partially_paid: "bg-yellow-100 text-yellow-800",
 };
 
-export function InvoiceDetailsDialog({ open, onClose, invoice }: InvoiceDetailsDialogProps) {
+export function InvoiceDetailsDialog({ open, onClose, invoice, onInvoiceUpdate }: InvoiceDetailsDialogProps) {
   if (!invoice) return null;
 
   return (
@@ -212,6 +214,12 @@ export function InvoiceDetailsDialog({ open, onClose, invoice }: InvoiceDetailsD
               </CardContent>
             </Card>
           )}
+
+          {/* Payment Management */}
+          <PaymentLinesManager 
+            invoice={invoice}
+            onPaymentUpdate={onInvoiceUpdate}
+          />
 
           {/* System Information */}
           <Card>

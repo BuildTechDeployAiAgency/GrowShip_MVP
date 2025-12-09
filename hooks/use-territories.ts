@@ -133,7 +133,8 @@ export function useTerritories({
     queryKey: ["territories", brandId, includeMetrics],
     queryFn: () => fetchTerritories(brandId, includeMetrics),
     enabled,
-    staleTime: 0,
+    staleTime: 10 * 60 * 1000, // 10 minutes - territory data is relatively static
+    refetchOnWindowFocus: false,
   });
   
   // Create territory mutation

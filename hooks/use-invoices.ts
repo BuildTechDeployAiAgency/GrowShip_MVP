@@ -150,7 +150,8 @@ export function useInvoices({
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["invoices", debouncedSearchTerm, filters, brandId, distributorId],
     queryFn: () => fetchInvoices(debouncedSearchTerm, filters, brandId, distributorId),
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000, // 5 minutes - invoice data doesn't change frequently
+    refetchOnWindowFocus: false,
   });
 
   const createInvoiceMutation = useMutation({
@@ -158,11 +159,46 @@ export function useInvoices({
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
+      // Calculate due date based on distributor payment terms
+      let dueDate = invoice.due_date;
+      
+      if (!dueDate && invoice.distributor_id) {
+        // Fetch distributor payment terms
+        let paymentTermsDays = 30; // Default to 30 days
+        
+        const { data: distributor } = await supabase
+          .from("distributors")
+          .select("payment_terms")
+          .eq("id", invoice.distributor_id)
+          .single();
+        
+        if (distributor?.payment_terms) {
+          // Parse payment terms - handle formats like "30", "Net 30", "COD", etc.
+          const paymentTerms = distributor.payment_terms.trim().toLowerCase();
+          
+          if (paymentTerms === "cod" || paymentTerms === "cash on delivery") {
+            paymentTermsDays = 0; // Payment due immediately
+          } else {
+            // Extract number from payment terms (e.g., "30" from "Net 30" or "30 days")
+            const match = paymentTerms.match(/(\d+)/);
+            if (match) {
+              paymentTermsDays = parseInt(match[1], 10);
+            }
+          }
+        }
+        
+        // Calculate due date
+        const invoiceDate = new Date(invoice.invoice_date || new Date().toISOString());
+        const calculatedDueDate = new Date(invoiceDate.getTime() + paymentTermsDays * 24 * 60 * 60 * 1000);
+        dueDate = calculatedDueDate.toISOString();
+      }
+
       const invoiceData = {
         ...invoice,
         user_id: user?.id,
         invoice_number: `INV-${Date.now()}`,
         invoice_date: invoice.invoice_date || new Date().toISOString(),
+        due_date: dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         created_by: user?.id,
         updated_by: user?.id,
       };
@@ -179,8 +215,10 @@ export function useInvoices({
 
       return newInvoice;
     },
-    onSuccess: () => {
+    onSuccess: (newInvoice) => {
+      // Invalidate specific invoice queries instead of all
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
       toast.success("Invoice created successfully!");
     },
     onError: (error: any) => {
@@ -214,7 +252,9 @@ export function useInvoices({
       }
     },
     onSuccess: () => {
+      // Invalidate specific invoice queries instead of all
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
       toast.success("Invoice updated successfully!");
     },
     onError: (error: any) => {
@@ -237,7 +277,9 @@ export function useInvoices({
       }
     },
     onSuccess: () => {
+      // Invalidate specific invoice queries instead of all
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
       toast.success("Invoice deleted successfully!");
     },
     onError: (error: any) => {

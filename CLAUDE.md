@@ -157,3 +157,48 @@ Excel/CSV import system with AI-assisted column mapping via OpenAI integration. 
 - Environment-based configuration prevents credential exposure
 - RLS policies enforce data access controls
 - Session management handled by Supabase Auth
+
+## Development Workflow Requirements
+
+### Documentation Management
+- Create `.md` files in `ChangeLogs/` folder for each GitHub commit showing all changes for that day
+- Save development documentation files to `Project-Research-Files/` folder upon completion
+- Always create comprehensive commit documentation in markdown format
+
+### Bulk Import Considerations
+Alert about scalability features needed to support ExcelJS library bulk import functionality for Distributors importing monthly orders. Implementation requires explicit approval before proceeding.
+
+### Server Management Protocol
+When restarting the server, follow this sequence to ensure latest code validation:
+
+1. Stop server: `Ctrl + C`
+2. Clean build cache: `rm -rf .next`
+3. Clean npm cache (optional): `npm cache clean --force`
+4. Install dependencies: `npm install`
+5. Build project: `npm run build`
+6. Start development: `npm run dev`
+
+### Bundle Analysis
+Use `npm run build:analyze` to analyze bundle size and performance when needed.
+
+### Additional Scripts
+```bash
+# Bundle analysis
+npm run build:analyze  # Build with bundle analyzer enabled
+
+# Manual TypeScript checking
+npx tsc --noEmit       # Type checking without emit
+```
+
+## File Exclusions
+Exclude these files from GitHub commits as specified in project rules:
+- Temporary development files
+- Build artifacts
+- Cache files
+- Environment-specific configurations
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
