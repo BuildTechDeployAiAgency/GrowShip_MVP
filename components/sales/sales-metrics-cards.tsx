@@ -37,14 +37,16 @@ export function SalesMetricsCards({ initialData }: SalesMetricsCardsProps = {}) 
       userId: user?.id,
       brandId: profile?.brand_id,
       userRole: profile?.role_name,
+      distributorId: filters.distributorId || undefined,
       year: filters.year,
-      month: filters.month || new Date().getMonth() + 1,
+      month: filters.month, // Allow undefined for "All Months" selection
     }),
     [
       tableSuffix,
       user?.id,
       profile?.brand_id,
       profile?.role_name,
+      filters.distributorId,
       filters.year,
       filters.month,
     ]

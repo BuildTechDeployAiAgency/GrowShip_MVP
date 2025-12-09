@@ -31,8 +31,9 @@ export function SalesByTerritoryChart() {
       userId: user?.id,
       year: filters.year,
       month: filters.month,
+      distributorId: filters.distributorId,
     }),
-    [tableSuffix, user?.id, filters.year, filters.month]
+    [tableSuffix, user?.id, filters.year, filters.month, filters.distributorId]
   );
 
   const { data, isLoading, error, refetch } = useSalesByTerritory({ filters: chartFilters });

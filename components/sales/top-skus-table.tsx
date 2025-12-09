@@ -34,6 +34,7 @@ export function TopSkusTable({ filters }: TopSkusTableProps = {}) {
       userRole: profile?.role_name,
       year: filters?.year || dateFilters.year,
       month: filters?.month || dateFilters.month,
+      distributorId: filters?.distributorId || dateFilters.distributorId,
     }),
     [
       filters,
@@ -43,6 +44,7 @@ export function TopSkusTable({ filters }: TopSkusTableProps = {}) {
       profile?.role_name,
       dateFilters.year,
       dateFilters.month,
+      dateFilters.distributorId,
     ]
   );
 
