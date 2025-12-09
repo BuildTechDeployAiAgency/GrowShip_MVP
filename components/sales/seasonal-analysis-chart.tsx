@@ -38,6 +38,7 @@ export function SeasonalAnalysisChart() {
       brandId: profile?.brand_id,
       userRole: profile?.role_name,
       year: filters.year, // Only year, no month needed
+      distributorId: filters.distributorId,
     }),
     [
       tableSuffix,
@@ -45,6 +46,7 @@ export function SeasonalAnalysisChart() {
       profile?.brand_id,
       profile?.role_name,
       filters.year,
+      filters.distributorId,
     ]
   );
 

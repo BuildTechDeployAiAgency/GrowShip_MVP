@@ -24,6 +24,7 @@ export interface DashboardMetricsFilters {
   userId?: string;
   brandId?: string;
   userRole?: string;
+  distributorId?: string;
   year?: number;
   month?: number;
 }

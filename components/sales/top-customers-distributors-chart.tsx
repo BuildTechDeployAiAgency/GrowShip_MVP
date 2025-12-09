@@ -40,6 +40,7 @@ export function TopCustomersDistributorsChart() {
       year: filters.year,
       month: filters.month,
       limit: 10,
+      distributorId: filters.distributorId,
     }),
     [
       tableSuffix,
@@ -48,6 +49,7 @@ export function TopCustomersDistributorsChart() {
       profile?.role_name,
       filters.year,
       filters.month,
+      filters.distributorId,
     ]
   );
 

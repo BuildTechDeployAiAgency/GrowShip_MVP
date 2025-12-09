@@ -36,9 +36,10 @@ async function fetchDashboardMetrics(
     p_table_suffix: filters.tableSuffix || "",
     p_user_id: filters.userId || null,
     p_year: filters.year || new Date().getFullYear(),
-    p_month: filters.month || new Date().getMonth() + 1,
+    p_month: filters.month ?? null, // Allow null for "All Months" to get full year data
     p_user_role: userRole || "",
     p_brand_id: brandId || null,
+    p_distributor_id: filters.distributorId || null,
   };
 
   const { data, error } = await supabase.rpc(
