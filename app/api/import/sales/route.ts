@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { parseSalesExcel, getSalesFileStats } from "@/lib/excel/sales-parser";
+import { parseSalesExcel, parseSalesCSV, getSalesFileStats } from "@/lib/excel/sales-parser";
 import { createHash } from "crypto";
 
 /**
  * POST /api/import/sales
- * Upload and parse sales data Excel file
+ * Upload and parse sales data from Excel or CSV file
  */
 export async function POST(request: NextRequest) {
   try {
@@ -52,16 +52,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
-    const allowedTypes = [
+    // Validate file type (Excel or CSV)
+    const allowedExcelTypes = [
       "application/vnd.ms-excel",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "application/octet-stream",
     ];
+    const allowedCSVTypes = [
+      "text/csv",
+      "application/csv",
+      "text/plain",
+    ];
+    
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    const isExcel = allowedExcelTypes.includes(file.type) || ["xlsx", "xls"].includes(fileExtension || "");
+    const isCSV = allowedCSVTypes.includes(file.type) || fileExtension === "csv";
 
-    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+    if (!isExcel && !isCSV) {
       return NextResponse.json(
-        { error: "Invalid file type. Please upload an Excel file (.xlsx or .xls)" },
+        { error: "Invalid file type. Please upload an Excel file (.xlsx, .xls) or CSV file (.csv)" },
         { status: 400 }
       );
     }
@@ -85,16 +94,23 @@ export async function POST(request: NextRequest) {
     // Get file statistics
     const fileStats = getSalesFileStats(buffer);
 
-    console.log(`[Sales Import] Parsing file: ${file.name} (${fileStats.sizeMB}MB, hash: ${fileHash.substring(0, 8)}...)`);
+    console.log(`[Sales Import] Parsing file: ${file.name} (${fileStats.sizeMB}MB, hash: ${fileHash.substring(0, 8)}..., type: ${isCSV ? 'CSV' : 'Excel'})`);
 
-    // Parse Excel file
+    // Prepare auto-populate data
     const isDistributorUser = profile.role_name?.startsWith("distributor_");
     const autoPopulateData = {
       brandId: profile.brand_id,
       distributorId: isDistributorUser ? profile.distributor_id : undefined,
     };
 
-    const parseResult = await parseSalesExcel(buffer, autoPopulateData);
+    // Parse file based on type (Excel or CSV)
+    let parseResult;
+    if (isCSV) {
+      const csvText = buffer.toString("utf-8");
+      parseResult = await parseSalesCSV(csvText, autoPopulateData);
+    } else {
+      parseResult = await parseSalesExcel(buffer, autoPopulateData);
+    }
 
     console.log(`[Sales Import] Parsed ${parseResult.salesRows.length} sales rows`);
     console.log(`[Sales Import] Extracted distributor ID: ${parseResult.extractedDistributorId || "none"}`);

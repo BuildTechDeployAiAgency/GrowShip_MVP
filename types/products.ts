@@ -42,6 +42,10 @@ export interface Product {
   max_stock_threshold?: number;
   enable_stock_alerts?: boolean;
   last_stock_check?: string;
+  
+  // Logistics parameters for forecasting/optimization
+  lead_time_days?: number;
+  safety_stock_days?: number;
 }
 
 // Stock status for inventory filtering

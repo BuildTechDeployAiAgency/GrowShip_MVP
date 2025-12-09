@@ -82,9 +82,16 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
   const autoPromptedRef = useRef(false);
   const autoPromptTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchOrderDetails = async () => {
+  /**
+   * Fetch order details from the database.
+   * @param showLoading - If true (default), shows loading skeleton. If false, refreshes data in background.
+   */
+  const fetchOrderDetails = async (showLoading: boolean = true) => {
     try {
-      setLoading(true);
+      // Only show loading skeleton if explicitly requested (initial load)
+      if (showLoading) {
+        setLoading(true);
+      }
       const supabase = createClient();
 
       // Fetch order
@@ -126,10 +133,15 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
       }
     } catch (err: any) {
       console.error("Error fetching order details:", err);
-      setError(err.message || "Failed to load order details");
-      toast.error("Failed to load order details");
+      // Only set error state on initial load to avoid disrupting user experience
+      if (showLoading) {
+        setError(err.message || "Failed to load order details");
+        toast.error("Failed to load order details");
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -142,7 +154,8 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
 
   const handleEditSuccess = () => {
     setShowEditDialog(false);
-    fetchOrderDetails(); // Refresh order data
+    // Refresh order data in background (no loading skeleton)
+    fetchOrderDetails(false);
     toast.success("Order updated successfully!");
   };
 
@@ -151,9 +164,14 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
     newStatus: OrderStatus,
     comment?: string
   ): Promise<boolean> => {
-    if (!order) return false;
+    console.log("[Frontend] updateOrderStatus called:", { orderId: order?.id, newStatus, comment });
+    if (!order) {
+      console.log("[Frontend] No order available, returning false");
+      return false;
+    }
 
     try {
+      console.log(`[Frontend] Making PATCH request to /api/orders/${order.id}`);
       const response = await fetch(`/api/orders/${order.id}`, {
         method: "PATCH",
         headers: {
@@ -165,14 +183,19 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
         }),
       });
 
+      console.log(`[Frontend] PATCH response status: ${response.status}`);
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.log("[Frontend] PATCH error data:", errorData);
         throw new Error(errorData.error || "Failed to update order status");
       }
 
+      const responseData = await response.json();
+      console.log("[Frontend] PATCH success, response:", responseData);
       return true;
     } catch (err: any) {
-      console.error("Error updating order status:", err);
+      console.error("[Frontend] Error updating order status:", err);
       toast.error(err.message || "Failed to update order status");
       return false;
     }
@@ -197,7 +220,8 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
       toast.success("Shipment created successfully!");
     }
 
-    fetchOrderDetails(); // Refresh order data to get updated fulfilment_status
+    // Refresh order data in background (no loading skeleton) to get updated fulfilment_status
+    fetchOrderDetails(false);
     setShipmentsKey((prev) => prev + 1); // Force refresh shipments list
     setHasActiveShipment(true);
   };
@@ -220,12 +244,19 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
         .from("shipments")
         .select("id, shipment_status")
         .eq("order_id", order.id)
-        .not("shipment_status", "in", "('delivered','cancelled','returned')");
+        .not("shipment_status", "in", "(delivered,cancelled,returned)");
 
       if (!isMounted) return;
 
       if (error) {
-        console.error("Error checking active shipments:", error);
+        // Log detailed error info for debugging
+        console.error("Error checking active shipments:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          fullError: JSON.stringify(error, null, 2)
+        });
         setHasActiveShipment(false);
       } else {
         setHasActiveShipment((data || []).length > 0);
@@ -299,23 +330,59 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
   };
 
   const handleStatusConfirm = async (comment: string) => {
-    if (!pendingStatus || !order) return;
+    console.log("[Frontend] handleStatusConfirm called:", { pendingStatus, orderId: order?.id, comment });
+    if (!pendingStatus || !order) {
+      console.log("[Frontend] Missing pendingStatus or order, returning early");
+      return;
+    }
     
     setIsUpdatingStatus(true);
     try {
+      console.log("[Frontend] Calling updateOrderStatus...");
       const success = await updateOrderStatus(pendingStatus, comment);
       if (!success) {
         throw new Error("Failed to update order status");
       }
 
       toast.success(`Order status updated to ${pendingStatus}`);
-      fetchOrderDetails(); // Refresh order data
+      // Refresh order data in background (no loading skeleton)
+      fetchOrderDetails(false);
     } catch (err: any) {
       console.error("Error updating order status:", err);
       throw err; // Re-throw so dialog knows update failed
     } finally {
       setIsUpdatingStatus(false);
       setPendingStatus(null);
+    }
+  };
+
+  const handleGenerateInvoice = async (order: Order) => {
+    if (isDistributorAdmin) {
+      toast.info("Distributor users cannot generate invoices.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/orders/${order.id}/generate-invoice`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to generate invoice");
+      }
+
+      const invoice = await response.json();
+      toast.success(`Invoice ${invoice.invoice_number} generated successfully!`);
+      
+      // Optional: Navigate to invoice details or show a success dialog
+      // router.push(`/invoices/${invoice.id}`);
+    } catch (err: any) {
+      console.error("Error generating invoice:", err);
+      toast.error(err.message || "Failed to generate invoice");
     }
   };
 
@@ -414,13 +481,27 @@ export function OrderDetails({ orderId }: OrderDetailsProps) {
           </Button>
           {canManageOrders && (
             <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleGenerateInvoice(order)}
+                disabled={isDistributorAdmin}
+                title={
+                  isDistributorAdmin
+                    ? "Distributor users cannot generate invoices"
+                    : "Generate invoice from this order"
+                }
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Generate Invoice
+              </Button>
               <Button size="sm" onClick={() => setShowEditDialog(true)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit Order
               </Button>
               {canCreateShipment && (
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   onClick={() => setShowShipmentDialog(true)}
                   className="bg-teal-600 hover:bg-teal-700"
                 >

@@ -130,11 +130,13 @@ export function EventDetailDialog({
   const getEntityLink = () => {
     if (!event.related_entity_type || !event.related_entity_id) return null;
 
+    // Note: Some pages have detail views (po, shipment, distributor), others only have lists
+    // For list-only pages, we link to the list page - future enhancement could add highlighting
     const linkMap: Record<string, string> = {
-      invoice: `/invoices?highlight=${event.related_entity_id}`,
+      invoice: `/invoices`, // Invoices page is list-only, no detail view
       po: `/purchase-orders/${event.related_entity_id}`,
       shipment: `/shipments/${event.related_entity_id}`,
-      campaign: `/marketing?highlight=${event.related_entity_id}`,
+      campaign: `/marketing`, // Marketing page is placeholder, no detail view yet
       distributor: `/distributors/${event.related_entity_id}`,
     };
 

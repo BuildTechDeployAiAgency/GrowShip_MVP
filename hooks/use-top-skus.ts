@@ -27,7 +27,7 @@ export interface TopSkusFilters {
   year?: number;
   month?: number;
   limit?: number;
-  distributorId?: string;
+  distributorId?: string | null;
 }
 
 export interface UseTopSkusOptions {

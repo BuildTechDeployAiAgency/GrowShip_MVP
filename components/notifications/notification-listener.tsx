@@ -74,13 +74,13 @@ export function NotificationListener() {
               }
             }
           )
-          .subscribe((status) => {
+          .subscribe((status, err) => {
             if (status === "SUBSCRIBED") {
               console.log("Notification listener active");
             } else if (status === "CLOSED") {
               console.log("Notification listener closed");
             } else if (status === "CHANNEL_ERROR") {
-              console.error("Notification listener error");
+              console.error("Notification listener error:", err);
             }
           });
       } catch (error) {

@@ -50,38 +50,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get historical sales data from orders
-    const { data: orders } = await supabase
-      .from("orders")
-      .select("order_date, items")
+    // Get historical sales data from sales_data table
+    // This includes both system orders AND distributor uploads
+    const { data: salesData, error: salesError } = await supabase
+      .from("sales_data")
+      .select("sku, sales_date, reporting_month, quantity_sold, total_sales, sales_channel")
       .eq("brand_id", finalBrandId)
-      .gte("order_date", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString())
-      .order("order_date", { ascending: true });
+      .gte("sales_date", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString())
+      .order("sales_date", { ascending: true });
 
-    if (!orders || orders.length === 0) {
+    if (salesError) {
+      console.error("Error fetching sales data:", salesError);
       return NextResponse.json(
-        { error: "Insufficient historical data for forecasting" },
+        { error: "Failed to retrieve sales history" },
+        { status: 500 }
+      );
+    }
+
+    if (!salesData || salesData.length === 0) {
+      return NextResponse.json(
+        { error: "Insufficient historical data for forecasting. Upload sales data or create orders first." },
         { status: 400 }
       );
     }
 
-    // Extract SKU-level sales
+    // Extract SKU-level sales from sales_data
     const skuSales: Record<string, { quantity: number; revenue: number; date: string }[]> = {};
 
-    orders.forEach((order) => {
-      if (order.items && Array.isArray(order.items)) {
-        order.items.forEach((item: any) => {
-          const itemSku = item.sku;
-          if (!skuSales[itemSku]) {
-            skuSales[itemSku] = [];
-          }
-          skuSales[itemSku].push({
-            quantity: item.quantity || 0,
-            revenue: item.total || 0,
-            date: order.order_date,
-          });
-        });
+    salesData.forEach((sale) => {
+      const itemSku = sale.sku;
+      if (!itemSku) return;
+      
+      if (!skuSales[itemSku]) {
+        skuSales[itemSku] = [];
       }
+      skuSales[itemSku].push({
+        quantity: sale.quantity_sold || 0,
+        revenue: sale.total_sales || 0,
+        date: sale.sales_date || sale.reporting_month,
+      });
     });
 
     // Calculate forecast period in months

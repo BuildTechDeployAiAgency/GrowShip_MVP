@@ -3,7 +3,13 @@
 import { useState, useEffect } from "react";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { createClient } from "@/lib/supabase/client";
-import { Organization, UserProfile, UserMembership } from "@/types/auth";
+import { Organization, UserProfile, UserMembership, Brand } from "@/types/auth";
+import { BrandDistributorRelationshipDetailed } from "@/types/relationships";
+import { OrganizationActionsMenu } from "./organization-actions-menu";
+import { OrganizationDetailDialog } from "./organization-detail-dialog";
+import { UserActionsMenu } from "./user-actions-menu";
+import { RelationshipsList } from "./relationships-list";
+import { AssignDistributorDialog } from "./assign-distributor-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,9 +33,11 @@ import {
   Trash2,
   Shield,
   Globe,
-  AlertCircle
+  AlertCircle,
+  Bell
 } from "lucide-react";
 import { toast } from "sonner";
+import { NotificationSettingsMatrix } from "./notification-settings-matrix";
 
 interface OrganizationStats {
   totalOrganizations: number;
@@ -61,6 +69,11 @@ export function SuperAdminDashboard() {
   const [orgType, setOrgType] = useState<"brand" | "distributor" | "manufacturer">("brand");
   const [creatingOrg, setCreatingOrg] = useState(false);
   const [activeTab, setActiveTab] = useState("organizations");
+  const [selectedOrganization, setSelectedOrganization] = useState<Brand | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [assignDistributorDialogOpen, setAssignDistributorDialogOpen] = useState(false);
+  const [selectedRelationship, setSelectedRelationship] = useState<BrandDistributorRelationshipDetailed | null>(null);
+  const [relationshipDetailDialogOpen, setRelationshipDetailDialogOpen] = useState(false);
   const supabase = createClient();
 
   // Define loadDashboardData BEFORE useEffect
@@ -203,12 +216,61 @@ export function SuperAdminDashboard() {
   });
 
   const filteredUsers = allUsers.filter(user => {
-    const matchesSearch = user.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.contact_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (user.company_name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+                         (user.contact_name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+                         (user.email?.toLowerCase() || "").includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === "all" || user.role_type === filterType;
     return matchesSearch && matchesFilter;
   });
+
+  // Organization action handlers
+  const handleViewOrganization = (org: Brand) => {
+    setSelectedOrganization(org);
+    setDetailDialogOpen(true);
+  };
+
+  const handleEditOrganization = (org: Brand) => {
+    console.log("Edit organization:", org);
+    // TODO: Implement edit functionality
+  };
+
+  const handleToggleOrganizationStatus = async (org: Brand) => {
+    try {
+      const { error } = await supabase
+        .from("brands")
+        .update({ is_active: !org.is_active })
+        .eq("id", org.id);
+
+      if (error) throw error;
+
+      // Refresh data
+      await loadDashboardData();
+    } catch (error) {
+      console.error("Error updating organization status:", error);
+    }
+  };
+
+  // Relationship action handlers
+  const handleAssignDistributor = () => {
+    setAssignDistributorDialogOpen(true);
+  };
+
+  const handleViewRelationshipDetails = (relationship: BrandDistributorRelationshipDetailed) => {
+    setSelectedRelationship(relationship);
+    setRelationshipDetailDialogOpen(true);
+  };
+
+  const handleEditRelationship = (relationship: BrandDistributorRelationshipDetailed) => {
+    setSelectedRelationship(relationship);
+    // TODO: Implement edit relationship dialog
+    console.log("Edit relationship:", relationship);
+  };
+
+  const handleAssignmentSuccess = () => {
+    setAssignDistributorDialogOpen(false);
+    // Refresh any cached data if needed
+    loadDashboardData();
+  };
 
   if (loading) {
     return (
@@ -326,6 +388,10 @@ export function SuperAdminDashboard() {
             <TabsTrigger value="organizations">Organizations</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="relationships">Relationships</TabsTrigger>
+            <TabsTrigger value="notifications" className="flex items-center gap-1.5">
+              <Bell className="h-4 w-4" />
+              Notifications
+            </TabsTrigger>
           </TabsList>
 
           {/* Organizations Tab */}
@@ -392,17 +458,13 @@ export function SuperAdminDashboard() {
                           {new Date(org.created_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <OrganizationActionsMenu
+                            organization={org}
+                            onViewDetails={handleViewOrganization}
+                            onEdit={handleEditOrganization}
+                            onStatusChange={handleToggleOrganizationStatus}
+                            onRefresh={loadDashboardData}
+                          />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -471,22 +533,30 @@ export function SuperAdminDashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={user.user_status === "approved" ? "default" : "secondary"}>
+                          <Badge 
+                            variant={
+                              user.user_status === "approved" 
+                                ? "default" 
+                                : user.user_status === "pending"
+                                ? "secondary"
+                                : "destructive"
+                            }
+                            className={
+                              user.user_status === "pending"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : user.user_status === "suspended"
+                                ? "bg-red-100 text-red-800"
+                                : ""
+                            }
+                          >
                             {user.user_status}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <UserActionsMenu
+                            user={user}
+                            onRefresh={loadDashboardData}
+                          />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -498,17 +568,24 @@ export function SuperAdminDashboard() {
 
           {/* Relationships Tab */}
           <TabsContent value="relationships" className="space-y-4">
+            <RelationshipsList
+              onAssignDistributor={handleAssignDistributor}
+              onViewDetails={handleViewRelationshipDetails}
+              onEditRelationship={handleEditRelationship}
+            />
+          </TabsContent>
+
+          {/* Notifications Tab */}
+          <TabsContent value="notifications" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Brand-Distributor Relationships</CardTitle>
+                <CardTitle>Notification Settings</CardTitle>
                 <CardDescription>
-                  Manage associations between brands and distributors
+                  Configure which roles receive each notification type across the system
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <p className="text-gray-500">Relationship management coming soon...</p>
-                </div>
+                <NotificationSettingsMatrix />
               </CardContent>
             </Card>
           </TabsContent>
@@ -641,6 +718,21 @@ export function SuperAdminDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Organization Detail Dialog */}
+        <OrganizationDetailDialog
+          open={detailDialogOpen}
+          onOpenChange={setDetailDialogOpen}
+          organization={selectedOrganization}
+          onEdit={handleEditOrganization}
+        />
+
+        {/* Assign Distributor Dialog */}
+        <AssignDistributorDialog
+          open={assignDistributorDialogOpen}
+          onOpenChange={setAssignDistributorDialogOpen}
+          onSuccess={handleAssignmentSuccess}
+        />
     </div>
   );
 }

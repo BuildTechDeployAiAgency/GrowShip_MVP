@@ -25,16 +25,17 @@ interface ShipmentStatusDialogProps {
   onConfirm: (newStatus: ShipmentStatus, notes?: string) => Promise<void>;
 }
 
+// Strict shipment status transitions - only valid next steps are shown
 const STATUS_TRANSITIONS: Record<ShipmentStatus, ShipmentStatus[]> = {
-  pending: ["processing", "in_transit", "cancelled"],
-  processing: ["in_transit", "shipped", "cancelled"],
-  in_transit: ["out_for_delivery", "delivered", "failed"],
+  pending: ["processing", "cancelled"],
+  processing: ["shipped", "cancelled"],
+  shipped: ["in_transit"],
+  in_transit: ["out_for_delivery", "failed"],
   out_for_delivery: ["delivered", "failed"],
-  shipped: ["delivered", "failed"],
-  delivered: [],
-  failed: ["pending"],
-  returned: [],
-  cancelled: [],
+  failed: ["in_transit", "cancelled"], // Retry or Cancel
+  delivered: [], // Terminal state
+  returned: [], // Terminal state
+  cancelled: [], // Terminal state
 };
 
 const STATUS_INFO: Record<

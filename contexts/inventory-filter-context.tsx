@@ -24,7 +24,7 @@ const defaultFilters: InventoryFilters = {
 };
 
 // Active tab type
-export type InventoryTab = "overview" | "products" | "transactions";
+export type InventoryTab = "overview" | "products" | "transactions" | "settings";
 
 // Context interface
 interface InventoryFilterContextType {

@@ -18,6 +18,7 @@ import { ProductDetailsContent } from "@/components/products/product-details-con
 import { ProductOrdersSection } from "@/components/products/product-orders-section";
 import { ProductInventoryBreakdown } from "@/components/products/product-inventory-breakdown";
 import { Card, CardContent } from "@/components/ui/card";
+import { resolveUserBrandId } from "@/lib/brand-context";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -29,10 +30,13 @@ export default function ProductDetailPage() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("overview");
 
+  const profileIsSuperAdmin = profile?.role_name === "super_admin";
+  const resolvedBrandId = resolveUserBrandId(profile, profileIsSuperAdmin);
+
   const { deleteProduct } = useProducts({
     searchTerm: "",
     filters: { status: "all", category: "all" },
-    brandId: profile?.brand_id,
+    brandId: resolvedBrandId,
   });
 
   useEffect(() => {
@@ -304,4 +308,3 @@ export default function ProductDetailPage() {
     </ProtectedPage>
   );
 }
-

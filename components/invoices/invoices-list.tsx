@@ -33,6 +33,7 @@ import { useInvoices, Invoice, PaymentStatus } from "@/hooks/use-invoices";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { format } from "date-fns";
 import { InvoiceFormDialog } from "./invoice-form-dialog";
+import { InvoiceDetailsDialog } from "./invoice-details-dialog";
 import { formatCurrency } from "@/lib/formatters";
 
 const paymentColors: Record<PaymentStatus, string> = {
@@ -57,6 +58,7 @@ export function InvoicesList({ onCreateClick }: InvoicesListProps) {
 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const {
     invoices,
@@ -97,6 +99,16 @@ export function InvoicesList({ onCreateClick }: InvoicesListProps) {
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
+    setSelectedInvoice(null);
+  };
+
+  const handleViewDetails = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setIsDetailsOpen(true);
+  };
+
+  const handleCloseDetails = () => {
+    setIsDetailsOpen(false);
     setSelectedInvoice(null);
   };
 
@@ -251,7 +263,7 @@ export function InvoicesList({ onCreateClick }: InvoicesListProps) {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleViewDetails(invoice)}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
@@ -296,6 +308,12 @@ export function InvoicesList({ onCreateClick }: InvoicesListProps) {
         onSuccess={() => {
           // Refetch is handled automatically by the hook
         }}
+      />
+
+      <InvoiceDetailsDialog
+        open={isDetailsOpen}
+        onClose={handleCloseDetails}
+        invoice={selectedInvoice}
       />
     </div>
   );

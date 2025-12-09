@@ -34,18 +34,22 @@ import {
   ChevronLeft,
   ChevronRight,
   Package,
-  X
+  X,
+  RefreshCw
 } from "lucide-react";
 import Link from "next/link";
 import { TransactionType, TransactionStatus, SourceType } from "@/types/inventory";
+import { resolveUserBrandId } from "@/lib/brand-context";
 
 export function InventoryTransactionsList() {
-  const { profile } = useEnhancedAuth();
+  const { profile, canPerformAction } = useEnhancedAuth();
   const { filters: contextFilters, clearProductSelection } = useInventoryFilter();
+  const isSuperAdmin = canPerformAction("view_all_users");
+  const resolvedBrandId = resolveUserBrandId(profile, isSuperAdmin);
   
   // Fetch products for dropdown
   const { products: dropdownProducts, isLoading: productsLoading } = useProductsDropdown(
-    profile?.brand_id
+    resolvedBrandId
   );
 
   // Local filter state
@@ -81,7 +85,7 @@ export function InventoryTransactionsList() {
     status: filters.status === "all" ? undefined : (filters.status as TransactionStatus),
   };
 
-  const { transactions, pagination, isLoading, error } = useInventoryTransactions(queryFilters);
+  const { transactions, pagination, isLoading, error, refetch } = useInventoryTransactions(queryFilters);
 
   // Handle product selection change
   const handleProductChange = (value: string) => {
@@ -296,6 +300,16 @@ export function InventoryTransactionsList() {
                 <SelectItem value="reversed">Reversed</SelectItem>
               </SelectContent>
             </Select>
+
+            <Button
+              variant="outline"
+              onClick={() => refetch()}
+              disabled={isLoading}
+              title="Refresh transactions list"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
 
             <Button
               variant="outline"

@@ -36,6 +36,7 @@ import { Plus, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProductLookup } from "@/components/products/product-lookup";
+import { resolveUserBrandId } from "@/lib/brand-context";
 
 interface POFormDialogProps {
   open: boolean;
@@ -98,6 +99,7 @@ export function POFormDialog({
   const { profile, canPerformAction } = useEnhancedAuth();
   const isSuperAdmin = canPerformAction("view_all_users");
   const isDistributorAdmin = profile?.role_name?.startsWith("distributor_");
+  const resolvedBrandId = resolveUserBrandId(profile, isSuperAdmin);
   
   const { createPurchaseOrder, updatePurchaseOrder } = usePurchaseOrders({
     searchTerm: "",
@@ -106,14 +108,14 @@ export function POFormDialog({
       paymentStatus: "all",
       dateRange: "all",
     },
-    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    brandId: resolvedBrandId,
     distributorId: isDistributorAdmin ? profile?.distributor_id : undefined,
   });
 
   const { distributors, loading: distributorsLoading } = useDistributors({
     searchTerm: "",
     filters: { status: "all" },
-    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    brandId: resolvedBrandId,
     distributorId: isDistributorAdmin ? profile?.distributor_id : undefined,
     isSuperAdmin,
   });
@@ -121,7 +123,7 @@ export function POFormDialog({
   const { products, loading: productsLoading } = useProducts({
     searchTerm: "",
     filters: { status: "all", category: "all" },
-    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    brandId: resolvedBrandId,
     isSuperAdmin,
     pageSize: 200,
   });
@@ -137,7 +139,7 @@ export function POFormDialog({
     supplier_phone: "",
     po_date: todayDate,
     distributor_id: undefined,
-    brand_id: profile?.brand_id || "",
+    brand_id: resolvedBrandId || "",
     po_status: "draft",
     payment_status: "pending",
     items: [],
@@ -186,8 +188,8 @@ export function POFormDialog({
           .select("*")
           .eq("id", profile.distributor_id!);
 
-        if (profile.brand_id) {
-          query = query.eq("brand_id", profile.brand_id);
+        if (resolvedBrandId) {
+          query = query.eq("brand_id", resolvedBrandId);
         }
 
         const { data, error } = await query.limit(1).maybeSingle();
@@ -216,7 +218,7 @@ export function POFormDialog({
             setCurrentDistributor({
               id: profile.distributor_id!,
               name: fallbackName,
-              brand_id: profile.brand_id || "",
+              brand_id: resolvedBrandId || "",
               contact_email: profile.email || "",
               contact_phone: "",
               contact_name: profile.contact_name || "",
@@ -236,14 +238,16 @@ export function POFormDialog({
     if (!currentDistributor) {
       fetchDistributor();
     }
-  }, [isDistributorAdmin, profile?.distributor_id, profile?.brand_id, open, distributors, currentDistributor]);
+  }, [isDistributorAdmin, profile?.distributor_id, resolvedBrandId, open, distributors, currentDistributor]);
 
   // Update brand_id when profile changes
   useEffect(() => {
-    if (profile?.brand_id && !po) {
-      setFormData((prev) => ({ ...prev, brand_id: profile.brand_id! }));
+    if (resolvedBrandId && !po) {
+      setFormData((prev) =>
+        prev.brand_id === resolvedBrandId ? prev : { ...prev, brand_id: resolvedBrandId }
+      );
     }
-  }, [profile?.brand_id, po]);
+  }, [resolvedBrandId, po]);
 
   // Reset form when dialog opens/closes
   useEffect(() => {
@@ -286,9 +290,7 @@ export function POFormDialog({
         ? profile.distributor_id 
         : undefined;
 
-      const initialBrandId = isDistributorAdmin && profile?.brand_id
-        ? profile.brand_id
-        : (profile?.brand_id || "");
+      const initialBrandId = resolvedBrandId || "";
 
       // For distributor admin, use currentDistributor data if available
       const distributorData = isDistributorAdmin && currentDistributor ? currentDistributor : null;
@@ -326,7 +328,7 @@ export function POFormDialog({
       setSelectedProductId("");
       setActiveTab("details");
     }
-  }, [open, po, todayDate, profile?.brand_id, isDistributorAdmin, profile?.distributor_id, currentDistributor]);
+  }, [open, po, todayDate, resolvedBrandId, isDistributorAdmin, profile?.distributor_id, currentDistributor]);
 
   // Calculate totals when items change
   useEffect(() => {
@@ -387,7 +389,7 @@ export function POFormDialog({
             supplier_name: selectedDistributor.name,
             supplier_email: selectedDistributor.contact_email,
             supplier_phone: selectedDistributor.contact_phone,
-            brand_id: selectedDistributor.brand_id || prev.brand_id, // Ensure brand_id is set
+        brand_id: selectedDistributor.brand_id || prev.brand_id, // Ensure brand_id is set
           }));
         }
       }
@@ -506,8 +508,8 @@ export function POFormDialog({
       ? profile.distributor_id 
       : formData.distributor_id;
 
-    const effectiveBrandId = isDistributorAdmin && profile?.brand_id
-      ? profile.brand_id
+    const effectiveBrandId = isDistributorAdmin
+      ? resolvedBrandId || formData.brand_id
       : formData.brand_id;
 
     if (!effectiveDistributorId) {

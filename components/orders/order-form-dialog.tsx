@@ -31,6 +31,7 @@ import { toast } from "react-toastify";
 import { AlertTriangle, Plus, X, ShoppingCart } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ProductLookup } from "@/components/products/product-lookup";
+import { resolveUserBrandId } from "@/lib/brand-context";
 
 interface OrderFormDialogProps {
   open: boolean;
@@ -115,6 +116,7 @@ export function OrderFormDialog({
 }: OrderFormDialogProps) {
   const { profile, canPerformAction, profileLoading } = useEnhancedAuth();
   const isSuperAdmin = canPerformAction("view_all_users");
+  const resolvedBrandId = resolveUserBrandId(profile, isSuperAdmin);
   const { createOrder, updateOrder } = useOrders({
     searchTerm: "",
     filters: {
@@ -123,14 +125,14 @@ export function OrderFormDialog({
       customerType: "all",
       dateRange: "all",
     },
-    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    brandId: resolvedBrandId,
   });
 
   const isDistributorAdmin = profile?.role_name?.startsWith("distributor_");
   const { distributors, loading: distributorsLoading } = useDistributors({
     searchTerm: "",
     filters: { status: "all" },
-    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    brandId: resolvedBrandId,
     distributorId: isDistributorAdmin ? profile?.distributor_id : undefined,
     isSuperAdmin,
   });
@@ -138,7 +140,7 @@ export function OrderFormDialog({
   const { products, loading: productsLoading } = useProducts({
     searchTerm: "",
     filters: { status: "all", category: "all" },
-    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    brandId: resolvedBrandId,
     isSuperAdmin,
     pageSize: 200,
   });
@@ -253,9 +255,7 @@ export function OrderFormDialog({
         : "";
       
       // For distributor_admin users, use their brand_id directly from profile
-      const initialBrandId = isDistributorAdmin && profile?.brand_id
-        ? profile.brand_id
-        : "";
+      const initialBrandId = isDistributorAdmin ? resolvedBrandId || "" : "";
       
       setFormData({
         distributor_id: initialDistributorId,
@@ -276,7 +276,7 @@ export function OrderFormDialog({
         payment_status: "pending",
       });
     }
-  }, [open, order, profileLoading, todayDate, isDistributorAdmin, profile?.distributor_id, profile?.brand_id]);
+  }, [open, order, profileLoading, todayDate, isDistributorAdmin, profile?.distributor_id, resolvedBrandId]);
 
   // Auto-populate fields when distributor is selected
   useEffect(() => {

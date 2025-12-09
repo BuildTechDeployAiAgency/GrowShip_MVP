@@ -41,6 +41,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     
     // Allow access if super admin, brand matches, or distributor matches (for distributor users)
     if (!isSuperAdmin && !isBrandMatch && !isDistributorMatch) {
+      console.error(`[PO History Access Denied] PO: ${id}, User: ${user.id}, Role: ${profile?.role_name}, Brand: ${profile?.brand_id}, Dist: ${profile?.distributor_id}, PO Brand: ${po.brand_id}, PO Dist: ${po.distributor_id}`);
       return NextResponse.json(
         { error: "You do not have access to this purchase order" },
         { status: 403 }

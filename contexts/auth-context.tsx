@@ -201,77 +201,33 @@ export function AuthProvider({
 
     if (data.user) {
       try {
-        const { data: existingProfile } = await supabase
-          .from("user_profiles")
-          .select("*")
-          .eq("user_id", data.user.id)
-          .maybeSingle();
+        // Call server-side API to create profile (bypasses RLS)
+        const response = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: data.user.id,
+            email: email,
+            role: role,
+            brandId: brandId,
+          }),
+        });
 
-        if (!existingProfile) {
-          const { error: profileError } = await supabase
-            .from("user_profiles")
-            .insert({
-              user_id: data.user.id,
-              role_name: (role + "_admin") as UserProfile["role_name"],
-              role_type: role as UserProfile["role_type"],
-              company_name: "",
-              contact_name: "",
-              email: email,
-              is_profile_complete: false,
-              user_status: "approved" as UserProfile["user_status"],
-            });
+        const result = await response.json();
 
-          if (profileError) {
-            console.error("Failed to create user profile:", profileError);
-            return {
-              error: {
-                message: "Database error saving new user",
-                details: profileError,
-              },
-            };
-          }
-
-          // Create user membership if brandId is provided
-          if (brandId) {
-            const { error: membershipError } = await supabase
-              .from("user_memberships")
-              .insert({
-                user_id: data.user.id,
-                brand_id: brandId,
-                role_name: (role + "_admin") as UserProfile["role_name"],
-                is_active: true,
-              });
-
-            if (membershipError) {
-              console.error(
-                "Failed to create user membership:",
-                membershipError
-              );
-              // Don't fail the entire signup if membership creation fails
-              // The user can still log in and we can create the membership later
-            }
-          }
-        } else {
-          if (existingProfile.role_name !== role) {
-            const { error: updateError } = await supabase
-              .from("user_profiles")
-              .update({
-                role_name: role as UserProfile["role_name"],
-                role_type: role as UserProfile["role_type"],
-              })
-              .eq("user_id", data.user.id);
-
-            if (updateError) {
-              console.error("Failed to update user profile role:", updateError);
-              return {
-                error: {
-                  message: "Database error updating user profile",
-                  details: updateError,
-                },
-              };
-            }
-          }
+        if (!response.ok) {
+          console.error("Failed to create user profile:", result);
+          return {
+            error: {
+              message: result.error || "Database error saving new user",
+              details: result.details,
+            },
+          };
         }
+
+        console.log("User profile created successfully via API:", result);
       } catch (profileError) {
         console.error("Error creating user profile:", profileError);
         return {
@@ -396,31 +352,35 @@ export function AuthProvider({
   };
 
   const signOut = async () => {
+    const currentUserId = user?.id;
+    
+    // Always clear cache and stored data first for reliability
     try {
-      const currentUserId = user?.id;
-      await supabase.auth.signOut();
-
       clearAllCache();
-
+    } catch (cacheError) {
+      console.error("Error clearing cache:", cacheError);
+    }
+    
+    try {
       clearAllStoredData();
       if (currentUserId) {
         clearLastVisitedPath(currentUserId);
       }
-
-      setUser(null);
-
-      router.push("/");
-    } catch (error) {
-      console.error("Error during sign out:", error);
-
-      clearAllCache();
-      clearAllStoredData();
-      if (user?.id) {
-        clearLastVisitedPath(user.id);
-      }
-      setUser(null);
-      router.push("/");
+    } catch (storageError) {
+      console.error("Error clearing storage:", storageError);
     }
+    
+    setUser(null);
+    
+    // Attempt Supabase signout
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Error during Supabase sign out:", error);
+    }
+    
+    // Use hard reload to ensure all in-memory state is cleared
+    window.location.href = "/";
   };
 
   const updateProfile = async (profileData: Partial<UserProfile>) => {

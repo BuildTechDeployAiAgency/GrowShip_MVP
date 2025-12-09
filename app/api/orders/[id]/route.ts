@@ -13,6 +13,10 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
+  
+  console.log("=======================================================");
+  console.log(`[ORDER API] PATCH request received for order: ${id}`);
+  console.log("=======================================================");
 
   try {
     const supabase = await createClient();
@@ -26,6 +30,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
+    console.log(`[ORDER API] Request body:`, JSON.stringify(body, null, 2));
     
     // Fetch current order to check permissions and current status
     const { data: currentOrder, error: fetchError } = await supabase
@@ -122,30 +127,73 @@ export async function PATCH(
     const oldStatus = currentOrder.order_status as OrderStatus;
     const newStatus = body.order_status as OrderStatus;
 
+    console.log(`[ORDER API] Status transition check: ${oldStatus} -> ${newStatus}`);
+
     if (newStatus && oldStatus !== newStatus) {
-      // Allocate stock when order moves to "processing"
+      console.log(`[ORDER API] *** STATUS CHANGED *** ${oldStatus} -> ${newStatus}`);
+      
+      // CASE 1: Pending -> Processing (Allocate)
       if (newStatus === "processing" && oldStatus === "pending") {
+        console.log(`[ORDER API] >>> Triggering syncOrderAllocation for order ${id}`);
         const syncResult = await syncOrderAllocation(id, user.id, true);
         if (!syncResult.success) {
           console.error("Failed to allocate inventory:", syncResult.error);
-          // Note: Order status is already updated, but inventory sync failed
-          // Consider adding a flag or notification for manual review
+        } else {
+          console.log(`Inventory allocated for order ${id}`);
         }
       }
-      // Deduct stock when order is "shipped" (fulfillment)
+      
+      // CASE 2: Processing -> Shipped (Fulfill)
       else if (newStatus === "shipped" && oldStatus === "processing") {
         const syncResult = await syncOrderFulfillment(id, user.id);
         if (!syncResult.success) {
           console.error("Failed to sync inventory on fulfillment:", syncResult.error);
+        } else {
+          console.log(`Inventory fulfilled for order ${id}`);
         }
       }
-      // Release stock when order is cancelled
+      
+      // CASE 3: Pending -> Shipped (Direct fulfillment - Allocate THEN Fulfill)
+      else if (newStatus === "shipped" && oldStatus === "pending") {
+        console.log(`Order ${id} moved directly from pending to shipped. Executing full sync sequence.`);
+        
+        // 1. Allocate first
+        const allocationResult = await syncOrderAllocation(id, user.id, true);
+        if (!allocationResult.success) {
+          console.error("Failed to allocate inventory during direct fulfillment:", allocationResult.error);
+        } else {
+          console.log(`Inventory allocated (direct) for order ${id}`);
+        }
+        
+        // 2. Then Fulfill
+        const fulfillmentResult = await syncOrderFulfillment(id, user.id);
+        if (!fulfillmentResult.success) {
+          console.error("Failed to sync inventory on direct fulfillment:", fulfillmentResult.error);
+        } else {
+          console.log(`Inventory fulfilled (direct) for order ${id}`);
+        }
+      }
+
+      // CASE 4: Cancellation
       else if (newStatus === "cancelled") {
-        const syncResult = await syncOrderCancellation(id, user.id, body.notes);
-        if (!syncResult.success) {
-          console.error("Failed to release inventory on cancellation:", syncResult.error);
+        // Only release stock if it was previously allocated (i.e., was processing)
+        // If it was shipped, we probably shouldn't just cancel it without a return workflow, but 
+        // for now assuming cancellation releases allocation if not shipped?
+        // Actually, if it was 'processing', it has allocated stock.
+        // If it was 'pending', it has NO allocated stock.
+        
+        if (oldStatus === "processing") {
+            const syncResult = await syncOrderCancellation(id, user.id, body.notes);
+            if (!syncResult.success) {
+              console.error("Failed to release inventory on cancellation:", syncResult.error);
+            }
+        } else if (oldStatus === "shipped") {
+            // If cancelling a shipped order, this is complex. 
+            // Usually requires a return. For now, let's log a warning.
+            console.warn(`Order ${id} cancelled after shipping. Inventory not automatically restored. Use return workflow.`);
         }
       }
+      
       // "delivered" status has no inventory impact (just confirmation)
       
       // If a change_reason was provided and status changed, update the most recent order_history entry

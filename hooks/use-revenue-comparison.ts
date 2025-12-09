@@ -12,7 +12,7 @@ export interface RevenueComparisonFilters {
   tableSuffix?: string;
   userId?: string;
   year?: number; // year for current vs previous will be year-1
-  distributorId?: string;
+  distributorId?: string | null;
 }
 
 export interface UseRevenueComparisonOptions {

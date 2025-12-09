@@ -18,7 +18,7 @@ export interface SeasonalAnalysisFilters {
   tableSuffix?: string;
   userId?: string;
   year?: number;
-  distributorId?: string;
+  distributorId?: string | null;
 }
 
 export interface UseSeasonalAnalysisOptions {

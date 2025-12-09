@@ -88,6 +88,8 @@ export interface ParsedSalesRow {
   // Normalized geographic IDs (looked up during import)
   territory_id?: string;
   region_id?: string;
+  // Normalized retailer ID (looked up or auto-created during import)
+  retailer_id?: string;
   sales_channel?: string;
   units_sold: number;
   total_sales: number;

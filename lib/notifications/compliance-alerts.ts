@@ -1,4 +1,21 @@
+/**
+ * ============================================================================
+ * COMPLIANCE & CALENDAR ALERTS NOTIFICATION SERVICE
+ * ============================================================================
+ * Creates notifications for compliance reviews and calendar events using the
+ * role-based NotificationDispatcher.
+ * 
+ * Notification Types:
+ *   - compliance_review_due: Monthly distributor compliance review deadlines
+ *   - payment_due_reminder: Payment due calendar reminders
+ *   - po_approval_due: PO approval deadline reminders
+ *   - shipment_arrival_reminder: Shipment arrival reminders
+ *   - backorder_review_reminder: Backorder review reminders
+ *   - custom_event_reminder: Generic calendar event reminders
+ */
+
 import { createAdminClient } from "@/lib/supabase/server";
+import { NotificationDispatcher } from "./dispatcher";
 
 /**
  * Check for upcoming compliance review calendar events and create notifications
@@ -26,43 +43,11 @@ export async function checkComplianceAlerts(brandId: string): Promise<{
     .lte("event_date", threeDaysOut);
 
   if (eventsError) {
-    console.error("Error fetching compliance events:", eventsError);
+    console.error("[checkComplianceAlerts] Error fetching events:", eventsError);
     return { notificationsCreated: 0 };
   }
 
   if (!complianceEvents || complianceEvents.length === 0) {
-    return { notificationsCreated: 0 };
-  }
-
-  // Get users who should receive compliance notifications (brand admins, super admins)
-  const { data: brandUsers, error: brandUsersError } = await supabase
-    .from("user_profiles")
-    .select("user_id, role_name")
-    .eq("brand_id", brandId)
-    .eq("user_status", "approved")
-    .in("role_name", ["brand_admin", "brand_manager", "brand_logistics"]);
-
-  if (brandUsersError) {
-    console.error("Error fetching brand users for compliance alerts:", brandUsersError);
-  }
-
-  // Get super admins
-  const { data: superAdmins, error: superAdminsError } = await supabase
-    .from("user_profiles")
-    .select("user_id")
-    .eq("role_name", "super_admin")
-    .eq("user_status", "approved");
-
-  if (superAdminsError) {
-    console.error("Error fetching super admins for compliance alerts:", superAdminsError);
-  }
-
-  // Combine all recipients
-  const allRecipients = new Set<string>();
-  brandUsers?.forEach((u) => allRecipients.add(u.user_id));
-  superAdmins?.forEach((u) => allRecipients.add(u.user_id));
-
-  if (allRecipients.size === 0) {
     return { notificationsCreated: 0 };
   }
 
@@ -72,21 +57,17 @@ export async function checkComplianceAlerts(brandId: string): Promise<{
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-    const { data: existingNotifications, error: existingError } = await supabase
+    const { data: existingNotification } = await supabase
       .from("notifications")
       .select("id")
       .eq("related_entity_type", "calendar_event")
       .eq("related_entity_id", event.id)
       .gte("created_at", oneDayAgo.toISOString())
-      .limit(1);
-
-    if (existingError) {
-      console.error("Error checking existing compliance notifications:", existingError);
-      continue;
-    }
+      .limit(1)
+      .maybeSingle();
 
     // Skip if notification was already sent recently
-    if (existingNotifications && existingNotifications.length > 0) {
+    if (existingNotification) {
       continue;
     }
 
@@ -97,46 +78,43 @@ export async function checkComplianceAlerts(brandId: string): Promise<{
     eventDate.setHours(0, 0, 0, 0);
     const daysUntilDue = Math.ceil((eventDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    let priority: "low" | "medium" | "high" | "urgent" = "medium";
-    let urgencyText = "";
+    let priority: "low" | "medium" | "high" | "urgent";
+    let urgencyText: string;
     
     if (daysUntilDue === 0) {
       priority = "urgent";
-      urgencyText = "due today";
+      urgencyText = "Due Today";
     } else if (daysUntilDue === 1) {
       priority = "high";
-      urgencyText = "due tomorrow";
+      urgencyText = "Due Tomorrow";
     } else {
       priority = "medium";
-      urgencyText = `due in ${daysUntilDue} days`;
+      urgencyText = `Due in ${daysUntilDue} Days`;
     }
 
-    // Create notifications for all recipients
-    const notifications = Array.from(allRecipients).map((userId) => ({
-      user_id: userId,
-      type: "warning",
-      title: `Compliance Review ${urgencyText.charAt(0).toUpperCase() + urgencyText.slice(1)}`,
-      message: event.title + (event.description ? `: ${event.description}` : ""),
-      brand_id: brandId,
-      related_entity_type: "calendar_event",
-      related_entity_id: event.id,
-      priority,
-      action_required: true,
-      action_url: `/calendar`,
-      is_read: false,
-    }));
+    // Dispatch using role-based system
+    const result = await NotificationDispatcher.dispatch(
+      "compliance_review_due",
+      {
+        title: `Compliance Review ${urgencyText}`,
+        message: event.title + (event.description ? `: ${event.description}` : ""),
+        brandId,
+        relatedEntityType: "calendar_event",
+        relatedEntityId: event.id,
+        priority,
+        actionRequired: true,
+        actionUrl: `/calendar`,
+      }
+    );
 
-    const { error: insertError } = await supabase
-      .from("notifications")
-      .insert(notifications);
-
-    if (insertError) {
-      console.error("Error creating compliance notifications:", insertError);
+    if (result.success) {
+      notificationsCreated += result.notificationsSent;
     } else {
-      notificationsCreated += notifications.length;
+      console.error("[checkComplianceAlerts] Error:", result.error);
     }
   }
 
+  console.log(`[checkComplianceAlerts] Brand ${brandId}: Created ${notificationsCreated} compliance notifications`);
   return { notificationsCreated };
 }
 
@@ -166,43 +144,11 @@ export async function checkCalendarEventAlerts(brandId: string): Promise<{
     .lte("event_date", threeDaysOut);
 
   if (eventsError) {
-    console.error("Error fetching upcoming calendar events:", eventsError);
+    console.error("[checkCalendarEventAlerts] Error fetching events:", eventsError);
     return { notificationsCreated: 0 };
   }
 
   if (!upcomingEvents || upcomingEvents.length === 0) {
-    return { notificationsCreated: 0 };
-  }
-
-  // Get users who should receive notifications
-  const { data: brandUsers, error: brandUsersError } = await supabase
-    .from("user_profiles")
-    .select("user_id, role_name")
-    .eq("brand_id", brandId)
-    .eq("user_status", "approved")
-    .in("role_name", ["brand_admin", "brand_manager", "brand_logistics"]);
-
-  if (brandUsersError) {
-    console.error("Error fetching brand users for calendar alerts:", brandUsersError);
-  }
-
-  // Get super admins
-  const { data: superAdmins, error: superAdminsError } = await supabase
-    .from("user_profiles")
-    .select("user_id")
-    .eq("role_name", "super_admin")
-    .eq("user_status", "approved");
-
-  if (superAdminsError) {
-    console.error("Error fetching super admins for calendar alerts:", superAdminsError);
-  }
-
-  // Combine all recipients
-  const allRecipients = new Set<string>();
-  brandUsers?.forEach((u) => allRecipients.add(u.user_id));
-  superAdmins?.forEach((u) => allRecipients.add(u.user_id));
-
-  if (allRecipients.size === 0) {
     return { notificationsCreated: 0 };
   }
 
@@ -212,21 +158,17 @@ export async function checkCalendarEventAlerts(brandId: string): Promise<{
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-    const { data: existingNotifications, error: existingError } = await supabase
+    const { data: existingNotification } = await supabase
       .from("notifications")
       .select("id")
       .eq("related_entity_type", "calendar_event")
       .eq("related_entity_id", event.id)
       .gte("created_at", oneDayAgo.toISOString())
-      .limit(1);
-
-    if (existingError) {
-      console.error("Error checking existing calendar notifications:", existingError);
-      continue;
-    }
+      .limit(1)
+      .maybeSingle();
 
     // Skip if notification was already sent recently
-    if (existingNotifications && existingNotifications.length > 0) {
+    if (existingNotification) {
       continue;
     }
 
@@ -237,21 +179,21 @@ export async function checkCalendarEventAlerts(brandId: string): Promise<{
     eventDate.setHours(0, 0, 0, 0);
     const daysUntilDue = Math.ceil((eventDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Determine notification type and priority based on event type
-    let notificationType = "reminder";
-    let priority: "low" | "medium" | "high" | "urgent" = "medium";
+    // Map event type to notification type key
+    let typeKey: string;
+    let priority: "low" | "medium" | "high" | "urgent";
     let actionUrl = "/calendar";
 
     switch (event.event_type) {
       case "payment_due":
-        notificationType = "payment";
+        typeKey = "payment_due_reminder";
         priority = daysUntilDue === 0 ? "urgent" : daysUntilDue === 1 ? "high" : "medium";
         if (event.related_entity_id) {
           actionUrl = `/invoices?highlight=${event.related_entity_id}`;
         }
         break;
       case "po_approval_due":
-        notificationType = "order";
+        typeKey = "po_approval_due";
         priority = daysUntilDue === 0 ? "high" : "medium";
         if (event.related_entity_id) {
           actionUrl = `/purchase-orders/${event.related_entity_id}`;
@@ -259,7 +201,7 @@ export async function checkCalendarEventAlerts(brandId: string): Promise<{
         break;
       case "shipment_arrival":
       case "delivery_milestone":
-        notificationType = "shipping";
+        typeKey = "shipment_arrival_reminder";
         priority = daysUntilDue === 0 ? "medium" : "low";
         if (event.related_entity_id && event.related_entity_type === "po") {
           actionUrl = `/purchase-orders/${event.related_entity_id}`;
@@ -268,42 +210,40 @@ export async function checkCalendarEventAlerts(brandId: string): Promise<{
         }
         break;
       case "backorder_review":
-        notificationType = "inventory";
+        typeKey = "backorder_review_reminder";
         priority = "medium";
         if (event.related_entity_id) {
           actionUrl = `/purchase-orders/${event.related_entity_id}`;
         }
         break;
       default:
-        notificationType = "reminder";
+        typeKey = "custom_event_reminder";
         priority = "low";
     }
 
-    // Create notifications for all recipients
-    const notifications = Array.from(allRecipients).map((userId) => ({
-      user_id: userId,
-      type: notificationType,
-      title: event.title,
-      message: event.description || `Event scheduled for ${event.event_date}`,
-      brand_id: brandId,
-      related_entity_type: "calendar_event",
-      related_entity_id: event.id,
-      priority,
-      action_required: daysUntilDue <= 1,
-      action_url: actionUrl,
-      is_read: false,
-    }));
+    // Dispatch using role-based system
+    const result = await NotificationDispatcher.dispatch(
+      typeKey,
+      {
+        title: event.title,
+        message: event.description || `Event scheduled for ${event.event_date}`,
+        brandId,
+        distributorId: event.distributor_id || undefined,
+        relatedEntityType: "calendar_event",
+        relatedEntityId: event.id,
+        priority,
+        actionRequired: daysUntilDue <= 1,
+        actionUrl,
+      }
+    );
 
-    const { error: insertError } = await supabase
-      .from("notifications")
-      .insert(notifications);
-
-    if (insertError) {
-      console.error("Error creating calendar event notifications:", insertError);
+    if (result.success) {
+      notificationsCreated += result.notificationsSent;
     } else {
-      notificationsCreated += notifications.length;
+      console.error(`[checkCalendarEventAlerts] Error for event ${event.id}:`, result.error);
     }
   }
 
+  console.log(`[checkCalendarEventAlerts] Brand ${brandId}: Created ${notificationsCreated} calendar notifications`);
   return { notificationsCreated };
 }

@@ -36,7 +36,7 @@ export function useInventoryTransactions(filters?: TransactionFilters) {
 
       return response.json() as Promise<TransactionListResponse>;
     },
-    staleTime: 30000, // 30 seconds
+    staleTime: 5000, // 5 seconds - reduced for faster updates after order status changes
     refetchOnWindowFocus: false,
   });
 
@@ -70,7 +70,7 @@ export function useProductTransactionHistory(productId: string, limit = 10) {
       return result.transactions as InventoryTransaction[];
     },
     enabled: !!productId,
-    staleTime: 30000,
+    staleTime: 5000, // 5 seconds - reduced for faster updates
     refetchOnWindowFocus: false,
   });
 

@@ -37,6 +37,7 @@ import {
 import { format } from "date-fns";
 import { ProductWithInventory, StockStatusType } from "@/types/products";
 import { formatCurrency } from "@/lib/formatters";
+import { resolveUserBrandId } from "@/lib/brand-context";
 
 // Stock status badge colors
 const stockStatusColors: Record<string, string> = {
@@ -57,8 +58,10 @@ const stockStatusLabels: Record<string, string> = {
 };
 
 export function InventoryProductsList() {
-  const { profile } = useEnhancedAuth();
+  const { profile, canPerformAction } = useEnhancedAuth();
   const { viewProductTransactions } = useInventoryFilter();
+  const isSuperAdmin = canPerformAction("view_all_users");
+  const resolvedBrandId = resolveUserBrandId(profile, isSuperAdmin);
   
   // Local filter state
   const [search, setSearch] = useState("");
@@ -85,7 +88,7 @@ export function InventoryProductsList() {
 
   // Fetch products
   const { products, summary, pagination, isLoading, error, refetch } = useInventoryProducts(
-    profile?.brand_id,
+    resolvedBrandId,
     {
       search: debouncedSearch,
       stockStatus: stockStatus as any,
@@ -434,4 +437,3 @@ export function InventoryProductsList() {
     </div>
   );
 }
-

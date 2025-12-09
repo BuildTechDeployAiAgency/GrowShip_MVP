@@ -1,0 +1,149 @@
+<!--
+  GrowShip Logo Components for Email Templates
+  
+  This file contains reusable logo components that can be copied into email templates.
+  Choose the appropriate version based on your email client compatibility needs.
+-->
+
+<!-- ============================================
+     OPTION 1: Text-Based Logo (Most Compatible)
+     Use this for maximum email client compatibility
+     ============================================ -->
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+  <tr>
+    <td style="vertical-align: middle; padding-right: 10px;">
+      <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #14b8a6 0%, #10b981 100%); border-radius: 10px; display: inline-block;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="40" height="40">
+          <tr>
+            <td align="center" valign="middle" style="color: #ffffff; font-size: 20px; font-weight: bold;">
+              ⚡
+            </td>
+          </tr>
+        </table>
+      </div>
+    </td>
+    <td style="vertical-align: middle;">
+      <span style="font-size: 28px; font-weight: bold; color: #14b8a6; letter-spacing: -0.5px;">GrowShip</span>
+    </td>
+  </tr>
+</table>
+
+
+<!-- ============================================
+     OPTION 2: SVG Logo (Modern Clients Only)
+     Use this for modern email clients that support SVG
+     Note: Not supported in all email clients (Outlook, Gmail)
+     ============================================ -->
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+  <tr>
+    <td style="vertical-align: middle; padding-right: 10px;">
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#14b8a6;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        <rect width="40" height="40" rx="10" fill="url(#logoGradient)"/>
+        <path d="M22 10L14 22H19L18 30L26 18H21L22 10Z" fill="white"/>
+      </svg>
+    </td>
+    <td style="vertical-align: middle;">
+      <span style="font-size: 28px; font-weight: bold; color: #14b8a6; letter-spacing: -0.5px;">GrowShip</span>
+    </td>
+  </tr>
+</table>
+
+
+<!-- ============================================
+     OPTION 3: Image-Based Logo (Recommended for Production)
+     Replace [YOUR_LOGO_URL] with your actual hosted logo URL
+     Host on: Supabase Storage, CloudFront, or any CDN
+     ============================================ -->
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+  <tr>
+    <td style="vertical-align: middle; padding-right: 10px;">
+      <!-- 
+        Replace this src with your hosted logo URL.
+        Recommended hosting options:
+        1. Supabase Storage bucket (public)
+        2. AWS S3 / CloudFront
+        3. Vercel / Next.js public folder
+        4. Any CDN (Cloudinary, imgix, etc.)
+        
+        Example URLs:
+        - https://your-project.supabase.co/storage/v1/object/public/assets/logo-icon.png
+        - https://your-domain.com/logo-icon.png
+      -->
+      <img src="[YOUR_LOGO_URL]" alt="GrowShip" width="40" height="40" style="display: block; border-radius: 10px;" />
+    </td>
+    <td style="vertical-align: middle;">
+      <span style="font-size: 28px; font-weight: bold; color: #14b8a6; letter-spacing: -0.5px;">GrowShip</span>
+    </td>
+  </tr>
+</table>
+
+
+<!-- ============================================
+     STANDALONE LOGO ICON (40x40px)
+     For when you need just the icon without text
+     ============================================ -->
+
+<!-- Text-based icon -->
+<div style="width: 40px; height: 40px; background: linear-gradient(135deg, #14b8a6 0%, #10b981 100%); border-radius: 10px; display: inline-block;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="40" height="40">
+    <tr>
+      <td align="center" valign="middle" style="color: #ffffff; font-size: 20px; font-weight: bold;">
+        ⚡
+      </td>
+    </tr>
+  </table>
+</div>
+
+
+<!-- ============================================
+     COLOR REFERENCE
+     ============================================
+     
+     GrowShip Brand Colors:
+     - Primary Teal: #14b8a6 (teal-600)
+     - Secondary Green: #10b981 (green-500)
+     - Light Teal: #ccfbf1 (teal-100)
+     - Dark Gray: #111827 (gray-900)
+     - Medium Gray: #6b7280 (gray-500)
+     - Light Gray: #9ca3af (gray-400)
+     
+     Background Colors:
+     - Teal Background: #f0fdfa (teal-50)
+     - Green Background: #ecfdf5 (green-50)
+     - Purple Background: #faf5ff (purple-50)
+     - Blue Background: #eff6ff (blue-50)
+     
+     Accent Colors:
+     - Purple: #8b5cf6 (violet-500)
+     - Blue: #2563eb (blue-600)
+     - Warning Yellow: #fef3c7 (amber-100)
+     
+     ============================================ -->
+
+
+<!-- ============================================
+     FOOTER LOGO (Smaller Version)
+     Use in email footers
+     ============================================ -->
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+  <tr>
+    <td style="text-align: center;">
+      <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #14b8a6;">
+        GrowShip
+      </p>
+      <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+        Multi-Tenant Business Platform
+      </p>
+    </td>
+  </tr>
+</table>

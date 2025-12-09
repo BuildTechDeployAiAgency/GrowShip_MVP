@@ -40,6 +40,7 @@ import { ProductFormDialog } from "@/components/products/product-form-dialog";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { formatCurrency } from "@/lib/formatters";
+import { resolveUserBrandId } from "@/lib/brand-context";
 
 const statusColors: Record<ProductStatus, string> = {
   active: "bg-green-100 text-green-800",
@@ -56,6 +57,8 @@ const getStockLevelColor = (quantity: number, reorderLevel: number = 0): string 
 
 export function ProductsList() {
   const { profile, canPerformAction } = useEnhancedAuth();
+  const isSuperAdmin = canPerformAction("view_all_users");
+  const resolvedBrandId = resolveUserBrandId(profile, isSuperAdmin);
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
@@ -82,8 +85,8 @@ export function ProductsList() {
   } = useProducts({
     searchTerm,
     filters,
-    brandId: profile?.brand_id,
-    isSuperAdmin: profile?.role_name === "super_admin",
+    brandId: resolvedBrandId,
+    isSuperAdmin,
   });
 
   const startItem = totalCount === 0 ? 0 : page * pageSize + 1;
@@ -174,7 +177,7 @@ export function ProductsList() {
 
           <Button
             onClick={() => setShowCreateDialog(true)}
-            disabled={!profile?.brand_id}
+            disabled={!resolvedBrandId}
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Product
@@ -462,7 +465,6 @@ export function ProductsList() {
     </div>
   );
 }
-
 
 
 

@@ -84,6 +84,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check for duplicate imports (same file already imported)
+    const { data: existingImports } = await supabase
+      .from("import_logs")
+      .select("id, file_hash, created_at, status")
+      .eq("file_hash", fileHash)
+      .eq("brand_id", brandId)
+      .eq("distributor_id", distributorId)
+      .in("status", ["completed", "partial"]);
+
+    if (existingImports && existingImports.length > 0) {
+      const lastImport = existingImports[0];
+      console.log(`[Sales Import] Duplicate file detected. Already imported on ${lastImport.created_at}`);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This file has already been imported",
+          existingImport: {
+            id: lastImport.id,
+            importedAt: lastImport.created_at,
+            status: lastImport.status,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     // Create import log entry
     const { data: importLog, error: logError } = await supabase
       .from("import_logs")
@@ -112,6 +138,33 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Sales Import] Created import log: ${importLog.id}`);
 
+    // Build retailer lookup cache (find or create retailers)
+    const retailerCache = new Map<string, string>(); // retailer_name -> retailer_id
+    const uniqueRetailerNames = [...new Set(salesRows.map(row => row.retailer_name?.trim()).filter(Boolean))];
+    
+    console.log(`[Sales Import] Processing ${uniqueRetailerNames.length} unique retailers`);
+    
+    for (const retailerName of uniqueRetailerNames) {
+      if (!retailerName) continue;
+      
+      // Try to find or create retailer using the database function
+      const { data: retailerResult, error: retailerError } = await supabase
+        .rpc("find_or_create_retailer", {
+          p_brand_id: brandId,
+          p_retailer_name: retailerName,
+          p_created_by: user.id,
+        });
+      
+      if (retailerError) {
+        console.warn(`[Sales Import] Failed to find/create retailer "${retailerName}":`, retailerError);
+        // Continue without retailer_id - will fallback to retailer_name only
+      } else if (retailerResult) {
+        retailerCache.set(retailerName.toLowerCase(), retailerResult);
+      }
+    }
+    
+    console.log(`[Sales Import] Cached ${retailerCache.size} retailers`);
+
     // Process sales rows in batches
     const BATCH_SIZE = 50;
     const errors: ValidationError[] = [];
@@ -123,28 +176,35 @@ export async function POST(request: NextRequest) {
       
       console.log(`[Sales Import] Processing batch ${Math.floor(i / BATCH_SIZE) + 1} (rows ${i + 1}-${Math.min(i + BATCH_SIZE, salesRows.length)})`);
 
-      // Transform sales rows to database format
-      const salesDataRecords = batch.map((row) => ({
-        brand_id: brandId,
-        distributor_id: distributorId,
-        sku: row.sku,
-        product_name: row.product_name,
-        category: row.category,
-        retailer_name: row.retailer_name,
-        territory: row.territory,
-        territory_country: row.territory_country,
-        sales_date: row.sales_date,
-        reporting_month: row.reporting_month,
-        sales_channel: row.sales_channel?.toLowerCase() || null,
-        total_sales: row.total_sales,
-        units_sold: row.units_sold,
-        gross_revenue_local: row.gross_revenue_local,
-        marketing_spend: row.marketing_spend,
-        currency: row.currency || "USD",
-        target_revenue: row.target_revenue,
-        notes: row.notes,
-        import_timestamp: new Date().toISOString(),
-      }));
+      // Transform sales rows to database format (including retailer_id lookup)
+      const salesDataRecords = batch.map((row) => {
+        const retailerId = row.retailer_name 
+          ? retailerCache.get(row.retailer_name.trim().toLowerCase()) 
+          : undefined;
+        
+        return {
+          brand_id: brandId,
+          distributor_id: distributorId,
+          sku: row.sku,
+          product_name: row.product_name,
+          category: row.category,
+          retailer_name: row.retailer_name,
+          retailer_id: retailerId || null,
+          territory: row.territory,
+          territory_country: row.territory_country,
+          sales_date: row.sales_date,
+          reporting_month: row.reporting_month,
+          sales_channel: row.sales_channel?.toLowerCase() || null,
+          total_sales: row.total_sales,
+          units_sold: row.units_sold,
+          gross_revenue_local: row.gross_revenue_local,
+          marketing_spend: row.marketing_spend,
+          currency: row.currency || "USD",
+          target_revenue: row.target_revenue,
+          notes: row.notes,
+          import_timestamp: new Date().toISOString(),
+        };
+      });
 
       // Insert batch into sales_data table
       const { data: insertedData, error: insertError } = await supabase

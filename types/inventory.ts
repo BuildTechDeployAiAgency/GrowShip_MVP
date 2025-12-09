@@ -185,10 +185,124 @@ export interface ProductWithInventory {
   max_stock_threshold?: number;
   enable_stock_alerts: boolean;
   
+  // Logistics parameters
+  lead_time_days?: number;
+  safety_stock_days?: number;
+  
   // Metadata
   last_stock_check?: string;
   status: string;
   created_at: string;
   updated_at: string;
+}
+
+// ================================================
+// SUPPLY PLANNING TYPES
+// ================================================
+
+export type SupplyPlanStatus = "draft" | "reviewed" | "approved" | "converted_to_po" | "cancelled";
+export type SupplyPlanPriority = "critical" | "high" | "normal" | "low";
+
+export interface SupplyPlan {
+  id: string;
+  brand_id: string;
+  forecast_id?: string;
+  product_id?: string;
+  sku: string;
+  product_name?: string;
+  
+  // Planning period
+  planning_period_start: string;
+  planning_period_end: string;
+  
+  // Recommendations
+  suggested_reorder_date: string;
+  suggested_reorder_quantity: number;
+  estimated_cost?: number;
+  currency: string;
+  
+  // Context
+  current_stock_level?: number;
+  forecasted_demand?: number;
+  incoming_supply?: number;
+  days_of_stock_remaining?: number;
+  reasoning?: string;
+  
+  // Workflow
+  status: SupplyPlanStatus;
+  priority: SupplyPlanPriority;
+  purchase_order_id?: string;
+  
+  // Audit
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  approved_by?: string;
+  approved_at?: string;
+}
+
+// ================================================
+// INVENTORY OPTIMIZATION TYPES
+// ================================================
+
+export type ReorderStatus =
+  | "CRITICAL_OUT_OF_STOCK"
+  | "URGENT_BELOW_SAFETY"
+  | "REORDER_NOW"
+  | "PLAN_REORDER"
+  | "OK";
+
+export interface InventoryOptimizationMetrics {
+  product_id: string;
+  brand_id: string;
+  sku: string;
+  product_name: string;
+  product_status: string;
+  
+  // Current inventory state
+  current_stock: number;
+  allocated_stock: number;
+  available_stock: number;
+  
+  // Logistics parameters
+  reorder_level: number;
+  reorder_quantity: number;
+  lead_time_days: number;
+  safety_stock_days: number;
+  
+  // Incoming supply
+  incoming_stock: number;
+  next_delivery_date?: string;
+  projected_stock: number;
+  
+  // Demand metrics
+  avg_daily_demand: number;
+  forecasted_demand_90d: number;
+  forecast_confidence: number;
+  
+  // Calculated values
+  calculated_safety_stock: number;
+  demand_during_lead_time: number;
+  calculated_reorder_point: number;
+  days_of_stock?: number;
+  estimated_stockout_date?: string;
+  
+  // Decision support
+  reorder_status: ReorderStatus;
+  suggested_order_quantity: number;
+  
+  // Metadata
+  calculated_at: string;
+}
+
+export interface SupplyPlanRecommendation {
+  sku: string;
+  product_name: string;
+  current_stock: number;
+  reorder_status: ReorderStatus;
+  days_of_stock?: number;
+  suggested_order_quantity: number;
+  suggested_reorder_date: string;
+  reasoning: string;
 }
 

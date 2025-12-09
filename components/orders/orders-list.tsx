@@ -41,6 +41,7 @@ import { format } from "date-fns";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { formatCurrency } from "@/lib/formatters";
+import { toast } from "react-toastify";
 
 const statusColors: Record<OrderStatus, string> = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -130,6 +131,36 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
     }
     if (confirm("Are you sure you want to delete this order?")) {
       await deleteOrder(orderId);
+    }
+  };
+
+  const handleGenerateInvoice = async (order: Order) => {
+    if (isDistributorAdmin) {
+      toast.info("Distributor users cannot generate invoices.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/orders/${order.id}/generate-invoice`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to generate invoice");
+      }
+
+      const invoice = await response.json();
+      toast.success(`Invoice ${invoice.invoice_number} generated successfully!`);
+      
+      // Optional: Navigate to invoice details or show a success dialog
+      // router.push(`/invoices/${invoice.id}`);
+    } catch (err: any) {
+      console.error("Error generating invoice:", err);
+      toast.error(err.message || "Failed to generate invoice");
     }
   };
 
@@ -358,7 +389,11 @@ export function OrdersList({ onCreateOrder }: OrdersListProps) {
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleGenerateInvoice(order)}
+                                    disabled={isDistributorAdmin}
+                                    className={isDistributorAdmin ? "opacity-50 cursor-not-allowed" : ""}
+                                  >
                                     <FileText className="mr-2 h-4 w-4" />
                                     Generate Invoice
                                   </DropdownMenuItem>

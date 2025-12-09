@@ -16,7 +16,7 @@ export interface SalesByCategoryFilters {
   userId?: string;
   year?: number;
   month?: number; // 1-12, optional
-  distributorId?: string;
+  distributorId?: string | null;
 }
 
 export interface UseSalesByCategoryOptions {

@@ -49,8 +49,8 @@ interface DistributorFilters {
 }
 
 interface UseDistributorsOptions {
-  searchTerm: string;
-  filters: DistributorFilters;
+  searchTerm?: string;
+  filters?: DistributorFilters;
   brandId?: string;
   distributorId?: string; // For distributor_admin users, only return their own distributor
   debounceMs?: number;
@@ -92,7 +92,7 @@ async function fetchDistributors(
     );
   }
 
-  if (filters.status !== "all") {
+  if (filters && filters.status && filters.status !== "all") {
     query = query.eq("status", filters.status);
   }
 
@@ -111,19 +111,19 @@ async function fetchDistributors(
 }
 
 export function useDistributors({
-  searchTerm,
-  filters,
+  searchTerm = "",
+  filters = { status: "all" },
   brandId,
   distributorId,
   debounceMs = 300,
   isSuperAdmin = false,
-}: UseDistributorsOptions): UseDistributorsReturn {
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+}: UseDistributorsOptions = {}): UseDistributorsReturn {
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm || "");
   const queryClient = useQueryClient();
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
+      setDebouncedSearchTerm(searchTerm || "");
     }, debounceMs);
 
     return () => clearTimeout(timer);
@@ -131,7 +131,7 @@ export function useDistributors({
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["distributors", debouncedSearchTerm, filters, brandId, isSuperAdmin, distributorId],
-    queryFn: () => fetchDistributors(debouncedSearchTerm, filters, brandId, isSuperAdmin, distributorId),
+    queryFn: () => fetchDistributors(debouncedSearchTerm, filters || { status: "all" }, brandId, isSuperAdmin, distributorId),
     staleTime: 0,
   });
 

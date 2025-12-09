@@ -1,3 +1,30 @@
+/**
+ * ============================================================================
+ * LEGACY ALERT GENERATOR
+ * ============================================================================
+ * 
+ * @deprecated These functions are being replaced by the NotificationDispatcher.
+ * 
+ * Migration Status:
+ * - po-alerts.ts: MIGRATED to NotificationDispatcher
+ * - inventory-alerts.ts: MIGRATED to NotificationDispatcher
+ * - payment-alerts.ts: MIGRATED to NotificationDispatcher
+ * - compliance-alerts.ts: MIGRATED to NotificationDispatcher
+ * 
+ * Files still using legacy functions (need migration):
+ * - lib/inventory/order-sync.ts (uses createNotificationsForBrand directly)
+ * - lib/inventory/po-sync.ts (uses createNotificationsForBrand directly)
+ * - app/api/inventory/adjust/route.ts (uses createNotificationsForBrand directly)
+ * - app/api/inventory/bulk-adjust/route.ts (uses createNotificationsForBrand directly)
+ * 
+ * These legacy functions remain functional for backward compatibility.
+ * New code should use:
+ *   import { NotificationDispatcher } from "@/lib/notifications/dispatcher";
+ *   await NotificationDispatcher.dispatch('type_key', payload, context);
+ * 
+ * See: lib/notifications/dispatcher.ts
+ */
+
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 export interface AlertData {

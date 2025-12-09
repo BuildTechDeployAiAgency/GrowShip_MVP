@@ -155,7 +155,7 @@ export async function createOrderFromLines(
       subtotal,
       total_amount: subtotal, // Simplified, could add tax/shipping
       currency: po.currency || "USD",
-      order_status: "submitted", // Changed from "pending" to trigger allocation
+      order_status: "processing", // Stock allocation happens immediately on creation
       payment_status: "pending",
       created_by: userId,
       updated_by: userId,

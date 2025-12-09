@@ -10,7 +10,10 @@ npm run dev          # Start development server (port 3000)
 npm run build        # Build for production  
 npm run start        # Start production server
 
-# Server management (reference from .cursor/rules)
+# TypeScript checking - IMPORTANT: Always run this before committing
+npx tsc --noEmit     # TypeScript type checking (no lint/typecheck npm scripts available)
+
+# Server management
 # Stop server: Ctrl + C
 # Clean cache: rm -rf .next
 # Clean npm cache: npm cache clean --force
@@ -77,12 +80,20 @@ FastAPI service in `/Backend/` handles file uploads, Excel/CSV processing, and A
 - Hooks: `use-*.ts` (e.g., `use-users.ts`)
 - Types: `kebab-case.ts` (e.g., `auth.ts`)
 - Pages: Next.js convention (`page.tsx`, `layout.tsx`)
+- API Routes: `/app/api/[resource]/[action]/route.ts`
 
 ### Component Patterns
 - Use `"use client"` directive for client-side interactivity
-- Wrap data fetching in custom hooks
+- Wrap data fetching in custom hooks (40+ hooks available in `/hooks/`)
 - Use `cn()` from `lib/utils.ts` for conditional classes
 - Form validation with React Hook Form + Zod schemas
+- Toast notifications via `sonner` package
+- UI components from Radix UI + shadcn/ui patterns
+
+### TypeScript Configuration
+- Strict mode enabled with path mapping `@/*` to project root
+- ES2017 target with modern module resolution
+- All components and hooks are fully typed
 
 ### Environment Configuration
 Required environment variables in `.env.local`:
@@ -90,6 +101,23 @@ Required environment variables in `.env.local`:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` 
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `NEXT_PUBLIC_APP_URL`
+
+### Critical Code Patterns
+
+**Permission System**: Use `PermissionChecker` class from `lib/permissions.ts` for all access control:
+```typescript
+const checker = createPermissionChecker(userRole, userOrganizationId);
+if (!checker.canManageUsers()) return;
+```
+
+**API Route Structure**: All routes follow pattern `/app/api/[resource]/[action]/route.ts` with proper error handling and authentication checks via Supabase clients.
+
+**Data Fetching**: Use TanStack Query hooks from `/hooks/use-*.ts` for all server state:
+```typescript
+const { data, loading, error } = useUsers();
+```
+
+**Cron Jobs**: Vercel cron configuration in `vercel.json` for scheduled tasks like alert processing at 6 AM daily.
 
 ## Workflow and Documentation
 
@@ -116,6 +144,13 @@ Manual testing checklist includes authentication flows, role-based access, profi
 
 ### Import System
 Excel/CSV import system with AI-assisted column mapping via OpenAI integration. Supports products, sales data, and order imports with validation and confirmation workflows.
+
+### API Architecture
+- **Route Pattern**: `/app/api/[resource]/[action]/route.ts`
+- **Authentication**: All routes use Supabase server client for auth checking
+- **Error Handling**: Standardized error responses with proper HTTP status codes
+- **File Processing**: Uses ExcelJS for Excel operations, supports template downloads and bulk operations
+- **Validation**: Multi-step validation flow (validate → confirm → process)
 
 ### Security Considerations
 - Known security vulnerability in xlsx package (documented in SECURITY-NOTES.md)

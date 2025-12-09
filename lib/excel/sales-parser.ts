@@ -294,3 +294,166 @@ export function getSalesFileStats(fileBuffer: Buffer): {
   };
 }
 
+/**
+ * Parse a CSV line handling quoted fields with commas
+ */
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+    
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // Escaped quote
+        current += '"';
+        i++; // Skip next quote
+      } else {
+        // Toggle quote mode
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  
+  // Push the last field
+  result.push(current.trim());
+  
+  return result;
+}
+
+/**
+ * Parse sales data from a CSV file
+ * Returns sales rows and extracted distributor_id
+ */
+export async function parseSalesCSV(
+  csvText: string,
+  autoPopulate?: SalesAutoPopulationData
+): Promise<{
+  salesRows: ParsedSalesRow[];
+  extractedDistributorId?: string;
+  distributorIdConsistent: boolean;
+}> {
+  // Split into lines and filter out empty lines
+  const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== "");
+  
+  if (lines.length === 0) {
+    throw new Error("CSV file is empty");
+  }
+  
+  // Parse headers from the first line
+  const headers = parseCSVLine(lines[0]);
+  
+  // Validate required headers
+  const enabledFields = getEnabledSalesFields();
+  const requiredHeaders = enabledFields
+    .filter((f) => f.isRequired)
+    .map((f) => f.header);
+
+  const missingHeaders = requiredHeaders.filter(
+    (header) => !headers.includes(header)
+  );
+
+  if (missingHeaders.length > 0) {
+    throw new Error(
+      `Missing required columns: ${missingHeaders.join(", ")}`
+    );
+  }
+  
+  // Parse rows into sales data
+  const salesRows: ParsedSalesRow[] = [];
+  const distributorIds = new Set<string>();
+  
+  for (let i = 1; i < lines.length; i++) {
+    const rowNumber = i + 1; // 1-based row number for error reporting
+    const values = parseCSVLine(lines[i]);
+    
+    // Build row data object
+    const rowData: Record<string, string> = {};
+    headers.forEach((header, idx) => {
+      rowData[header] = values[idx] || "";
+    });
+    
+    // Check if row has data
+    const hasRowData = headers.some(header => {
+      const value = rowData[header];
+      return value !== undefined && value !== null && value.trim() !== "";
+    });
+    
+    if (!hasRowData) continue;
+    
+    // Collect distributor IDs from rows
+    const distributorId = (rowData["Distributor ID"] || "").trim();
+    if (distributorId) {
+      distributorIds.add(distributorId);
+    }
+    
+    // Parse the sales row
+    const salesDate = parseDate(rowData["Sales Date"]);
+    const sku = (rowData["SKU"] || "").trim();
+    const retailerName = (rowData["Retailer"] || "").trim();
+    const territory = (rowData["Territory/Region"] || "").trim();
+    const unitsSold = parseNumber(rowData["Units Sold"]);
+    const totalSales = parseNumber(rowData["Net Revenue"]);
+    
+    if (salesDate && sku && retailerName && territory && unitsSold !== undefined && totalSales !== undefined) {
+      // Calculate reporting_month (first day of month)
+      const reportingMonth = normalizeToFirstDayOfMonth(salesDate);
+      
+      const salesRow: ParsedSalesRow = {
+        row: rowNumber,
+        sales_date: salesDate,
+        reporting_month: reportingMonth,
+        sku,
+        product_name: rowData["Product Name"] || undefined,
+        category: rowData["Category"] || undefined,
+        retailer_name: retailerName,
+        territory,
+        territory_country: rowData["Country"] || undefined,
+        sales_channel: rowData["Sales Channel"] || undefined,
+        units_sold: unitsSold,
+        total_sales: totalSales,
+        gross_revenue_local: parseNumber(rowData["Gross Revenue Local"]),
+        marketing_spend: parseNumber(rowData["Marketing Spend"]),
+        currency: rowData["Currency"] || "USD",
+        target_revenue: parseNumber(rowData["Target Revenue"]),
+        notes: rowData["Notes"] || undefined,
+        distributor_id: distributorId || autoPopulate?.distributorId || undefined,
+      };
+      
+      salesRows.push(salesRow);
+    }
+  }
+  
+  // Extract and validate distributor ID
+  let extractedDistributorId: string | undefined;
+  let distributorIdConsistent = true;
+
+  if (distributorIds.size > 1) {
+    // Multiple different distributor IDs found
+    distributorIdConsistent = false;
+    throw new Error(
+      `Multiple distributor IDs found in CSV: ${Array.from(distributorIds).join(", ")}. Only one distributor per upload is allowed.`
+    );
+  } else if (distributorIds.size === 1) {
+    // Single distributor ID found
+    extractedDistributorId = Array.from(distributorIds)[0];
+  } else if (autoPopulate?.distributorId) {
+    // No distributor ID in CSV, use auto-populated one
+    extractedDistributorId = autoPopulate.distributorId;
+  }
+
+  return {
+    salesRows,
+    extractedDistributorId,
+    distributorIdConsistent,
+  };
+}
+

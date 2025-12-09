@@ -222,53 +222,31 @@ export function usePurchaseOrders({
 
   const createPOMutation = useMutation({
     mutationFn: async (po: Partial<PurchaseOrder>): Promise<PurchaseOrder> => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      console.log("[Client] Creating purchase order with data:", {
+        po_status: po.po_status,
+        brand_id: po.brand_id,
+        distributor_id: po.distributor_id,
+        supplier_name: po.supplier_name
+      });
+      
+      // Use the dedicated API endpoint which handles both creation and notifications
+      const response = await fetch("/api/purchase-orders/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(po),
+      });
 
-      const poData = {
-        ...po,
-        user_id: user?.id,
-        po_number: `PO-${Date.now()}`,
-        po_date: new Date().toISOString(),
-        created_by: user?.id,
-        updated_by: user?.id,
-      };
+      console.log("[Client] PO creation API response status:", response.status);
 
-      const { data: newPO, error: createError } = await supabase
-        .from("purchase_orders")
-        .insert(poData)
-        .select()
-        .single();
-
-      if (createError) {
-        throw createError;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("[Client] PO creation failed:", errorData);
+        throw new Error(errorData.error || "Failed to create purchase order");
       }
 
-      // Trigger notification creation via API
-      if (newPO && user?.id && newPO.brand_id) {
-        try {
-          await fetch("/api/notifications", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              type: "order",
-              title: "New Purchase Order Created",
-              message: `Purchase Order ${newPO.po_number} has been created and requires review`,
-              brand_id: newPO.brand_id,
-              related_entity_type: "po",
-              related_entity_id: newPO.id,
-              priority: "medium",
-              action_required: true,
-              action_url: `/purchase-orders/${newPO.id}`,
-            }),
-          });
-        } catch (notifError) {
-          console.error("Error creating PO notification:", notifError);
-          // Don't fail the PO creation if notification fails
-        }
-      }
-
-      return newPO;
+      const result = await response.json();
+      console.log("[Client] PO created successfully:", result.purchaseOrder?.po_number);
+      return result.purchaseOrder;
     },
     onSuccess: (newPO) => {
       prependPurchaseOrder(queryClient, newPO);

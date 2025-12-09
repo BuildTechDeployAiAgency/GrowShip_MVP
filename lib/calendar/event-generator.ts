@@ -252,7 +252,7 @@ export async function generateEventsFromCampaigns(brandId: string): Promise<Gene
 
   const { data: campaigns, error } = await supabase
     .from("marketing_campaigns")
-    .select("id, campaign_name, start_date, end_date, status")
+    .select("id, name, start_date, end_date, status")
     .eq("brand_id", brandId)
     .in("status", ["planned", "active"]);
 
@@ -273,8 +273,8 @@ export async function generateEventsFromCampaigns(brandId: string): Promise<Gene
     if (campaign.start_date && campaign.start_date >= today && campaign.start_date <= thirtyDaysOut) {
       events.push({
         event_type: "campaign_start",
-        title: `Campaign Start: ${campaign.campaign_name}`,
-        description: `Marketing campaign "${campaign.campaign_name}" starts today`,
+        title: `Campaign Start: ${campaign.name}`,
+        description: `Marketing campaign "${campaign.name}" starts today`,
         event_date: campaign.start_date,
         related_entity_type: "campaign",
         related_entity_id: campaign.id,
@@ -287,8 +287,8 @@ export async function generateEventsFromCampaigns(brandId: string): Promise<Gene
     if (campaign.end_date && campaign.end_date >= today && campaign.end_date <= thirtyDaysOut) {
       events.push({
         event_type: "campaign_end",
-        title: `Campaign End: ${campaign.campaign_name}`,
-        description: `Marketing campaign "${campaign.campaign_name}" ends today`,
+        title: `Campaign End: ${campaign.name}`,
+        description: `Marketing campaign "${campaign.name}" ends today`,
         event_date: campaign.end_date,
         related_entity_type: "campaign",
         related_entity_id: campaign.id,
@@ -304,8 +304,8 @@ export async function generateEventsFromCampaigns(brandId: string): Promise<Gene
       if (popDueDateStr >= today && popDueDateStr <= thirtyDaysOut) {
         events.push({
           event_type: "pop_upload_due",
-          title: `POP Upload Due: ${campaign.campaign_name}`,
-          description: `Proof of performance documents are due for campaign "${campaign.campaign_name}"`,
+          title: `POP Upload Due: ${campaign.name}`,
+          description: `Proof of performance documents are due for campaign "${campaign.name}"`,
           event_date: popDueDateStr,
           related_entity_type: "campaign",
           related_entity_id: campaign.id,
@@ -329,7 +329,7 @@ export async function generateEventsFromReports(brandId: string): Promise<Genera
   // Get all distributors for this brand
   const { data: distributors, error: distError } = await supabase
     .from("distributors")
-    .select("id, distributor_name")
+    .select("id, name")
     .eq("brand_id", brandId)
     .eq("status", "active");
 
@@ -349,7 +349,7 @@ export async function generateEventsFromReports(brandId: string): Promise<Genera
       for (const distributor of distributors) {
         events.push({
           event_type: "compliance_review",
-          title: `Monthly Report Due: ${distributor.distributor_name}`,
+          title: `Monthly Report Due: ${distributor.name}`,
           description: `Monthly distributor report for ${targetMonth.toLocaleString('default', { month: 'long', year: 'numeric' })} is due`,
           event_date: reportDueDateStr,
           related_entity_type: "distributor",

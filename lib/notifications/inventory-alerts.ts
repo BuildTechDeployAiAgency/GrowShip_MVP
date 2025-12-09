@@ -1,15 +1,28 @@
-// ================================================
-// INVENTORY ALERTS NOTIFICATION SERVICE
-// ================================================
-// Creates notifications for inventory threshold events
+/**
+ * ============================================================================
+ * INVENTORY ALERTS NOTIFICATION SERVICE
+ * ============================================================================
+ * Creates notifications for inventory threshold events using the role-based
+ * NotificationDispatcher.
+ * 
+ * Notification Types:
+ *   - product_out_of_stock: Product quantity reaches zero
+ *   - critical_stock_level: Stock below critical threshold
+ *   - low_stock_alert: Stock below low stock threshold
+ *   - low_available_stock: Available stock after allocations is low
+ *   - stock_running_out_soon: Predictive alert based on sales velocity
+ *   - stock_replenished: Stock restored above threshold
+ *   - overstock_alert: Stock exceeds maximum threshold
+ */
 
 import { createClient } from "@/lib/supabase/server";
-import { createNotificationsForBrand } from "./alert-generator";
+import { NotificationDispatcher } from "./dispatcher";
 
 export type InventoryAlertLevel = "critical" | "low" | "overstock";
 
 /**
  * Create low or critical stock alert notification
+ * Uses role-based dispatch for recipient resolution
  */
 export async function createLowStockAlert(
   productId: string,
@@ -25,19 +38,31 @@ export async function createLowStockAlert(
     .single();
 
   if (error || !product) {
-    console.error("Product not found for alert:", productId);
+    console.error("[createLowStockAlert] Product not found:", productId);
     return;
   }
 
   const currentStock = product.quantity_in_stock || 0;
   const availableStock = product.available_stock || 0;
-  const threshold = level === "critical" ? product.critical_stock_threshold : product.low_stock_threshold;
 
-  // Determine priority based on level
-  const priority = level === "critical" ? "urgent" : "high";
-  const title = level === "critical" 
-    ? currentStock === 0 ? "Product Out of Stock" : "Critical Stock Level"
-    : "Low Stock Alert";
+  // Determine notification type, priority and content based on level
+  let typeKey: string;
+  let title: string;
+  let priority: "low" | "medium" | "high" | "urgent";
+
+  if (level === "critical" && currentStock === 0) {
+    typeKey = "product_out_of_stock";
+    title = "Product Out of Stock";
+    priority = "urgent";
+  } else if (level === "critical") {
+    typeKey = "critical_stock_level";
+    title = "Critical Stock Level";
+    priority = "urgent";
+  } else {
+    typeKey = "low_stock_alert";
+    title = "Low Stock Alert";
+    priority = "high";
+  }
 
   // Create notification message
   let message = `${product.product_name} (${product.sku})`;
@@ -50,20 +75,26 @@ export async function createLowStockAlert(
     }
   }
 
-  // Create notification for all brand users
-  await createNotificationsForBrand(
+  // Dispatch using role-based system
+  const result = await NotificationDispatcher.dispatch(
+    typeKey,
     {
-      type: "warning",
       title,
       message,
-      related_entity_type: "inventory",
-      related_entity_id: productId,
+      brandId: product.brand_id,
+      relatedEntityType: "inventory",
+      relatedEntityId: productId,
       priority,
-      action_required: true,
-      action_url: `/products/${productId}`,
-    },
-    product.brand_id
+      actionRequired: true,
+      actionUrl: `/products/${productId}`,
+    }
   );
+
+  if (!result.success) {
+    console.error("[createLowStockAlert] Error:", result.error);
+  } else {
+    console.log(`[createLowStockAlert] Sent ${result.notificationsSent} notifications for ${product.sku}`);
+  }
 
   // Also create calendar event for restock reminder if critically low
   if (level === "critical" && currentStock > 0) {
@@ -99,26 +130,30 @@ export async function createStockRestoredAlert(productId: string): Promise<void>
     .single();
 
   if (error || !product) {
-    console.error("Product not found for alert:", productId);
+    console.error("[createStockRestoredAlert] Product not found:", productId);
     return;
   }
 
   const currentStock = product.quantity_in_stock || 0;
 
-  // Create success notification
-  await createNotificationsForBrand(
+  // Dispatch using role-based system
+  const result = await NotificationDispatcher.dispatch(
+    "stock_replenished",
     {
-      type: "success",
       title: "Stock Replenished",
       message: `${product.product_name} (${product.sku}) stock has been replenished to ${currentStock} units`,
-      related_entity_type: "inventory",
-      related_entity_id: productId,
+      brandId: product.brand_id,
+      relatedEntityType: "inventory",
+      relatedEntityId: productId,
       priority: "low",
-      action_required: false,
-      action_url: `/products/${productId}`,
-    },
-    product.brand_id
+      actionRequired: false,
+      actionUrl: `/products/${productId}`,
+    }
   );
+
+  if (!result.success) {
+    console.error("[createStockRestoredAlert] Error:", result.error);
+  }
 
   // Remove any pending restock reminders from calendar
   await supabase
@@ -149,20 +184,24 @@ export async function createOverstockAlert(productId: string): Promise<void> {
   const currentStock = product.quantity_in_stock || 0;
   const overstockAmount = currentStock - product.max_stock_threshold;
 
-  // Create warning notification
-  await createNotificationsForBrand(
+  // Dispatch using role-based system
+  const result = await NotificationDispatcher.dispatch(
+    "overstock_alert",
     {
-      type: "warning",
       title: "Overstock Alert",
       message: `${product.product_name} (${product.sku}) has ${currentStock} units, which is ${overstockAmount} units over the maximum threshold (${product.max_stock_threshold})`,
-      related_entity_type: "inventory",
-      related_entity_id: productId,
+      brandId: product.brand_id,
+      relatedEntityType: "inventory",
+      relatedEntityId: productId,
       priority: "medium",
-      action_required: false,
-      action_url: `/products/${productId}`,
-    },
-    product.brand_id
+      actionRequired: false,
+      actionUrl: `/products/${productId}`,
+    }
   );
+
+  if (!result.success) {
+    console.error("[createOverstockAlert] Error:", result.error);
+  }
 }
 
 /**
@@ -182,26 +221,30 @@ export async function createRunningOutSoonAlert(
     .single();
 
   if (error || !product) {
-    console.error("Product not found for alert:", productId);
+    console.error("[createRunningOutSoonAlert] Product not found:", productId);
     return;
   }
 
   const currentStock = product.quantity_in_stock || 0;
 
-  // Create predictive warning
-  await createNotificationsForBrand(
+  // Dispatch using role-based system
+  const result = await NotificationDispatcher.dispatch(
+    "stock_running_out_soon",
     {
-      type: "warning",
       title: "Stock Running Out Soon",
       message: `${product.product_name} (${product.sku}) has ${currentStock} units and is projected to run out in approximately ${daysUntilOut} days based on recent sales velocity`,
-      related_entity_type: "inventory",
-      related_entity_id: productId,
+      brandId: product.brand_id,
+      relatedEntityType: "inventory",
+      relatedEntityId: productId,
       priority: "high",
-      action_required: true,
-      action_url: `/products/${productId}`,
-    },
-    product.brand_id
+      actionRequired: true,
+      actionUrl: `/products/${productId}`,
+    }
   );
+
+  if (!result.success) {
+    console.error("[createRunningOutSoonAlert] Error:", result.error);
+  }
 
   // Create calendar event for predicted stock-out date
   const stockOutDate = new Date();
@@ -219,6 +262,48 @@ export async function createRunningOutSoonAlert(
     status: "upcoming",
     created_by: null, // System-generated
   });
+}
+
+/**
+ * Create low available stock alert (when allocations cause available stock to drop)
+ */
+export async function createLowAvailableStockAlert(
+  productId: string,
+  availableStock: number,
+  brandId: string
+): Promise<void> {
+  const supabase = await createClient();
+
+  // Get product details
+  const { data: product, error } = await supabase
+    .from("products")
+    .select("product_name, sku")
+    .eq("id", productId)
+    .single();
+
+  if (error || !product) {
+    console.error("[createLowAvailableStockAlert] Product not found:", productId);
+    return;
+  }
+
+  // Dispatch using role-based system
+  const result = await NotificationDispatcher.dispatch(
+    "low_available_stock",
+    {
+      title: "Low Available Stock",
+      message: `${product.product_name} (${product.sku}) has ${availableStock} units available after allocation`,
+      brandId,
+      relatedEntityType: "inventory",
+      relatedEntityId: productId,
+      priority: "high",
+      actionRequired: true,
+      actionUrl: `/products/${productId}`,
+    }
+  );
+
+  if (!result.success) {
+    console.error("[createLowAvailableStockAlert] Error:", result.error);
+  }
 }
 
 /**
@@ -284,7 +369,7 @@ export async function checkInventoryAlerts(brandId: string): Promise<void> {
     }
   }
 
-  console.log(`Checked inventory alerts for brand ${brandId}: ${evaluations.length} products evaluated`);
+  console.log(`[checkInventoryAlerts] Brand ${brandId}: ${evaluations.length} products evaluated`);
 
   // ================================================
   // PREDICTIVE STOCK-OUT ALERTS (Out-of-Stock Risk)
@@ -317,9 +402,9 @@ export async function checkInventoryAlerts(brandId: string): Promise<void> {
       await createRunningOutSoonAlert(product.product_id, product.days_until_out);
     }
 
-    console.log(`Checked predictive stock-out alerts for brand ${brandId}: ${runningOutSoon.length} products at risk`);
+    console.log(`[checkInventoryAlerts] Predictive alerts for brand ${brandId}: ${runningOutSoon.length} products at risk`);
   } catch (error) {
-    console.error(`Error checking predictive stock-out alerts for brand ${brandId}:`, error);
+    console.error(`[checkInventoryAlerts] Error checking predictive alerts for brand ${brandId}:`, error);
   }
 }
 
@@ -341,5 +426,5 @@ export async function cleanupOldInventoryAlerts(olderThanDays: number = 30): Pro
     .eq("is_read", true)
     .lt("created_at", cutoffDate.toISOString());
 
-  console.log(`Cleaned up inventory notifications older than ${olderThanDays} days`);
+  console.log(`[cleanupOldInventoryAlerts] Cleaned up notifications older than ${olderThanDays} days`);
 }

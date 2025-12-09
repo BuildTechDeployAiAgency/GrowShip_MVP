@@ -35,6 +35,7 @@ import type { Product, ProductStatus } from "@/types/products";
 import { useManufacturers } from "@/hooks/use-manufacturers";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
 import { toast } from "react-toastify";
+import { resolveUserBrandId } from "@/lib/brand-context";
 
 interface ProductFormDialogProps {
   open: boolean;
@@ -73,16 +74,17 @@ export function ProductFormDialog({
 }: ProductFormDialogProps) {
   const { profile, canPerformAction } = useEnhancedAuth();
   const isSuperAdmin = canPerformAction?.("view_all_users") ?? false;
+  const resolvedBrandId = resolveUserBrandId(profile, isSuperAdmin);
   const { createProduct, updateProduct } = useProducts({
     searchTerm: "",
     filters: { status: "all", category: "all" },
-    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    brandId: resolvedBrandId,
   });
 
   const { manufacturers, loading: manufacturersLoading } = useManufacturers({
     searchTerm: "",
     filters: { status: "all", country: "all" },
-    brandId: isSuperAdmin ? undefined : profile?.brand_id,
+    brandId: resolvedBrandId,
     isSuperAdmin,
   });
 
@@ -199,7 +201,7 @@ export function ProductFormDialog({
     }
 
     // Safety check - this should not happen if button is properly disabled
-    if (!profile?.brand_id) {
+    if (!resolvedBrandId) {
       toast.error("Unable to save. Please refresh the page and try again.");
       return;
     }
@@ -208,7 +210,7 @@ export function ProductFormDialog({
 
     try {
       const productData: Partial<Product> = {
-        brand_id: profile.brand_id, // Auto-populated from logged-in user
+        brand_id: resolvedBrandId, // Auto-populated from logged-in user
         sku: formData.sku.trim(),
         product_name: formData.product_name.trim(),
         description: formData.description.trim() || undefined,
@@ -624,14 +626,14 @@ export function ProductFormDialog({
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              disabled={loading || !profile?.brand_id}
-              title={!profile?.brand_id ? "Please wait while your profile loads..." : ""}
+            <Button
+              type="submit"
+              disabled={loading || !resolvedBrandId}
+              title={!resolvedBrandId ? "Please wait while your profile loads..." : ""}
             >
               {loading ? "Saving..." : isEditing ? "Update Product" : "Create Product"}
             </Button>
-            {!profile?.brand_id && !loading && (
+            {!resolvedBrandId && !loading && (
               <p className="text-xs text-amber-600 ml-2">
                 Loading your profile...
               </p>

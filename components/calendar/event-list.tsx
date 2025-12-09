@@ -66,13 +66,19 @@ export function EventList() {
   });
 
   const getEventLink = (event: CalendarEvent) => {
-    if (event.related_entity_type === "invoice" && event.related_entity_id) {
-      return `/invoices/${event.related_entity_id}`;
-    }
-    if (event.related_entity_type === "po" && event.related_entity_id) {
-      return `/purchase-orders/${event.related_entity_id}`;
-    }
-    return null;
+    if (!event.related_entity_type || !event.related_entity_id) return null;
+
+    // Note: Some pages have detail views (po, shipment, distributor), others only have lists
+    // For list-only pages, we link to the list page - future enhancement could add highlighting
+    const linkMap: Record<string, string> = {
+      invoice: `/invoices`, // Invoices page is list-only, no detail view
+      po: `/purchase-orders/${event.related_entity_id}`,
+      shipment: `/shipments/${event.related_entity_id}`,
+      campaign: `/marketing`, // Marketing page is placeholder, no detail view yet
+      distributor: `/distributors/${event.related_entity_id}`,
+    };
+
+    return linkMap[event.related_entity_type] || null;
   };
 
   if (isLoading) {

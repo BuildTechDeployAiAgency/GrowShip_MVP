@@ -300,6 +300,7 @@ function MenuItemWithChildren({
 export function Sidebar({ isOpen, onClose, initialMenuData }: SidebarProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const { user: authUser, profile: authProfile, signOut } = useAuth();
 
@@ -342,8 +343,19 @@ export function Sidebar({ isOpen, onClose, initialMenuData }: SidebarProps) {
     setMounted(true);
   }, []);
 
-  const handleSignOut = async () => {
-    await signOut();
+  const handleSignOut = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isSigningOut) return;
+    
+    setIsSigningOut(true);
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Error during sign out:", error);
+      setIsSigningOut(false);
+    }
   };
 
   // Show loading skeleton during SSR and initial mount
@@ -573,10 +585,20 @@ export function Sidebar({ isOpen, onClose, initialMenuData }: SidebarProps) {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={handleSignOut}
-                    className="flex items-center text-red-600 focus:text-red-600"
+                    disabled={isSigningOut}
+                    className={`flex items-center text-red-600 focus:text-red-600 ${isSigningOut ? "cursor-not-allowed opacity-70" : ""}`}
                   >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Sign Out</span>
+                    {isSigningOut ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <span>Signing Out...</span>
+                      </>
+                    ) : (
+                      <>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Sign Out</span>
+                      </>
+                    )}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

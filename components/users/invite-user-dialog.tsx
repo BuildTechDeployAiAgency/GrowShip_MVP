@@ -23,10 +23,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "react-toastify";
 import { useEnhancedAuth } from "@/contexts/enhanced-auth-context";
+import type { Brand } from "@/types/auth";
 
 interface InviteUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  targetOrganization?: Brand;
+  onSuccess?: () => void;
 }
 
 interface InviteFormData {
@@ -39,18 +42,62 @@ interface InviteFormData {
 export function InviteUserDialog({
   open,
   onOpenChange,
+  targetOrganization,
+  onSuccess,
 }: InviteUserDialogProps) {
   const { profile, currentOrganization, organizations, canPerformAction } = useEnhancedAuth();
   const [formData, setFormData] = useState<InviteFormData>({
     email: "",
     role: "",
     message: "",
-    brand_id: currentOrganization?.id || "",
+    brand_id: targetOrganization?.id || currentOrganization?.id || "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const isSuperAdmin = profile?.role_name === "super_admin";
+
+  // Get organization type for role filtering
+  const organizationType = targetOrganization?.organization_type || 
+    (formData.brand_id ? organizations?.find(org => org.id === formData.brand_id)?.organization_type : null);
+
+  // Filter roles based on organization type
+  const getAvailableRoles = () => {
+    const baseRoles = [
+      { value: "brand_admin", label: "Brand Admin" },
+      { value: "brand_finance", label: "Brand Finance" },
+      { value: "brand_manager", label: "Brand Manager" },
+      { value: "brand_user", label: "Brand User" },
+    ];
+
+    if (organizationType === "distributor") {
+      return [
+        { value: "distributor_admin", label: "Distributor Admin" },
+        { value: "distributor_finance", label: "Distributor Finance" },
+        { value: "distributor_manager", label: "Distributor Manager" },
+        { value: "distributor_user", label: "Distributor User" },
+      ];
+    } else if (organizationType === "manufacturer") {
+      return [
+        { value: "manufacturer_admin", label: "Manufacturer Admin" },
+        { value: "manufacturer_finance", label: "Manufacturer Finance" },
+        { value: "manufacturer_manager", label: "Manufacturer Manager" },
+        { value: "manufacturer_customer", label: "Manufacturer Customer" },
+      ];
+    }
+
+    return baseRoles;
+  };
+
+  // Update form data when target organization changes
+  React.useEffect(() => {
+    if (targetOrganization?.id) {
+      setFormData(prev => ({
+        ...prev,
+        brand_id: targetOrganization.id
+      }));
+    }
+  }, [targetOrganization?.id]);
 
   // Show info notification when dialog opens
   React.useEffect(() => {
@@ -152,10 +199,11 @@ export function InviteUserDialog({
         email: "",
         role: "",
         message: "",
-        brand_id: currentOrganization?.id || "",
+        brand_id: targetOrganization?.id || currentOrganization?.id || "",
       });
       setError(null);
       onOpenChange(false);
+      onSuccess?.();
     } catch (err: any) {
       console.error("Error inviting user:", err);
       const errorMessage = err.message || "Failed to send invitation";
@@ -237,11 +285,16 @@ export function InviteUserDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <User className="h-6 w-6 text-teal-600" />
-            Invite Team Member
+            {targetOrganization 
+              ? `Invite User to ${targetOrganization.name}`
+              : "Invite Team Member"
+            }
           </DialogTitle>
           <DialogDescription>
-            Send an invitation to a team member to join your organization. They
-            will receive an email with instructions to set up their account.
+            {targetOrganization 
+              ? `Send an invitation to join ${targetOrganization.name} (${targetOrganization.organization_type}). They will receive an email with instructions to set up their account.`
+              : "Send an invitation to a team member to join your organization. They will receive an email with instructions to set up their account."
+            }
           </DialogDescription>
         </DialogHeader>
 
@@ -267,11 +320,11 @@ export function InviteUserDialog({
             />
           </div>
 
-          {isSuperAdmin && (
+          {isSuperAdmin && !targetOrganization && (
             <div className="space-y-2">
               <Label htmlFor="brand" className="flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
-                Brand *
+                Organization *
               </Label>
               <Select
                 value={formData.brand_id}
@@ -280,16 +333,32 @@ export function InviteUserDialog({
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a brand" />
+                  <SelectValue placeholder="Select an organization" />
                 </SelectTrigger>
                 <SelectContent>
                   {organizations.map((org) => (
                     <SelectItem key={org.id} value={org.id}>
-                      {org.name}
+                      {org.name} ({org.organization_type})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {targetOrganization && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Organization
+              </Label>
+              <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+                <Building className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{targetOrganization.name}</span>
+                <span className="text-sm text-muted-foreground">
+                  ({targetOrganization.organization_type})
+                </span>
+              </div>
             </div>
           )}
 
@@ -308,21 +377,11 @@ export function InviteUserDialog({
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="brand_admin">Brand Admin</SelectItem>
-                <SelectItem value="brand_finance">Brand Finance</SelectItem>
-                <SelectItem value="brand_operations">
-                  Brand Operations
-                </SelectItem>
-                <SelectItem value="brand_viewer">Brand Viewer</SelectItem>
-                <SelectItem value="manufacturer_admin">
-                  Manufacturer Admin
-                </SelectItem>
-                <SelectItem value="manufacturer_finance">
-                  Manufacturer Finance
-                </SelectItem>
-                <SelectItem value="manufacturer_manager">
-                  Manufacturer Manager
-                </SelectItem>
+                {getAvailableRoles().map((role) => (
+                  <SelectItem key={role.value} value={role.value}>
+                    {role.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

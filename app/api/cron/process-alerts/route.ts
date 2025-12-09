@@ -6,6 +6,35 @@ import { syncCalendarEvents } from "@/lib/calendar/event-generator";
 import { createClient } from "@/lib/supabase/server";
 
 /**
+ * Verify cron secret for security
+ * Returns null if authorized, or a NextResponse error if not
+ */
+function verifyCronAuth(request: NextRequest): NextResponse | null {
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+
+  // CRON_SECRET must be configured in production
+  if (!cronSecret) {
+    console.error("[CRON] CRON_SECRET environment variable not configured");
+    return NextResponse.json(
+      { error: "Server configuration error" },
+      { status: 500 }
+    );
+  }
+
+  // Verify the authorization header matches
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    console.warn("[CRON] Unauthorized access attempt");
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  return null; // Authorized
+}
+
+/**
  * POST /api/cron/process-alerts
  * 
  * Automated background job to:
@@ -16,20 +45,16 @@ import { createClient } from "@/lib/supabase/server";
  * 
  * Can be triggered by:
  * - Vercel Cron (vercel.json)
- * - External schedulers
- * - Manual API call for testing
+ * - External schedulers with valid CRON_SECRET
+ * 
+ * Security: Requires Bearer token matching CRON_SECRET environment variable
  */
 export async function POST(request: NextRequest) {
   try {
-    // Optional: Verify cron secret for security
-    const authHeader = request.headers.get("authorization");
-    const cronSecret = process.env.CRON_SECRET;
-    
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+    // Verify cron secret - REQUIRED for security
+    const authError = verifyCronAuth(request);
+    if (authError) {
+      return authError;
     }
 
     const startTime = Date.now();
@@ -157,13 +182,35 @@ export async function POST(request: NextRequest) {
 /**
  * GET /api/cron/process-alerts
  * 
- * Health check endpoint
+ * Health check endpoint (unauthenticated) or trigger cron job (authenticated)
+ * 
+ * - Without auth header: Returns basic health status
+ * - With valid auth header: Triggers the full cron job processing
  */
 export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get("authorization");
+
+  // If no auth header, return basic health check (safe, limited info)
+  if (!authHeader) {
+    return NextResponse.json({
+      status: "ready",
+      endpoint: "/api/cron/process-alerts",
+      message: "Use POST with Authorization header to trigger alert processing",
+    });
+  }
+
+  // If auth header provided, verify it and run the cron job
+  const authError = verifyCronAuth(request);
+  if (authError) {
+    return authError;
+  }
+
+  // Create a synthetic request to reuse POST logic
+  // For now, just indicate that GET with auth should use POST
   return NextResponse.json({
-    status: "ready",
-    endpoint: "/api/cron/process-alerts",
-    message: "Use POST to trigger alert processing",
+    status: "authenticated",
+    message: "Use POST method to trigger alert processing",
+    hint: "Vercel Cron should be configured to use POST method",
   });
 }
 

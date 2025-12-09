@@ -46,18 +46,8 @@ const fulfillmentData = [
   },
 ];
 
-const monthlyMetrics = [
-  { month: "Jan", rate: 92.3 },
-  { month: "Feb", rate: 93.1 },
-  { month: "Mar", rate: 91.8 },
-  { month: "Apr", rate: 93.5 },
-  { month: "May", rate: 94.2 },
-  { month: "Jun", rate: 94.8 },
-  { month: "Jul", rate: 95.1 },
-  { month: "Aug", rate: 94.7 },
-  { month: "Sep", rate: 95.3 },
-  { month: "Oct", rate: 94.5 },
-];
+// Monthly metrics data will be fetched from database in future implementation
+// For now, this section shows a placeholder message
 
 export function OrderFulfillmentMetrics() {
   const { profile } = useEnhancedAuth();
@@ -70,15 +60,16 @@ export function OrderFulfillmentMetrics() {
 
   const isLoading = metricsLoading || performanceLoading;
 
-  // Use real data if available, otherwise fall back to hardcoded data
+  // Use real data - show actual values (including 0) when data is available
   const fulfillmentDataDisplay = useMemo(() => {
-    if (metrics && performance) {
-      const onTimeRate = performance.on_time_percentage || 0;
+    // If either metrics or performance exists, use real data with proper defaults
+    if (metrics || performance) {
+      const onTimeRate = performance?.on_time_percentage ?? 0;
       return [
         {
           status: "On-time Delivery",
           value: onTimeRate,
-          count: performance.on_time_deliveries || 0,
+          count: performance?.on_time_deliveries ?? 0,
           icon: CheckCircle2,
           color: "text-green-600",
           bgColor: "bg-green-100",
@@ -86,8 +77,8 @@ export function OrderFulfillmentMetrics() {
         },
         {
           status: "In Transit",
-          value: metrics.orders_shipped || 0,
-          count: metrics.orders_shipped || 0,
+          value: metrics?.orders_shipped ?? 0,
+          count: metrics?.orders_shipped ?? 0,
           icon: TruckIcon,
           color: "text-blue-600",
           bgColor: "bg-blue-100",
@@ -95,8 +86,8 @@ export function OrderFulfillmentMetrics() {
         },
         {
           status: "Processing",
-          value: metrics.orders_pending || 0,
-          count: metrics.orders_pending || 0,
+          value: metrics?.orders_pending ?? 0,
+          count: metrics?.orders_pending ?? 0,
           icon: Package,
           color: "text-orange-600",
           bgColor: "bg-orange-100",
@@ -104,8 +95,8 @@ export function OrderFulfillmentMetrics() {
         },
         {
           status: "Delayed",
-          value: performance.late_deliveries || 0,
-          count: performance.late_deliveries || 0,
+          value: performance?.late_deliveries ?? 0,
+          count: performance?.late_deliveries ?? 0,
           icon: Clock,
           color: "text-red-600",
           bgColor: "bg-red-100",
@@ -113,14 +104,13 @@ export function OrderFulfillmentMetrics() {
         },
       ];
     }
+    // Only use fallback data if neither hook returned data
     return fulfillmentData;
   }, [metrics, performance]);
 
-  const onTimeRate = performance?.on_time_percentage || 94.5;
-  const pendingOrders = metrics?.orders_pending || 142;
-  const pendingValue = metrics?.orders_pending
-    ? `$${((metrics.orders_pending * 1000) / 1000).toFixed(0)}K`
-    : "$387K";
+  // Use nullish coalescing (??) to properly show 0 instead of falling back to fake data
+  const onTimeRate = performance?.on_time_percentage ?? 0;
+  const pendingOrders = metrics?.orders_pending ?? 0;
 
   if (isLoading) {
     return (
@@ -217,22 +207,11 @@ export function OrderFulfillmentMetrics() {
           <h4 className="text-sm font-semibold text-gray-900 mb-4">
             Monthly On-time Delivery Rate
           </h4>
-          <div className="space-y-3">
-            {monthlyMetrics.slice(-5).map((metric, index) => (
-              <div key={index} className="flex items-center gap-3">
-                <span className="text-xs font-medium text-gray-600 w-8">
-                  {metric.month}
-                </span>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Progress value={metric.rate} className="h-2 flex-1" />
-                    <span className="text-xs font-semibold text-gray-900 w-12">
-                      {metric.rate}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="flex flex-col items-center justify-center py-6 text-gray-400">
+            <Clock className="h-8 w-8 mb-2" />
+            <p className="text-xs text-center">
+              Monthly trend data coming soon
+            </p>
           </div>
         </div>
 
@@ -242,8 +221,10 @@ export function OrderFulfillmentMetrics() {
             <p className="text-xs text-gray-600 mt-1">Pending Orders</p>
           </div>
           <div className="text-center p-3 bg-gray-50 rounded-lg">
-            <p className="text-2xl font-bold text-gray-900">{pendingValue}</p>
-            <p className="text-xs text-gray-600 mt-1">Pending Value</p>
+            <p className="text-2xl font-bold text-gray-900">
+              {metrics?.total_orders ?? 0}
+            </p>
+            <p className="text-xs text-gray-600 mt-1">Total Orders</p>
           </div>
         </div>
       </CardContent>

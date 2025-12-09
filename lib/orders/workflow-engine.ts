@@ -2,8 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { syncOrderAllocation, syncOrderFulfillment, syncOrderCancellation } from "@/lib/inventory/order-sync";
 
-export type OrderStatus = "draft" | "submitted" | "fulfilled" | "delivered" | "cancelled";
-export type OrderAction = "submit" | "fulfill" | "deliver" | "cancel";
+export type OrderStatus = "pending" | "processing" | "shipped" | "delivered" | "cancelled";
+export type OrderAction = "process" | "ship" | "deliver" | "cancel";
 
 export interface OrderWorkflowTransition {
   from: OrderStatus;
@@ -14,11 +14,12 @@ export interface OrderWorkflowTransition {
 }
 
 const VALID_TRANSITIONS: OrderWorkflowTransition[] = [
-  { from: "draft", to: "submitted", action: "submit" },
-  { from: "submitted", to: "fulfilled", action: "fulfill" },
-  { from: "fulfilled", to: "delivered", action: "deliver" },
-  { from: "draft", to: "cancelled", action: "cancel" },
-  { from: "submitted", to: "cancelled", action: "cancel" },
+  { from: "pending", to: "processing", action: "process" },
+  { from: "processing", to: "shipped", action: "ship" },
+  { from: "pending", to: "shipped", action: "ship" }, // Direct fulfillment
+  { from: "shipped", to: "delivered", action: "deliver" },
+  { from: "pending", to: "cancelled", action: "cancel" },
+  { from: "processing", to: "cancelled", action: "cancel" },
 ];
 
 /**
@@ -238,7 +239,7 @@ export async function executeOrderTransition(
     updated_at: new Date().toISOString(),
   };
 
-  if (action === "fulfill") {
+  if (action === "ship") {
     updateData.actual_delivery_date = new Date().toISOString();
   }
 
@@ -259,29 +260,30 @@ export async function executeOrderTransition(
   }
 
   // Handle inventory synchronization based on action
-  if (action === "submit") {
-    // Allocate stock when order is submitted
-    const syncResult = await syncOrderAllocation(orderId, userId, true); // Allow negative stock
+  if (action === "process") {
+    // Allocate stock when order moves to processing
+    const syncResult = await syncOrderAllocation(orderId, userId, true);
     if (!syncResult.success) {
-      console.error("Failed to sync inventory on order submission:", syncResult.error);
-      // Note: We don't roll back the order status, but log the error
-      // Consider adding a flag to the order to indicate sync failure
+      console.error("Failed to sync inventory on order processing:", syncResult.error);
     }
-  } else if (action === "fulfill") {
-    // Consume allocated stock when order is fulfilled (stock deduction happens here)
+  } else if (action === "ship") {
+    // If coming from pending, allocate first
+    if (order.order_status === 'pending') {
+         await syncOrderAllocation(orderId, userId, true);
+    }
+    // Consume allocated stock when order is shipped
     const syncResult = await syncOrderFulfillment(orderId, userId);
     if (!syncResult.success) {
-      console.error("Failed to sync inventory on order fulfillment:", syncResult.error);
+      console.error("Failed to sync inventory on order shipment:", syncResult.error);
     }
-  } else if (action === "deliver") {
-    // Deliver action is status-only - stock was already deducted at fulfillment
-    // This marks the order as received by customer (no inventory impact)
-    console.log(`Order ${orderId} marked as delivered`);
   } else if (action === "cancel") {
     // Release allocated stock when order is cancelled
-    const syncResult = await syncOrderCancellation(orderId, userId, notes);
-    if (!syncResult.success) {
-      console.error("Failed to sync inventory on order cancellation:", syncResult.error);
+    // Only if it was in processing (where stock is allocated)
+    if (order.order_status === 'processing') {
+        const syncResult = await syncOrderCancellation(orderId, userId, notes);
+        if (!syncResult.success) {
+          console.error("Failed to sync inventory on order cancellation:", syncResult.error);
+        }
     }
   }
 
@@ -345,4 +347,3 @@ export async function validateNewOrderWithPO(
 
   return { valid: true };
 }
-
