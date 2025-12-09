@@ -27,6 +27,7 @@ export interface TopSkusFilters {
   year?: number;
   month?: number;
   limit?: number;
+  distributorId?: string;
 }
 
 export interface UseTopSkusOptions {
@@ -58,6 +59,7 @@ async function fetchTopSkus(
     p_limit: filters.limit || 10,
     p_user_role: userRole || "",
     p_brand_id: brandId || null,
+    p_distributor_id: filters.distributorId || null,
   };
 
   // Call the RPC function

@@ -21,32 +21,19 @@ import {
   ComposedChart,
 } from "recharts";
 import { formatCurrency } from "@/lib/formatters";
+import { createDashboardFilters } from "@/lib/utils/table-suffix";
 
 export function RevenueComparisonChart() {
   const { user } = useAuth();
   const { profile } = useEnhancedAuth();
   const { filters } = useDateFilters();
 
-  // Brand admins use organization-based table, others use personal table
-  const tableSuffix = profile?.role_name?.startsWith("brand_admin")
-    ? `sales_documents_view_${profile.brand_id?.replace(/-/g, "_")}`
-    : `sales_documents_${user?.id?.replace(/-/g, "_")}`;
-
   const chartFilters = useMemo(
-    () => ({
-      tableSuffix,
-      userId: user?.id,
-      brandId: profile?.brand_id,
-      userRole: profile?.role_name,
+    () => createDashboardFilters(profile, user, {
       year: filters.year,
+      distributorId: filters.distributorId || undefined,
     }),
-    [
-      tableSuffix,
-      user?.id,
-      profile?.brand_id,
-      profile?.role_name,
-      filters.year,
-    ]
+    [profile, user, filters.year, filters.distributorId]
   );
 
   const { data, isLoading, error, refetch } = useRevenueComparison({

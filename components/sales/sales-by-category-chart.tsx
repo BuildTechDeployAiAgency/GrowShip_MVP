@@ -38,6 +38,7 @@ export function SalesByCategoryChart() {
       userRole: profile?.role_name,
       year: filters.year,
       month: filters.month,
+      distributorId: filters.distributorId,
     }),
     [
       tableSuffix,
@@ -46,6 +47,7 @@ export function SalesByCategoryChart() {
       profile?.role_name,
       filters.year,
       filters.month,
+      filters.distributorId,
     ]
   );
 

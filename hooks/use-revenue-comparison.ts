@@ -12,6 +12,7 @@ export interface RevenueComparisonFilters {
   tableSuffix?: string;
   userId?: string;
   year?: number; // year for current vs previous will be year-1
+  distributorId?: string;
 }
 
 export interface UseRevenueComparisonOptions {
@@ -66,6 +67,7 @@ async function fetchRevenueComparison(
     p_year: filters.year || new Date().getFullYear(),
     p_user_role: userRole || "",
     p_brand_id: brandId || null,
+    p_distributor_id: filters.distributorId || null,
   };
 
   // Expecting an RPC that returns monthly rows with month_number/current/previous totals

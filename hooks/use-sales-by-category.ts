@@ -16,6 +16,7 @@ export interface SalesByCategoryFilters {
   userId?: string;
   year?: number;
   month?: number; // 1-12, optional
+  distributorId?: string;
 }
 
 export interface UseSalesByCategoryOptions {
@@ -50,6 +51,7 @@ async function fetchSalesByCategory(
     p_month: filters.month ?? null,
     p_user_role: userRole || "",
     p_brand_id: brandId || null,
+    p_distributor_id: filters.distributorId || null,
   };
 
   // RPC must accept (p_table_suffix text, p_user_id uuid, p_year int, p_month int|null)

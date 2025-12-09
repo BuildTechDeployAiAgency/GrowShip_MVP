@@ -24,6 +24,7 @@ export interface TopCustomersFilters {
   year?: number;
   month?: number;
   limit?: number;
+  distributorId?: string;
 }
 
 export interface UseTopCustomersOptions {
@@ -56,6 +57,7 @@ async function fetchTopCustomers(
     p_limit: filters.limit || 10,
     p_user_role: userRole || "",
     p_brand_id: brandId || null,
+    p_distributor_id: filters.distributorId || null,
   };
 
   // Call the RPC function (to be created in Supabase)

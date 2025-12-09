@@ -18,6 +18,7 @@ export interface SeasonalAnalysisFilters {
   tableSuffix?: string;
   userId?: string;
   year?: number;
+  distributorId?: string;
 }
 
 export interface UseSeasonalAnalysisOptions {
@@ -51,6 +52,7 @@ async function fetchSeasonalAnalysis(
     p_year: filters.year || new Date().getFullYear(),
     p_user_role: userRole || "",
     p_brand_id: brandId || null,
+    p_distributor_id: filters.distributorId || null,
   };
 
   // RPC must accept (p_table_suffix text, p_user_id uuid, p_year int)
