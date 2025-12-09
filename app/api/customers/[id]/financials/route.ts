@@ -22,7 +22,7 @@ export async function GET(
     // Get user profile for brand access control
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role_name, brand_id, organization_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 

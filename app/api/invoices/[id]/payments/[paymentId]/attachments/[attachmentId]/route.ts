@@ -46,7 +46,7 @@ export async function GET(
     // Get user profile for permission check
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role_name, organization_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 
@@ -57,8 +57,8 @@ export async function GET(
     // Check permissions
     const invoice = attachment.invoice_payment_lines.invoices;
     const isSuperAdmin = profile.role_name === "super_admin";
-    const isBrandAdmin = profile.role_name === "brand_admin" && invoice.brand_id === profile.organization_id;
-    const isDistributor = invoice.distributor_id === profile.organization_id;
+    const isBrandAdmin = profile.role_name === "brand_admin" && invoice.brand_id === profile.brand_id;
+    const isDistributor = invoice.distributor_id === profile.distributor_id;
 
     if (!isSuperAdmin && !isBrandAdmin && !isDistributor) {
       return NextResponse.json(

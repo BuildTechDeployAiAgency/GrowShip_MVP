@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     // Get user profile for access control
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role_name, brand_id, organization_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 
@@ -43,9 +43,9 @@ export async function GET(request: NextRequest) {
 
     if (!isSuperAdmin) {
       if (isBrandAdmin) {
-        effectiveBrandId = profile.brand_id || profile.organization_id;
+        effectiveBrandId = profile.brand_id;
       } else {
-        effectiveDistributorId = profile.organization_id;
+        effectiveDistributorId = profile.distributor_id;
       }
     }
 

@@ -22,7 +22,7 @@ export async function GET(
     // Get user profile for access control
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role_name, brand_id, organization_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 
@@ -87,9 +87,9 @@ export async function GET(
     
     if (!isSuperAdmin) {
       if (isBrandAdmin) {
-        query = query.eq("brand_id", profile.brand_id || profile.organization_id);
+        query = query.eq("brand_id", profile.brand_id);
       } else {
-        query = query.or(`brand_id.eq.${profile.organization_id},distributor_id.eq.${profile.organization_id}`);
+        query = query.eq("distributor_id", profile.distributor_id);
       }
     }
 
@@ -137,7 +137,7 @@ export async function PUT(
     // Get user profile for access control
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role_name, brand_id, organization_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 
@@ -168,8 +168,8 @@ export async function PUT(
     const isSuperAdmin = profile.role_name === "super_admin";
     const isBrandAdmin = ["brand_admin", "brand_manager"].includes(profile.role_name);
     const hasAccess = isSuperAdmin || 
-                     (isBrandAdmin && existingCampaign.brand_id === (profile.brand_id || profile.organization_id)) ||
-                     existingCampaign.distributor_id === profile.organization_id;
+                     (isBrandAdmin && existingCampaign.brand_id === profile.brand_id) ||
+                     existingCampaign.distributor_id === profile.distributor_id;
     
     if (!hasAccess) {
       return NextResponse.json(
@@ -332,7 +332,7 @@ export async function DELETE(
     // Get user profile for access control
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role_name, brand_id, organization_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 
@@ -361,7 +361,7 @@ export async function DELETE(
     const isSuperAdmin = profile.role_name === "super_admin";
     const isBrandAdmin = ["brand_admin", "brand_manager"].includes(profile.role_name);
     const hasAccess = isSuperAdmin || 
-                     (isBrandAdmin && existingCampaign.brand_id === (profile.brand_id || profile.organization_id));
+                     (isBrandAdmin && existingCampaign.brand_id === profile.brand_id);
     
     if (!hasAccess) {
       return NextResponse.json(

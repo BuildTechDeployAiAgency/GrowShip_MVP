@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     // Get user profile for access control
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role_name, brand_id, organization_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 
@@ -111,10 +111,10 @@ export async function GET(request: NextRequest) {
     if (!isSuperAdmin) {
       if (isBrandAdmin) {
         // Brand admins can see all campaigns for their brand
-        query = query.eq("brand_id", profile.brand_id || profile.organization_id);
+        query = query.eq("brand_id", profile.brand_id);
       } else {
-        // Other users can only see campaigns for their organization
-        query = query.or(`brand_id.eq.${profile.organization_id},distributor_id.eq.${profile.organization_id}`);
+        // Distributors can only see campaigns assigned to them
+        query = query.eq("distributor_id", profile.distributor_id);
       }
     }
 
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
     // Get user profile for access control
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role_name, brand_id, organization_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 
@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
 
     // For non-super admins, ensure brand_id matches their organization
     if (!isSuperAdmin) {
-      if (body.brandId !== (profile.brand_id || profile.organization_id)) {
+      if (body.brandId !== profile.brand_id) {
         return NextResponse.json(
           { error: "You can only create campaigns for your brand" },
           { status: 403 }

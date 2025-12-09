@@ -33,10 +33,10 @@ export default function MarketingPage() {
 
   // Get user's brand/organization for filtering
   const brandId = profile?.role_name?.includes("brand") ? 
-    (profile?.brand_id || profile?.organization_id) : undefined;
+    profile?.brand_id : undefined;
   const distributorId = !profile?.role_name?.includes("brand") && 
                        !profile?.role_name?.includes("super") ? 
-    profile?.organization_id : undefined;
+    profile?.distributor_id : undefined;
 
   const { data: dashboardMetrics, isLoading: metricsLoading } = useMarketingDashboardMetrics(
     brandId, 

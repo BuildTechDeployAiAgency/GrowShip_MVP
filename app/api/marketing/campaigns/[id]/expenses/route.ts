@@ -22,7 +22,7 @@ export async function GET(
     // Get user profile for access control
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role_name, brand_id, organization_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 
@@ -45,8 +45,8 @@ export async function GET(
     const isSuperAdmin = profile.role_name === "super_admin";
     const isBrandAdmin = ["brand_admin", "brand_manager"].includes(profile.role_name);
     const hasAccess = isSuperAdmin || 
-                     (isBrandAdmin && campaign.brand_id === (profile.brand_id || profile.organization_id)) ||
-                     campaign.distributor_id === profile.organization_id;
+                     (isBrandAdmin && campaign.brand_id === profile.brand_id) ||
+                     campaign.distributor_id === profile.distributor_id;
     
     if (!hasAccess) {
       return NextResponse.json(
@@ -128,7 +128,7 @@ export async function POST(
     // Get user profile for access control
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role_name, brand_id, organization_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 
@@ -177,8 +177,8 @@ export async function POST(
     const isSuperAdmin = profile.role_name === "super_admin";
     const isBrandAdmin = ["brand_admin", "brand_manager"].includes(profile.role_name);
     const hasAccess = isSuperAdmin || 
-                     (isBrandAdmin && campaign.brand_id === (profile.brand_id || profile.organization_id)) ||
-                     campaign.distributor_id === profile.organization_id;
+                     (isBrandAdmin && campaign.brand_id === profile.brand_id) ||
+                     campaign.distributor_id === profile.distributor_id;
     
     if (!hasAccess) {
       return NextResponse.json(

@@ -21,7 +21,7 @@ export async function PUT(
     // Get user profile for permissions
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("role_name, organization_id")
+      .select("role_name, brand_id, distributor_id")
       .eq("user_id", user.id)
       .single();
 
@@ -49,9 +49,9 @@ export async function PUT(
 
     // Check permissions for different operations
     const isSuperAdmin = profile.role_name === "super_admin";
-    const isBrandAdmin = profile.role_name === "brand_admin" && paymentLine.invoices.brand_id === profile.organization_id;
+    const isBrandAdmin = profile.role_name === "brand_admin" && paymentLine.invoices.brand_id === profile.brand_id;
     const isOwner = paymentLine.created_by === user.id;
-    const isDistributor = paymentLine.invoices.distributor_id === profile.organization_id;
+    const isDistributor = paymentLine.invoices.distributor_id === profile.distributor_id;
 
     // Only brand admins and super admins can change status (verify/reject payments)
     if (status && status !== paymentLine.status) {
