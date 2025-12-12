@@ -347,10 +347,10 @@ export function MarketingCampaignsList({
                       <TableCell>
                         <div className="space-y-1">
                           <Badge variant="outline" className="capitalize">
-                            {campaign.campaignType.replace(/_/g, " ")}
+                            {campaign.campaignType?.replace(/_/g, " ") || 'Unknown'}
                           </Badge>
                           <div className="text-sm text-gray-500 capitalize">
-                            {campaign.channel.replace(/_/g, " ")}
+                            {campaign.channel?.replace(/_/g, " ") || 'Unknown'}
                           </div>
                         </div>
                       </TableCell>

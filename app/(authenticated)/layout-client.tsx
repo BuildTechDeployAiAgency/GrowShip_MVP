@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { HeaderProvider, useHeader } from "@/contexts/header-context";
 import { EnhancedAuthProvider } from "@/contexts/enhanced-auth-context";
+import { DateFilterProvider } from "@/contexts/date-filter-context";
 import { MenuItem } from "@/types/menu";
 
 interface AuthenticatedLayoutClientProps {
@@ -53,11 +54,13 @@ export function AuthenticatedLayoutClient({
 }: AuthenticatedLayoutClientProps) {
   return (
     <EnhancedAuthProvider>
-      <HeaderProvider>
-        <LayoutContent userId={userId} initialMenuData={initialMenuData}>
-          {children}
-        </LayoutContent>
-      </HeaderProvider>
+      <DateFilterProvider>
+        <HeaderProvider>
+          <LayoutContent userId={userId} initialMenuData={initialMenuData}>
+            {children}
+          </LayoutContent>
+        </HeaderProvider>
+      </DateFilterProvider>
     </EnhancedAuthProvider>
   );
 }

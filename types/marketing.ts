@@ -424,6 +424,9 @@ export interface CreateCampaignRequest {
   distributorContribution: number;
   startDate: string;
   endDate: string;
+  targetReach?: number;
+  targetImpressions?: number;
+  targetLeads?: number;
   targetRoiPercentage?: number;
   targetSalesAmount?: number;
   tags?: string[];

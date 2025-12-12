@@ -134,3 +134,11 @@ When you run a forecast, you get actionable data to drive your purchasing:
 - **Less Dead Stock:** Stop buying products that aren't selling.
 - **Fewer Stockouts:** Buy growth products _before_ you run out.
 - **Cash Flow Management:** Know exactly how much capital you need for inventory months in advance.
+
+
+
+
+
+
+
+

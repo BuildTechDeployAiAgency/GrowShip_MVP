@@ -38,7 +38,7 @@ export default function MarketingPage() {
                        !profile?.role_name?.includes("super") ? 
     profile?.distributor_id : undefined;
 
-  const { data: dashboardMetrics, isLoading: metricsLoading } = useMarketingDashboardMetrics(
+  const { data: dashboardMetrics, isLoading: metricsLoading, error: metricsError } = useMarketingDashboardMetrics(
     brandId, 
     distributorId
   );
@@ -112,7 +112,28 @@ export default function MarketingPage() {
           </div>
 
           {/* Quick Stats */}
-          {!metricsLoading && dashboardMetrics && (
+          {metricsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[...Array(4)].map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="p-6">
+                    <div className="animate-pulse">
+                      <div className="h-4 bg-gray-200 rounded mb-4"></div>
+                      <div className="h-8 bg-gray-200 rounded mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : metricsError ? (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <div className="text-red-600 mb-2">Failed to load dashboard metrics</div>
+                <p className="text-sm text-gray-500">Please try refreshing the page</p>
+              </CardContent>
+            </Card>
+          ) : dashboardMetrics ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card>
                 <CardHeader className="pb-2">
@@ -180,7 +201,7 @@ export default function MarketingPage() {
                 </CardContent>
               </Card>
             </div>
-          )}
+          ) : null}
 
           {/* Alerts */}
           {alerts && alerts.length > 0 && (
@@ -258,7 +279,24 @@ export default function MarketingPage() {
                     <CardTitle>Channel Performance</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {dashboardMetrics?.channelPerformance && dashboardMetrics.channelPerformance.length > 0 ? (
+                    {metricsLoading ? (
+                      <div className="space-y-3">
+                        {[...Array(3)].map((_, i) => (
+                          <div key={i} className="animate-pulse">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+                                <div className="h-3 bg-gray-200 rounded w-16"></div>
+                              </div>
+                              <div className="text-right">
+                                <div className="h-4 bg-gray-200 rounded w-12 mb-2"></div>
+                                <div className="h-3 bg-gray-200 rounded w-16"></div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : dashboardMetrics?.channelPerformance && dashboardMetrics.channelPerformance.length > 0 ? (
                       <div className="space-y-3">
                         {dashboardMetrics.channelPerformance.slice(0, 5).map((channel) => (
                           <div key={channel.channel} className="flex items-center justify-between">
@@ -283,7 +321,10 @@ export default function MarketingPage() {
                       </div>
                     ) : (
                       <div className="text-center text-gray-500 py-8">
-                        No channel data available
+                        {dashboardMetrics?.totalCampaigns === 0 
+                          ? "Create your first campaign to see channel performance" 
+                          : "No channel performance data available yet"
+                        }
                       </div>
                     )}
                   </CardContent>
@@ -331,11 +372,6 @@ export default function MarketingPage() {
         <CampaignFormDialog
           open={showCreateDialog}
           onClose={() => setShowCreateDialog(false)}
-          onSubmit={async (data) => {
-            console.log("Create campaign:", data);
-            // TODO: Handle campaign creation
-            setShowCreateDialog(false);
-          }}
         />
       </MainLayout>
     </ProtectedPage>

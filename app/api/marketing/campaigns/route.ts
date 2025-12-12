@@ -177,10 +177,58 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Transform snake_case to camelCase for frontend compatibility
+    const transformedCampaigns = campaigns?.map(campaign => ({
+      id: campaign.id,
+      name: campaign.name,
+      description: campaign.description,
+      campaignCode: campaign.campaign_code,
+      brandId: campaign.brand_id,
+      distributorId: campaign.distributor_id,
+      regionId: campaign.region_id,
+      countryCode: campaign.country_code,
+      campaignType: campaign.campaign_type,
+      channel: campaign.channel,
+      targetAudience: campaign.target_audience,
+      totalBudget: campaign.total_budget,
+      allocatedBudget: campaign.allocated_budget,
+      spentBudget: campaign.spent_budget,
+      remainingBudget: campaign.remaining_budget,
+      fundSource: campaign.fund_source,
+      brandContribution: campaign.brand_contribution,
+      distributorContribution: campaign.distributor_contribution,
+      startDate: campaign.start_date,
+      endDate: campaign.end_date,
+      launchDate: campaign.launch_date,
+      status: campaign.status,
+      approvalStatus: campaign.approval_status,
+      targetReach: campaign.target_reach,
+      targetImpressions: campaign.target_impressions,
+      targetLeads: campaign.target_leads,
+      targetSalesAmount: campaign.target_sales_amount,
+      targetRoiPercentage: campaign.target_roi_percentage,
+      actualReach: campaign.actual_reach,
+      actualImpressions: campaign.actual_impressions,
+      actualLeads: campaign.actual_leads,
+      actualSalesAmount: campaign.actual_sales_amount,
+      actualRoiPercentage: campaign.actual_roi_percentage,
+      totalRevenue: campaign.total_revenue,
+      attributedOrders: campaign.attributed_orders,
+      costPerAcquisition: campaign.cost_per_acquisition,
+      returnOnAdSpend: campaign.return_on_ad_spend,
+      createdBy: campaign.created_by,
+      approvedBy: campaign.approved_by,
+      approvedAt: campaign.approved_at,
+      tags: campaign.tags,
+      externalCampaignId: campaign.external_campaign_id,
+      createdAt: campaign.created_at,
+      updatedAt: campaign.updated_at,
+    })) || [];
+
     const totalPages = Math.ceil((count || 0) / pageSize);
 
     return NextResponse.json({
-      campaigns: campaigns || [],
+      campaigns: transformedCampaigns,
       totalCount: count || 0,
       totalPages,
       currentPage: page,
@@ -313,8 +361,11 @@ export async function POST(request: NextRequest) {
       end_date: body.endDate,
       status: 'draft',
       approval_status: 'pending',
-      target_reach: body.targetRoiPercentage,
+      target_reach: body.targetReach,
+      target_impressions: body.targetImpressions,
+      target_leads: body.targetLeads,
       target_sales_amount: body.targetSalesAmount,
+      target_roi_percentage: body.targetRoiPercentage,
       actual_reach: 0,
       actual_impressions: 0,
       actual_leads: 0,
@@ -326,6 +377,8 @@ export async function POST(request: NextRequest) {
       tags: body.tags || [],
     };
 
+    console.log('About to insert campaign data:', campaignData);
+
     // Insert campaign
     const { data: campaign, error: insertError } = await supabase
       .from("marketing_campaigns")
@@ -335,13 +388,65 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       console.error("Error creating campaign:", insertError);
+      console.error("Insert error details:", insertError.details);
+      console.error("Insert error hint:", insertError.hint);
       return NextResponse.json(
-        { error: "Failed to create campaign" },
+        { error: `Failed to create campaign: ${insertError.message}` },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(campaign, { status: 201 });
+    console.log('Campaign created successfully:', campaign);
+
+    // Transform snake_case to camelCase for frontend compatibility
+    const transformedCampaign = {
+      id: campaign.id,
+      name: campaign.name,
+      description: campaign.description,
+      campaignCode: campaign.campaign_code,
+      brandId: campaign.brand_id,
+      distributorId: campaign.distributor_id,
+      regionId: campaign.region_id,
+      countryCode: campaign.country_code,
+      campaignType: campaign.campaign_type,
+      channel: campaign.channel,
+      targetAudience: campaign.target_audience,
+      totalBudget: campaign.total_budget,
+      allocatedBudget: campaign.allocated_budget,
+      spentBudget: campaign.spent_budget,
+      remainingBudget: campaign.remaining_budget,
+      fundSource: campaign.fund_source,
+      brandContribution: campaign.brand_contribution,
+      distributorContribution: campaign.distributor_contribution,
+      startDate: campaign.start_date,
+      endDate: campaign.end_date,
+      launchDate: campaign.launch_date,
+      status: campaign.status,
+      approvalStatus: campaign.approval_status,
+      targetReach: campaign.target_reach,
+      targetImpressions: campaign.target_impressions,
+      targetLeads: campaign.target_leads,
+      targetSalesAmount: campaign.target_sales_amount,
+      targetRoiPercentage: campaign.target_roi_percentage,
+      actualReach: campaign.actual_reach,
+      actualImpressions: campaign.actual_impressions,
+      actualLeads: campaign.actual_leads,
+      actualSalesAmount: campaign.actual_sales_amount,
+      actualRoiPercentage: campaign.actual_roi_percentage,
+      totalRevenue: campaign.total_revenue,
+      attributedOrders: campaign.attributed_orders,
+      costPerAcquisition: campaign.cost_per_acquisition,
+      returnOnAdSpend: campaign.return_on_ad_spend,
+      createdBy: campaign.created_by,
+      approvedBy: campaign.approved_by,
+      approvedAt: campaign.approved_at,
+      tags: campaign.tags,
+      externalCampaignId: campaign.external_campaign_id,
+      createdAt: campaign.created_at,
+      updatedAt: campaign.updated_at,
+    };
+
+    return NextResponse.json(transformedCampaign, { status: 201 });
 
   } catch (error: any) {
     console.error("Unexpected error creating campaign:", error);

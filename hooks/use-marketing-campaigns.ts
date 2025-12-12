@@ -433,29 +433,82 @@ export function useUpdateCampaignStatus() {
 // =============================================
 
 export function useMarketingDashboardMetrics(brandId?: string, distributorId?: string) {
-  const { data: campaigns } = useMarketingCampaigns({ brandId, distributorId });
+  const { data: campaigns, isLoading: campaignsLoading } = useMarketingCampaigns({ brandId, distributorId });
   const { data: roiSummary } = useCampaignROISummary({ brandId, distributorId });
   const { data: channelPerformance } = useChannelPerformance({ brandId, distributorId });
   const { data: alerts } = useCampaignPerformanceAlerts({ brandId, distributorId });
 
   return useQuery({
-    queryKey: ["marketing-dashboard-metrics", brandId, distributorId],
+    queryKey: ["marketing-dashboard-metrics", brandId, distributorId, campaigns?.totalCount],
     queryFn: async () => {
-      const activeCampaigns = campaigns?.campaigns.filter(c => c.status === "active") || [];
-      const totalBudget = campaigns?.campaigns.reduce((sum, c) => sum + c.totalBudget, 0) || 0;
-      const spentBudget = campaigns?.campaigns.reduce((sum, c) => sum + c.spentBudget, 0) || 0;
-      const totalRevenue = campaigns?.campaigns.reduce((sum, c) => sum + c.totalRevenue, 0) || 0;
+      const campaignList = campaigns?.campaigns || [];
+      const activeCampaigns = campaignList.filter(c => c.status === "active");
+      const totalBudget = campaignList.reduce((sum, c) => sum + (c.totalBudget || 0), 0);
+      const spentBudget = campaignList.reduce((sum, c) => sum + (c.spentBudget || 0), 0);
+      const totalRevenue = campaignList.reduce((sum, c) => sum + (c.totalRevenue || 0), 0);
       
-      const averageROI = roiSummary && roiSummary.length > 0 
-        ? roiSummary.reduce((sum, r) => sum + r.roiPercentage, 0) / roiSummary.length 
-        : 0;
+      // Calculate basic ROI metrics from campaign data if ROI summary is not available
+      let averageROI = 0;
+      let averageROAS = 0;
+      
+      if (roiSummary && roiSummary.length > 0) {
+        averageROI = roiSummary.reduce((sum, r) => sum + r.roiPercentage, 0) / roiSummary.length;
+        averageROAS = roiSummary.reduce((sum, r) => sum + r.roas, 0) / roiSummary.length;
+      } else if (campaignList.length > 0) {
+        // Fallback: calculate from campaign actual ROI data
+        const campaignsWithROI = campaignList.filter(c => c.actualRoiPercentage !== undefined);
+        if (campaignsWithROI.length > 0) {
+          averageROI = campaignsWithROI.reduce((sum, c) => sum + (c.actualRoiPercentage || 0), 0) / campaignsWithROI.length;
+        }
+        
+        const campaignsWithROAS = campaignList.filter(c => c.returnOnAdSpend !== undefined && c.returnOnAdSpend > 0);
+        if (campaignsWithROAS.length > 0) {
+          averageROAS = campaignsWithROAS.reduce((sum, c) => sum + (c.returnOnAdSpend || 0), 0) / campaignsWithROAS.length;
+        }
+      }
 
-      const averageROAS = roiSummary && roiSummary.length > 0 
-        ? roiSummary.reduce((sum, r) => sum + r.roas, 0) / roiSummary.length 
-        : 0;
+      // Generate channel performance from campaign data if analytics are not available
+      let processedChannelPerformance = channelPerformance || [];
+      if (!channelPerformance && campaignList.length > 0) {
+        const channelMap = new Map();
+        
+        campaignList.forEach(campaign => {
+          if (!campaign.channel) return;
+          
+          const existing = channelMap.get(campaign.channel) || {
+            channel: campaign.channel,
+            campaignCount: 0,
+            totalRevenue: 0,
+            totalSpent: 0,
+            averageRoi: 0,
+          };
+          
+          existing.campaignCount += 1;
+          existing.totalRevenue += campaign.totalRevenue || 0;
+          existing.totalSpent += campaign.spentBudget || 0;
+          
+          channelMap.set(campaign.channel, existing);
+        });
+        
+        // Calculate average ROI for each channel
+        channelMap.forEach((channel, key) => {
+          const campaignsInChannel = campaignList.filter(c => c.channel === key);
+          const roiValues = campaignsInChannel
+            .filter(c => c.actualRoiPercentage !== undefined)
+            .map(c => c.actualRoiPercentage || 0);
+          
+          if (roiValues.length > 0) {
+            channel.averageRoi = roiValues.reduce((sum, roi) => sum + roi, 0) / roiValues.length;
+          }
+        });
+        
+        processedChannelPerformance = Array.from(channelMap.values())
+          .sort((a, b) => b.averageRoi - a.averageRoi);
+      }
 
-      const topPerformingCampaign = roiSummary?.sort((a, b) => b.roiPercentage - a.roiPercentage)[0];
-      const worstPerformingCampaign = roiSummary?.sort((a, b) => a.roiPercentage - b.roiPercentage)[0];
+      const topPerformingCampaign = roiSummary?.length > 0 
+        ? campaigns?.campaigns.find(c => c.id === roiSummary.sort((a, b) => b.roiPercentage - a.roiPercentage)[0]?.campaignId)
+        : campaignList.sort((a, b) => (b.actualRoiPercentage || 0) - (a.actualRoiPercentage || 0))[0];
 
       return {
         totalCampaigns: campaigns?.totalCount || 0,
@@ -465,16 +518,17 @@ export function useMarketingDashboardMetrics(brandId?: string, distributorId?: s
         totalRevenue,
         averageROI,
         averageROAS,
-        topPerformingCampaign: topPerformingCampaign ? 
-          campaigns?.campaigns.find(c => c.id === topPerformingCampaign.campaignId) : undefined,
-        worstPerformingCampaign: worstPerformingCampaign ? 
-          campaigns?.campaigns.find(c => c.id === worstPerformingCampaign.campaignId) : undefined,
+        topPerformingCampaign,
+        worstPerformingCampaign: campaignList.sort((a, b) => (a.actualRoiPercentage || 0) - (b.actualRoiPercentage || 0))[0],
         budgetUtilization: totalBudget > 0 ? (spentBudget / totalBudget) * 100 : 0,
         recentAlerts: alerts?.slice(0, 5) || [],
-        channelPerformance: channelPerformance || [],
+        channelPerformance: processedChannelPerformance,
+        // Add loading and error states
+        isLoading: campaignsLoading,
+        hasError: false,
       };
     },
-    enabled: !!campaigns && !!roiSummary,
+    enabled: !!campaigns || !campaignsLoading, // Enable when we have campaigns or when not loading
     staleTime: 5 * 60 * 1000,
   });
 }
